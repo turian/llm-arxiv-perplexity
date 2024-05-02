@@ -38,7 +38,7 @@ for paper, model, model_clean, model_output in tqdm(paper_model_pairs):
         tmptxtfile = os.path.join(tmpdirname, "tmp.txt")
         tmperrfile = os.path.join(tmpdirname, "tmp.err")
         # Run perplexity
-        cmd = f"CUDA_VISIBLE_DEVICES=0 /home/ubuntu/llama.cpp/build/bin/perplexity --model {model} -f {paper} --flash-attn --seed 0 -ngl 128 > {tmptxtfile} 2> {tmperrfile}"
+        cmd = f"CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 /llama.cpp/build/bin/perplexity --model {model} -f {paper} --flash-attn --seed 0 -ngl 128 > {tmptxtfile} 2> {tmperrfile}"
         print(cmd)
         now = datetime.datetime.now()
         os.system(cmd)

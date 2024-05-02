@@ -1,0 +1,27 @@
+# Configuration for Cog ⚙️
+# Reference: https://cog.run/yaml
+
+build:
+  #gpu: true
+  gpu: false
+  system_packages:
+    - "wget"
+    - "git"
+    - "cmake"
+    - "g++"
+    - "build-essential"
+  python_version: "3.11"
+  # a list of packages in the format <package-name>==<version>
+  python_packages:
+    - "json-schema-enforcer==0.1.4"
+    - "playwright"
+    - "beautifulsoup4"
+    - "tqdm"
+  # cd /src
+  # - 'pushd llama.cpp ; cmake -B build -DLLAMA_CUDA=ON ; cmake --build build --config Release ; popd'
+  # - "ln -s --force $(which echo) $(which pip)"
+  run:
+    - 'git clone https://github.com/ggerganov/llama.cpp.git ; cd llama.cpp ; cmake -B build ; cmake --build build --config Release ; cd ..'
+    - "ln -s --force $(which echo) $(which pip)"
+
+predict: "predict.py:Predictor"
