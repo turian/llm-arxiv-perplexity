@@ -2,8 +2,8 @@
 # Reference: https://cog.run/yaml
 
 build:
-  #gpu: true
-  gpu: false
+  gpu: true
+  #gpu: false
   system_packages:
     - "wget"
     - "git"
@@ -21,7 +21,8 @@ build:
   # - 'pushd llama.cpp ; cmake -B build -DLLAMA_CUDA=ON ; cmake --build build --config Release ; popd'
   # - "ln -s --force $(which echo) $(which pip)"
   run:
-    - 'git clone https://github.com/ggerganov/llama.cpp.git ; cd llama.cpp ; cmake -B build ; cmake --build build --config Release ; cd ..'
+    - 'git clone https://github.com/ggerganov/llama.cpp.git ; cd llama.cpp ; cmake -B build -DLLAMA_CUDA=ON ; cmake --build build --config Release ; cd ..'
     - "ln -s --force $(which echo) $(which pip)"
+    - "rm -Rf /src/data/*/models"
 
 predict: "predict.py:Predictor"
