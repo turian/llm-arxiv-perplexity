@@ -61,14 +61,28 @@
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Model</th>
-                        <th colspan="2">Perplexity</th>
+                        <th>Model<br>
+                        </th>
+                        <th>Perplexity<br>
+                        </th>
+                        <th>
+                            <div id="ticks1cell"></div><br>
+                            <div id="ticks2cell"></div>
+                        </th>
+                    </tr>
+                    <!--
+
+                    <tr>
+                        <th></th>
+                        <th></th>
+                        <th id="ticks1cell"></th>
                     </tr>
                     <tr>
                         <th></th>
-                        <th>Value</th>
-                        <th>Bar</th>
+                        <th></th>
+                        <th id="ticks2cell"></th>
                     </tr>
+                    -->
                 </thead>
                 <tbody id="dataRows">
                     <!-- Data rows will be added here by JavaScript -->
@@ -83,6 +97,6 @@
             </table>
         </div>
     </div>
-    <script src="app.js"></script>
+    <script src="app.js" defer></script>
 </body>
 </html>
