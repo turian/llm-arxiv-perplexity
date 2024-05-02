@@ -8,7 +8,7 @@ from find_all_gguf_models import find_all_gguf_models
 
 random.seed(0)
 
-papers = list(glob.glob("data/*/papers/*.txt"))
+papers = sorted(list(glob.glob("data/*/papers/*.txt")))
 random.shuffle(papers)
 
 models = list(find_all_gguf_models())
