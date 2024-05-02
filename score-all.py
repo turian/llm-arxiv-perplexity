@@ -1,8 +1,11 @@
+import datetime
 import glob
-import random
+import json
 import os.path
-from tqdm import tqdm
+import random
 import tempfile
+
+from tqdm import tqdm
 
 from find_all_gguf_models import find_all_gguf_models
 
@@ -15,13 +18,15 @@ models = list(find_all_gguf_models())
 
 paper_model_pairs = []
 for paper in papers:
-    for (model_clean, model) in models:
-        model_output = os.path.join(paper.replace("papers", "models"), model_clean, "perplexity.txt")
+    for model_clean, model in models:
+        model_output = os.path.join(
+            paper.replace("papers", "models"), model_clean, "perplexity.txt"
+        )
         if os.path.exists(model_output):
             continue
         paper_model_pairs.append((paper, model, model_clean, model_output))
 
-for (paper, model, model_clean, model_output) in tqdm(paper_model_pairs):
+for paper, model, model_clean, model_output in tqdm(paper_model_pairs):
     print(f"Processing {paper} with {model_clean}")
     os.makedirs(os.path.dirname(model_output), exist_ok=True)
 
@@ -32,14 +37,29 @@ for (paper, model, model_clean, model_output) in tqdm(paper_model_pairs):
         tmperrfile = os.path.join(tmpdirname, "tmp.err")
         # Run perplexity
         cmd = f"/Users/joseph/dev/llama.cpp/perplexity --model {model} -f {paper} --flash-attn --seed 0 > {tmptxtfile} 2> {tmperrfile}"
+        now = datetime.datetime.now()
         os.system(cmd)
 
         if "Final estimate" not in open(tmptxtfile).read():
             print(f"Final estimate not found in {tmptxtfile}")
             continue
 
+        elapsed = datetime.datetime.now() - now
+
         finaltxtfile = model_output
         assert finaltxtfile.endswith(".txt")
         finalerrfile = finaltxtfile[:-4] + ".err"
         os.rename(tmperrfile, finalerrfile)
         os.rename(tmptxtfile, finaltxtfile)
+        finalerrfile = finaltxtfile[:-4] + ".json"
+        with open(finalerrfile, "wt") as f:
+            f.write(
+                json.dumps(
+                    {
+                        "elapsed": elapsed.total_seconds(),
+                        "model": model,
+                        "paper": paper,
+                        "model_clean": model_clean,
+                    }
+                )
+            )
