@@ -1,0 +1,490 @@
+  1. 1 Introduction
+  2. 2 Related Work
+    1. 2.1 Triple Extraction Methods
+    2. 2.2 Biomedical Triple Extraction Datasets
+  3. 3  GIT
+    1. 3.1 Repurposing MTCD
+    2. 3.2 Non-Drug Therapy Annotation
+    3. 3.3 Data Statistics and Comparison with Other Datasets
+  4. 4 Experiments
+    1. 4.1 Evaluation Metrics
+    2. 4.2 Datasets
+    3. 4.3 Baselines
+    4. 4.4 Results and Discussion
+  5. 5 Conclusion
+  6. A Appendix
+    1. A.1 Data Statistics
+    2. A.2 Annotation Guidelines
+    3. A.3 Statistics for Each Relation Type and the Definition of Each Relation Type
+    4. A.4 Instruction of Triple Extraction by GPT3.5/4
+
+HTML conversions sometimes display errors due to content that did not convert
+correctly from the source. This paper uses the following packages that are not
+yet supported by the HTML conversion tool. Feedback on these issues are not
+necessary; they are known and are being worked on.
+
+  * failed: inconsolata
+
+Authors: achieve the best HTML results from your LaTeX submissions by
+following these best practices.
+
+License: CC BY 4.0
+
+arXiv:2310.18463v5 [cs.CL] 17 Apr 2024
+
+# Benchingmaking Large Langage Models in Biomedical Triple Extraction
+
+Mingchen Li, Huixue Zhou, Rui Zhang  
+University of Minnesota Twin Cities  
+{li003378, zhou1742, zhan1386}@umn.edu  
+
+###### Abstract
+
+Biomedical triple extraction systems aim to automatically extract biomedical
+entities and relations between entities. The exploration of applying large
+language models (LLM) to triple extraction is still relatively unexplored. In
+this work, we mainly focus on sentence-level biomedical triple extraction.
+Furthermore, the absence of a high-quality biomedical triple extraction
+dataset impedes the progress in developing robust triple extraction systems.
+To address these challenges, initially, we compare the performance of various
+large language models. Additionally, we present GIT, an expert-annotated
+biomedical triple extraction dataset that covers a wider range of relation
+types.
+
+Benchingmaking Large Langage Models in Biomedical Triple Extraction
+
+  
+
+Mingchen Li, Huixue Zhou, Rui Zhang University of Minnesota Twin Cities
+{li003378, zhou1742, zhan1386}@umn.edu
+
+##  1 Introduction
+
+Biomedical triple extraction aims to accurately identify relational triples
+(head entity, relation, tail entity) in biomedical text. This process involves
+recognizing biomedical entity pairs (head and tail) and extracting the
+relation between these paired entities. It is an important task in natural
+language processing, as the extracted information can be used to construct
+knowledge graphs Fellbaum (2010); Li et al. (2020) and for downstream
+applications, including link prediction Li et al. (2022), drug repurposing
+Zhang et al. (2021), question answering Li and Ji (2022).
+
+Most efforts on triple extraction systems focus on employing either the table-
+filling method Tang et al. (2022); Shang et al. (2022) or generation methods
+Lu et al. (2022); Gao et al. (2023). In particular, UniRel Tang et al. (2022)
+employs the output probability matrix of an auto-encoding language model to
+assess both entity-entity interactions and entity-relation interactions, while
+UIE Lu et al. (2022) transfers the different information extraction tasks such
+as named entity recognition Li and Zhang (2023); Li et al. (2023), relation
+extraction Sui et al. (2023); Chen et al. (2023) to a unified generation
+framework. However, the exploration of applying large language models (LLM) to
+triple extraction is still relatively unexplored.
+
+Another significant challenge in this field is the scarcity of high-quality
+datasets. Current datasets do not offer enough variety in relation types. For
+instance, the BioRelEx dataset Khachatrian et al. (2019) is restricted to just
+one relation type (Binding), while the ADE dataset Gurulingappa et al. (2012)
+includes two relation types (Drug-adverse effect, Drug-dosage). As indicated
+by our medical expert, this limited range fails to accurately reflect the
+complex relationships that exist between biomedical entities.
+
+So in this work, we system compare the LLM performance on biomedical triple
+extraction. Additionally, for the second challenge, we developed a high-
+quality biomedical triple extraction dataset GIT (General BioMedical and
+Complementary and Integrative Health Triples), 111Complementary and
+Integrative Health refers to non-drug therapies characterized by its high-
+quality annotations and comprehensive coverage of relation types.
+
+  * •
+
+We conduct a thorough analysis of several LLM’s performance on three datasets.
+
+  * •
+
+We introduce a biomedical triple extraction dataset GIT with high-quality
+annotations and comprehensive coverage of relation types.
+
+##  2 Related Work
+
+###  2.1 Triple Extraction Methods
+
+Most previous studies on triple extraction are directed toward employing
+either the table-filling method Tang et al. (2022); Shang et al. (2022); Liu
+et al. (2023) or generation methods Lu et al. (2022); Gao et al. (2023); Fei
+et al. (2022); Lou et al. (2023); Tan et al. (2022). For example, UniRel Tang
+et al. (2022) models entity-entity interactions and entity-relation
+interactions in one single interaction map, which is predicted by the output
+probability matrix of auto-encoding language models, such as BERT Devlin et
+al. (2018). OneRel Shang et al. (2022) introduces "BIE" (Begin, Inside, End)
+signs to indicate the position information of a token within entities and
+utilizes the labeled relationship in BIE to denote the relationship. UIE Lu et
+al. (2022) explores the ability to universally model various information
+extraction tasks and adaptively generate the content of the different tasks.
+E2H Gao et al. (2023) employs a three-stage approach to enhance entity
+recognition, relation recognition, and triple extraction capabilities.
+Compared with all these studies, our focus is on utilizing the retrieval-
+augmented language model to prompt the model to accurately retrieve chunk
+information and generate triples.
+
+###  2.2 Biomedical Triple Extraction Datasets
+
+There is some prior research Khachatrian et al. (2019); Gurulingappa et al.
+(2012); Cheng et al. (2008); Taboureau et al. (2010) that focuses on
+biomedical triple extraction dataset construction through expert annotation.
+For example, the BioRelEx Khachatrian et al. (2019) annotates 2,010 sentences
+extracted from biomedical literature, specifically addressing binding
+interactions involving proteins and/or biomolecules. ADE Gurulingappa et al.
+(2012) involves the manual annotation of 4,272 sentences from medical reports,
+specifically focusing on descriptions of drug-related adverse effects. DDI
+Segura-Bedmar et al. (2013) consists of five relation types (mechanism,
+effect, advice, int, None) extracted from MedLine abstracts. Despite their
+success, these datasets lack sufficient variety in relation types to
+adequately represent the connections among biomedical entities. Therefore, we
+introduce GM-CIHT in our work to address this limitation.
+
+##  3  GIT
+
+Due to the annotation costs, dataset availability is a primary bottleneck for
+biomedical triple extraction. Annotating over a thousand pieces of data is a
+demanding task for experts. In order to reduce the burden of labeling, we
+propose repurposing an established expert-annotated dataset Medical Triple
+Classification Dataset (MTCD) Zhang et al. (2021) from the broader biomedical
+domain. Simultaneously, we have also undertaken the annotation of 2,450
+sentences on non-drug therapies, a task completed by two medical experts. For
+the required domain expertise, we enlisted the services of two medical experts
+who worked for 12 weeks. Each expert worked 25 hours per week at a rate of $26
+per hour.
+
+###  3.1 Repurposing MTCD
+
+MTCD, designed for medical triple classification, consists of 4,352 positive
+and 2,140 negative pairs sourced from SemMedDB Kilicoglu et al. (2012). These
+pairs were annotated by medical experts with prior experience in medical
+annotations, which covered 20 distinct relation types. As the nature of the
+task in triple classification differs from triple extraction, in our study, we
+initially selected 4,352 positive data instances from MTCD as the source
+dataset and relabeled the positive data instance.
+
+###  3.2 Non-Drug Therapy Annotation
+
+The CIHT (Complementary and Integrative Health Triples) dataset focuses on the
+relationship between complementary and integrative health (CIH) therapies and
+their impact on diseases, genes, gene products, and chemicals. We defined CIH
+entities and relation types based on CIHLex Zhou et al. (2023). To collect
+data, we utilized all terms in CIHLex to search articles from the abstracts of
+the PubMed White (2020) bibliographic database related to CIH. From the
+initial pool of articles retrieved using CIHLex terms, we narrowed down our
+selection by refining the retrieved abstracts using PubTator Wei et al.
+(2013). This refinement aimed to identify abstracts containing terms related
+to diseases, genes, and chemicals. We randomly selected 400 abstracts to be
+included in our dataset. Subsequently, experts with a Doctor of Chiropractic
+(DC) degree annotated the dataset according to our pre-defined guidelines. For
+further details regarding the guidelines, please refer to Appendix A.2. To
+assess the annotation quality, in line with prior work Zhou et al. (2023), two
+annotators independently reviewed a shared set of 10% of the notes. Each
+annotator then individually annotated the remaining notes. Subsequently, we
+utilized Cohen’s Kappa for token-based annotation to evaluate the inter-
+annotator agreement for the CIHT dataset annotations. The Cohen’s Kappa score
+was determined to be 87.99%.
+
+###  3.3 Data Statistics and Comparison with Other Datasets
+
+In Table 1, we show the statistics for GIT as well as the comparable values
+for seven widely-used biomedical triple extraction datasets, BioRelEx
+Khachatrian et al. (2019), ADE Gurulingappa et al. (2012), CHEMPROT Taboureau
+et al. (2010), DDI Segura-Bedmar et al. (2013), COMAGC Lee et al. (2013),
+EUADR Van Mulligen et al. (2012), PolySearch Cheng et al. (2008). GIT differs
+from other triple extraction datasets because it includes a broader array of
+relation types, encompassing 22 distinct types. Additionally, the GIT dataset
+consists of 4,691 labeled sentences, surpassing the size of all other
+datasets. This demonstrates GIT provides a valuable benchmark for biomedical
+triple extraction. For detailed statistics on each relation type and the
+respective definitions, please refer to the Appendix A.3.
+
+Dataset | # Entities | #Relation Types | # sentences  
+---|---|---|---  
+BioRelEx Khachatrian et al. (2019) | 9,871 | 1 | 2,010  
+ADE Gurulingappa et al. (2012) | 11,070 | 2 | 4,272  
+CHEMPROT Taboureau et al. (2010) | – | 14 | 3,895  
+COMAGC Lee et al. (2013) | 541 | 15 | 821  
+EUADR Van Mulligen et al. (2012) | 339 | 4 | 355  
+PolySearch Cheng et al. (2008) | 255 | 2 | 522  
+GIT(our dataset) | 5,644 | 22 | 4,691  
+  
+Table 1: Comparing GIT to the seven commonly used biomedical triple extraction
+datasets. GIT contains 3,734 training instances, 465 testing instances, and
+492 validation instances. In GIT, the training, testing, and validation
+datasets each consist of distinct instances, ensuring there are no duplicates
+or overlaps between them.
+
+##  4 Experiments
+
+###  4.1 Evaluation Metrics
+
+Same as Tang et al. (2022); Zeng et al. (2019), triple is regarded as correct
+when its relation type, the head entity and the tail entity are all correct.
+For example, in the sentence: Infusion of prostacyclin (PGI2) reportedly
+attenuates renal ischemic injury in the dog and the rat., triple <Infusion,
+treats, rat> is regarded as correct while  <injury, treats, rat> is not.
+Following the evaluation method of the previous work Tang et al. (2022); Shang
+et al. (2022); Lu et al. (2022); Gao et al. (2023), we evaluated all the
+models and reported the evaluation metric, including Micro Precision, Recall,
+and F1-score.
+
+###  4.2 Datasets
+
+The constructed biomedical triple extraction dataset GIT is used as the
+benchmark dataset. To further validate the universality of our framework, we
+also evaluate our model on two commonly utilized biomedical datasets: CHEMPROT
+Taboureau et al. (2010) and DDI Segura-Bedmar et al. (2013). For additional
+data statistics, please refer to Appendix A.1.
+
+###  4.3 Baselines
+
+1) GPT-3.5/4222https://platform.openai.com/docs/models/overview: GPT-3.5-turbo
+(P1), GPT-3.5-turbo (P2), GPT-4 (P1), and GPT-4 (P2). For these models, we
+formulate prompts to guide the GPT models in generating triples for each input
+sentence, along with providing the corresponding relation definitions in the
+prompts. The distinction between prompt (P1) and prompt (P2) lies in the
+output format. For more detailed information, please refer to Appendix A.4. We
+also include the 2) LLaMA family as baselines, namely MedLLaMA 13B Wu et al.
+(2023) and LLaMA2-13b Touvron et al. (2023).
+
+###  4.4 Results and Discussion
+
+Table 2 presents the experiment results of various approaches based on
+Precision, Recall and F value. Results are the average over 5 runs. We have
+the following observations: (1) GPT-3.5/4 exhibits the lowest performance. The
+main reason is that the reported results are in the zero-shot setting due to
+the unavailability of open resources. (2)Despite MedLLaMA 13B being trained on
+the biomedical domain, it still exhibits worse performance than LLaMA2 13B.
+
+| DDI | ChemProt | GIT  
+---|---|---|---  
+Approach | Precision | Recall | F1 | Precision | Recall | F1 | Precision | Recall | F1  
+GPT-4 (P1) | 7.35 | 10.00 | 8.47 | 25.00 | 28.00 | 26.42 | 9.51 | 9.25 | 9.38  
+GPT-4 (P2) | 5.08 | 9.00 | 6.50 | 20.79 | 37.00 | 26.61 | 9.48 | 9.46 | 9.47  
+MedLLaMA 13B Wu et al. (2023) | 76.08 | 76.08 | 76.08 | 69.98 | 69.31 | 69.64 | 58.70 | 36.98 | 45.38  
+LLaMA2 13B Touvron et al. (2023) | 79.61 | 79.61 | 79.61 | 85.24 | 84.52 | 84.88 | 72.14 | 70.75 | 71.44  
+  
+Table 2: Results of various approaches for biomeidcal triple extraction on
+DDI, ChemProt and GIT
+
+##  5 Conclusion
+
+In this paper, we compare four LLM’s performance on three biomedical triple
+extraction datasets. Additionally, we create a biomedical triple extraction
+dataset with extensive relation type coverage and expert annotations.
+
+## References
+
+  * Chen et al. (2023) Hui Chen, Pengfei Hong, Wei Han, Navonil Majumder, and Soujanya Poria. 2023.  Dialogue relation extraction with document-level heterogeneous graph attention networks.  _Cognitive Computation_ , pages 1–10. 
+  * Cheng et al. (2008) Dean Cheng, Craig Knox, Nelson Young, Paul Stothard, Sambasivarao Damaraju, and David S Wishart. 2008.  Polysearch: a web-based text mining system for extracting relationships between human diseases, genes, mutations, drugs and metabolites.  _Nucleic acids research_ , 36(suppl_2):W399–W405. 
+  * Devlin et al. (2018) Jacob Devlin, Ming-Wei Chang, Kenton Lee, and Kristina Toutanova. 2018.  Bert: Pre-training of deep bidirectional transformers for language understanding.  _arXiv preprint arXiv:1810.04805_. 
+  * Fei et al. (2022) Hao Fei, Shengqiong Wu, Jingye Li, Bobo Li, Fei Li, Libo Qin, Meishan Zhang, Min Zhang, and Tat-Seng Chua. 2022.  Lasuie: Unifying information extraction with latent adaptive structure-aware generative language model.  _Advances in Neural Information Processing Systems_ , 35:15460–15475. 
+  * Fellbaum (2010) Christiane Fellbaum. 2010.  Wordnet.  In _Theory and applications of ontology: computer applications_ , pages 231–243. Springer. 
+  * Gao et al. (2023) Chang Gao, Wenxuan Zhang, Wai Lam, and Lidong Bing. 2023.  Easy-to-hard learning for information extraction.  _arXiv preprint arXiv:2305.09193_. 
+  * Gurulingappa et al. (2012) Harsha Gurulingappa, Abdul Mateen Rajput, Angus Roberts, Juliane Fluck, Martin Hofmann-Apitius, and Luca Toldo. 2012.  Development of a benchmark corpus to support the automatic extraction of drug-related adverse effects from medical case reports.  _Journal of biomedical informatics_ , 45(5):885–892. 
+  * Khachatrian et al. (2019) Hrant Khachatrian, Lilit Nersisyan, Karen Hambardzumyan, Tigran Galstyan, Anna Hakobyan, Arsen Arakelyan, Andrey Rzhetsky, and Aram Galstyan. 2019.  Biorelex 1.0: Biological relation extraction benchmark.  In _Proceedings of the 18th BioNLP Workshop and Shared Task_ , pages 176–190. 
+  * Kilicoglu et al. (2011) Halil Kilicoglu, Graciela Rosemblat, Marcelo Fiszman, and Thomas C Rindflesch. 2011.  Constructing a semantic predication gold standard from the biomedical literature.  _BMC Bioinformatics_ , 12(1):1–17. 
+  * Kilicoglu et al. (2020) Halil Kilicoglu, Graciela Rosemblat, Marcelo Fiszman, and Dongwook Shin. 2020.  Broad-coverage biomedical relation extraction with semrep.  _BMC bioinformatics_ , 21:1–28. 
+  * Kilicoglu et al. (2012) Halil Kilicoglu, Dongwook Shin, Marcelo Fiszman, Graciela Rosemblat, and Thomas C Rindflesch. 2012.  SemMedDB: a PubMed-scale repository of biomedical semantic predications.  _Bioinformatics_ , 28(23):3158–3160. 
+  * Lee et al. (2013) Hee-Jin Lee, Sang-Hyung Shim, Mi-Ryoung Song, Hyunju Lee, and Jong C Park. 2013.  Comagc: a corpus with multi-faceted annotations of gene-cancer relations.  _BMC bioinformatics_ , 14:1–17. 
+  * Li et al. (2022) Mingchen Li, Junfan Chen, Samuel Mensah, Nikolaos Aletras, Xiulong Yang, and Yang Ye. 2022.  A hierarchical n-gram framework for zero-shot link prediction.  _arXiv preprint arXiv:2204.10293_. 
+  * Li and Ji (2022) Mingchen Li and Shihao Ji. 2022.  Semantic structure based query graph prediction for question answering over knowledge graph.  _arXiv preprint arXiv:2204.10194_. 
+  * Li et al. (2023) Mingchen Li, Yang Ye, Jeremy Yeung, Huixue Zhou, Huaiyuan Chu, and Rui Zhang. 2023.  W-procer: Weighted prototypical contrastive learning for medical few-shot named entity recognition.  _arXiv preprint arXiv:2305.18624_. 
+  * Li and Zhang (2023) Mingchen Li and Rui Zhang. 2023.  How far is language model from 100% few-shot named entity recognition in medical domain.  _arXiv preprint arXiv:2307.00186_. 
+  * Li et al. (2020) Mingchen Li, Zili Zhou, and Yanna Wang. 2020.  Multi-fusion chinese wordnet (mcw): Compound of machine learning and manual correction.  _arXiv preprint arXiv:2002.01761_. 
+  * Liu et al. (2023) Chengyuan Liu, Fubang Zhao, Yangyang Kang, Jingyuan Zhang, Xiang Zhou, Changlong Sun, Fei Wu, and Kun Kuang. 2023.  Rexuie: A recursive method with explicit schema instructor for universal information extraction.  _arXiv preprint arXiv:2304.14770_. 
+  * Lou et al. (2023) Jie Lou, Yaojie Lu, Dai Dai, Wei Jia, Hongyu Lin, Xianpei Han, Le Sun, and Hua Wu. 2023.  Universal information extraction as unified semantic matching.  _arXiv preprint arXiv:2301.03282_. 
+  * Lu et al. (2022) Yaojie Lu, Qing Liu, Dai Dai, Xinyan Xiao, Hongyu Lin, Xianpei Han, Le Sun, and Hua Wu. 2022.  Unified structure generation for universal information extraction.  _arXiv preprint arXiv:2203.12277_. 
+  * Segura-Bedmar et al. (2013) Isabel Segura-Bedmar, Paloma Martínez Fernández, and María Herrero Zazo. 2013.  Semeval-2013 task 9: Extraction of drug-drug interactions from biomedical texts (ddiextraction 2013).  Association for Computational Linguistics. 
+  * Shang et al. (2022) Yu-Ming Shang, Heyan Huang, and Xianling Mao. 2022.  Onerel: Joint entity and relation extraction with one module in one step.  In _Proceedings of the AAAI Conference on Artificial Intelligence_ , volume 36, pages 11285–11293. 
+  * Sui et al. (2023) Dianbo Sui, Xiangrong Zeng, Yubo Chen, Kang Liu, and Jun Zhao. 2023.  Joint entity and relation extraction with set prediction networks.  _IEEE Transactions on Neural Networks and Learning Systems_. 
+  * Taboureau et al. (2010) Olivier Taboureau, Sonny Kim Nielsen, Karine Audouze, Nils Weinhold, Daniel Edsgärd, Francisco S Roque, Irene Kouskoumvekaki, Alina Bora, Ramona Curpan, Thomas Skøt Jensen, et al. 2010.  Chemprot: a disease chemical biology database.  _Nucleic acids research_ , 39(suppl_1):D367–D372. 
+  * Tan et al. (2022) Zeqi Tan, Yongliang Shen, Xuming Hu, Wenqi Zhang, Xiaoxia Cheng, Weiming Lu, and Yueting Zhuang. 2022.  Query-based instance discrimination network for relational triple extraction.  _arXiv preprint arXiv:2211.01797_. 
+  * Tang et al. (2022) Wei Tang, Benfeng Xu, Yuyue Zhao, Zhendong Mao, Yifeng Liu, Yong Liao, and Haiyong Xie. 2022.  Unirel: Unified representation and interaction for joint relational triple extraction.  _arXiv preprint arXiv:2211.09039_. 
+  * Touvron et al. (2023) Hugo Touvron, Thibaut Lavril, Gautier Izacard, Xavier Martinet, Marie-Anne Lachaux, Timothée Lacroix, Baptiste Rozière, Naman Goyal, Eric Hambro, Faisal Azhar, et al. 2023.  Llama: Open and efficient foundation language models.  _arXiv preprint arXiv:2302.13971_. 
+  * Van Mulligen et al. (2012) Erik M Van Mulligen, Annie Fourrier-Reglat, David Gurwitz, Mariam Molokhia, Ainhoa Nieto, Gianluca Trifiro, Jan A Kors, and Laura I Furlong. 2012.  The eu-adr corpus: annotated drugs, diseases, targets, and their relationships.  _Journal of biomedical informatics_ , 45(5):879–884. 
+  * Wei et al. (2013) Chih-Hsuan Wei, Hung-Yu Kao, and Zhiyong Lu. 2013.  Pubtator: a web-based text mining tool for assisting biocuration.  _Nucleic acids research_ , 41(W1):W518–W522. 
+  * White (2020) Jacob White. 2020.  Pubmed 2.0.  _Medical reference services quarterly_ , 39(4):382–387. 
+  * Wu et al. (2023) Chaoyi Wu, Xiaoman Zhang, Ya Zhang, Yanfeng Wang, and Weidi Xie. 2023.  Pmc-llama: Further finetuning llama on medical papers.  _arXiv preprint arXiv:2304.14454_. 
+  * Zeng et al. (2019) Xiangrong Zeng, Shizhu He, Daojian Zeng, Kang Liu, Shengping Liu, and Jun Zhao. 2019.  Learning the extraction order of multiple relational facts in a sentence with reinforcement learning.  In _Proceedings of the 2019 conference on empirical methods in natural language processing and the 9th international joint conference on natural language processing (EMNLP-IJCNLP)_ , pages 367–377. 
+  * Zhang et al. (2021) Rui Zhang, Dimitar Hristovski, Dalton Schutte, Andrej Kastrin, Marcelo Fiszman, and Halil Kilicoglu. 2021.  Drug repurposing for covid-19 via knowledge graph completion.  _Journal of biomedical informatics_ , 115:103696. 
+  * Zhou et al. (2023) Huixue Zhou, Robin Austin, Sheng-Chieh Lu, Greg Marc Silverman, Yuqi Zhou, Halil Kilicoglu, Hua Xu, and Rui Zhang. 2023.  Complementary and integrative health information in the literature: its lexicon and named entity recognition.  _Journal of the American Medical Informatics Association_ , page ocad216. 
+
+##  Appendix A Appendix
+
+###  A.1 Data Statistics
+
+Table 3 shows the data statistics for CHEMPROT, DDI, and GM-CIHT.
+
+Dataset | # Entities | #Relation Types | # train/test/dev  
+---|---|---|---  
+CHEMPROT Taboureau et al. (2010) | 5,990 | 14 | 4,111/3,438/2,411  
+DDI Segura-Bedmar et al. (2013) | 13,107 | 5 | 5,154/1,376/1,436  
+GM-CIHT (our dataset) | 5,644 | 22 | 3,734/465/492  
+  
+Table 3: Data Statistics for CHEMPROT, DDI, and GM-CIHT. "train/test/dev"
+denotes the counts of (sentence, triples) pairs within each training, testing,
+and development dataset split.
+
+###  A.2 Annotation Guidelines
+
+In Table 4, we have presented a part of the annotation guidelines about the
+annotation of relation types. These guidelines align with the definition of
+relation types.
+
+Relation Type | Definition  
+---|---  
+ASSOCIATED WITH |  CIH therapies that have a correlation or connection with specific chemicals or genes, either directly or indirectly, without necessarily altering their function.  
+DISRUPTS |  CIH therapies that interfere with or disturb the normal function or balance of particular chemicals or genes, either intentionally or unintentionally.  
+INHIBITS |  CIH therapies that suppress or reduce the production, release, or activity of certain chemicals or genes.  
+STIMULATES |  CIH therapies that promote or enhance the production, release, or activity of specific chemicals or genes.  
+TREATS |  CIH therapies applies a remedy with the diseases or symptoms of effecting a cure or managing a condition.  
+DOES NOT TREAT |  CIH therapies do not applies a remedy with the diseases or symptoms of effecting a cure or managing a condition.  
+AFFECTS |  Refers to the direct or indirect influence or impact (positive or negative) that CIH therapies have on the disease or syndrome, its symptoms, or the overall well-being of the individual.  
+  
+Table 4: A part of annotation guideline.
+
+###  A.3 Statistics for Each Relation Type and the Definition of Each Relation
+Type
+
+In Table 5, we present the sentence statistics for our 22 defined relation
+types within GM-CIHT.
+
+relation type | Sentences | relation type | Sentences  
+---|---|---|---  
+INTERACTS WITH | 1019 | PREVENTS | 107  
+TREATS | 726 | PRECEDES | 103  
+PROCESS OF | 686 | COMPLICATES | 101  
+INHIBITS | 345 | ASSOCIATED WITH | 89  
+STIMULATES | 298 | CAUSES | 76  
+USES | 293 | PREDISPOSES | 61  
+COEXISTS WITH | 256 | MANIFESTATION OF | 54  
+ADMINISTERED TO | 175 | AUGMENTS | 53  
+DIAGNOSES | 152 | DISRUPTS | 51  
+AFFECTS | 117 | DOES NOT TREAT | 24  
+PRODUCES | 116 | SYMPTOM OF | 10  
+  
+Table 5: Statistics of GM-CIHT.
+
+We adapt relation types used by the SemRep biomedical NLP tool Kilicoglu et
+al. (2020), which is itself adapted from the UMLS Semantic Network. We list
+the definitions of 22 relation types below Kilicoglu et al. (2011):
+
+  1. 1.
+
+CAUSES: Brings about a condition or an effect. Implied here is that an agent,
+such as for example, a pharmacologic substance or an organism, has brought
+about the effect. This includes induces, effects, evokes, and etiology.
+Neurocysticercosis (NCC) is one of the major causes of neurological disease
+
+  2. 2.
+
+COMPLICATES: Causes to become more severe or complex, or results in adverse
+effects.
+
+  3. 3.
+
+USES: Employs in the carrying out of some activity. This includes applies,
+utilizes, employs, and avails.
+
+  4. 4.
+
+STIMULATES: Increases or facilitates the action or function of (substance
+interaction).
+
+  5. 5.
+
+DISRUPTS: Alters or influences an already existing condition, state, or
+situation. Produces a negative effect on.
+
+  6. 6.
+
+TREATS: Applies a remedy with the object of effecting a cure or managing a
+condition.
+
+  7. 7.
+
+COEXISTS_WITH: Occurs together with, or jointly. Food intolerance-related
+constipation is characterized by proctitis.
+
+  8. 8.
+
+MANIFESTATION_OF: That part of a phenomenon which is directly observable or
+concretely or visibly expressed, or which gives evidence to the underlying
+process. This includes expression of, display of, and exhibition of.
+
+  9. 9.
+
+INTERACTS_WITH: Substance interaction.
+
+  10. 10.
+
+ADMINISTERED_TO: Given to an entity, when no assertion is made that the
+substance or procedure is being given as treatment.
+
+  11. 11.
+
+PREVENTS: Stops, hinders or eliminates an action or condition.
+
+  12. 12.
+
+PREDISPOSES: To be a risk to a disorder, pathology,or condition.
+
+  13. 13.
+
+INHIBITS: Decreases, limits, or blocks the action or function of (substance
+interaction).
+
+  14. 14.
+
+AUGMENTS: Expands or stimulates a process.
+
+  15. 15.
+
+PRODUCES: Brings forth, generates or creates. This includes yields, secretes,
+emits, biosynthesizes, generates, releases, discharges, and creates.
+
+  16. 16.
+
+PROCESS_OF: Disorder occurs in (higher) organism.
+
+  17. 17.
+
+PRECEDES: Occurs earlier in time. This includes antedates, comes before, is in
+advance of, predates, and is prior to.
+
+  18. 18.
+
+AFFECTS: Produces a direct effect on. Implied here is the altering or
+influencing of an existing condition, state, situation, or entity. This
+includes has a role in, alters, influences, predisposes, catalyzes,
+stimulates, regulates, depresses, impedes, enhances, contributes to, leads to,
+and modifies.
+
+  19. 19.
+
+DIAGNOSES: Distinguishes or identifies the nature or characteristics of.
+
+  20. 20.
+
+ASSOCIATED_WITH: Has a relationship to (genedisease relation).
+
+  21. 21.
+
+DOES_NOT_TREAT: antonyms of TREATS
+
+  22. 22.
+
+SYMPTOM_OF: departure from normal function or feeling which is noticed by a
+patient, reflecting the presence of an unusual state, or of a disease;
+subjective, observed by the patient, cannot be measured directly
+
+###  A.4 Instruction of Triple Extraction by GPT3.5/4
+
+Instructions for triple extraction using the GPT API can be found in Figure 1.
+
+![Refer to caption](x1.png) Figure 1: Example of Prompt 1 and Prompt 2 defined
+for GPT3.5/4 on the task of triple extraction.

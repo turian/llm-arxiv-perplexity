@@ -1,0 +1,1090 @@
+  1. 1 Introduction
+  2. 2 Related Work
+  3. 3 Method
+    1. 3.1 Preliminaries: Diffusion Models
+    2. 3.2 Factorized Diffusion
+    3. 3.3 Analysis of Factorized Diffusion
+    4. 3.4 Decompositions Considered
+      1. 3.4.1 Spatial frequencies.
+      2. 3.4.2 Color spaces.
+      3. 3.4.3 Motion blurring.
+      4. 3.4.4 Spatial decomposition.
+      5. 3.4.5 Scaling.
+    5. 3.5 Inverse Problems
+  4. 4 Results
+    1. 4.1 Hybrid Images
+      1. 4.1.1 Effect of blur kernel.
+      2. 4.1.2 Comparisons to OlivaÂ  _et al_.Â [42].
+    2. 4.2 Other Decompositions
+      1. 4.2.1 Color hybrids.
+      2. 4.2.2 Motion hybrids
+      3. 4.2.3 Spatial decomposition
+      4. 4.2.4 Scaling decomposition
+    3. 4.3 Inverse Problems
+    4. 4.4 Limitations and Negative Impacts
+  5. 5 Conclusion
+    1. 5.0.1 Acknowledgements.
+  6. 0.A Implementation Details
+    1. 0.A.1 Pixel Diffusion Model
+    2. 0.A.2 Hybrid Images
+    3. 0.A.3 Triple Hybrids
+    4. 0.A.4 Upscaling
+  7. 0.B Human Studies
+  8. 0.C Prior Triple Hybrid Methods
+  9. 0.D Metrics Implementation
+  10. 0.E Connection to MultiDiffusion
+  11. 0.F Hybrid Images with Latent Diffusion Models
+  12. 0.G Synthesizing Hybrid Images with other Methods
+  13. 0.H Further Analysis of Factorized Diffusion
+  14. 0.I Choosing Prompts
+  15. 0.J Colorization
+  16. 0.K Additional Results
+
+HTML conversions sometimes display errors due to content that did not convert
+correctly from the source. This paper uses the following packages that are not
+yet supported by the HTML conversion tool. Feedback on these issues are not
+necessary; they are known and are being worked on.
+
+  * failed: axessibility
+
+Authors: achieve the best HTML results from your LaTeX submissions by
+following these best practices.
+
+License: arXiv.org perpetual non-exclusive license
+
+arXiv:2404.11615v1 [cs.CV] 17 Apr 2024
+
+(eccv) Package eccv Warning: Package â€˜hyperrefâ€™ is loaded with option
+â€˜pagebackrefâ€™, which is *not* recommended for camera-ready version
+
+11institutetext: University of Michigan  
+11email: dgeng@umich.edu  
+https://dangeng.github.io/factorized_diffusion/
+
+# Factorized Diffusion: Perceptual  
+Illusions by Noise Decomposition
+
+Daniel Geng  â€ƒâ€ƒ Inbum Park  â€ƒâ€ƒ Andrew Owens
+
+###### Abstract
+
+Given a factorization of an image into a sum of linear components, we present
+a zero-shot method to control each individual component through diffusion
+model sampling. For example, we can decompose an image into low and high
+spatial frequencies and condition these components on different text prompts.
+This produces hybrid images, which change appearance depending on viewing
+distance. By decomposing an image into three frequency subbands, we can
+generate hybrid images with three prompts. We also use a decomposition into
+grayscale and color components to produce images whose appearance changes when
+they are viewed in grayscale, a phenomena that naturally occurs under dim
+lighting. And we explore a decomposition by a motion blur kernel, which
+produces images that change appearance under motion blurring. Our method works
+by denoising with a composite noise estimate, built from the components of
+noise estimates conditioned on different prompts. We also show that for
+certain decompositions, our method recovers prior approaches to compositional
+generation and spatial control. Finally, we show that we can extend our
+approach to generate hybrid images from real images. We do this by holding one
+component fixed and generating the remaining components, effectively solving
+an inverse problem.
+
+###### Keywords:
+
+Diffusion models Perceptual illusions Hybrid images
+
+##  1 Introduction
+
+![Refer to caption](x1.png) Figure 1: Illusions by Factorized Diffusion. By
+conditioning the components of a generated image with different prompts, we
+can use off-the-shelf text-conditioned image diffusion models to synthesize
+hybrid imagesÂ [42], hybrid images containing three objects, and new
+perceptual illusions which we refer to as color hybrids and motion hybrids,
+which change appearance when color is added or motion blur is induced. In
+addition, we can extract a component from an existing image and generate the
+missing components, allowing us to produce hybrid images from real images,
+which we term inverse hybrids. Examples shown are hand-picked. For random
+samples please see Fig.Â 9 and Fig.Â 18. For the hybrid images, we include
+insets to aid in visualization. However, perception of this effect depends on
+the resolution of the images, so we highly encourage the reader to zoom so
+that an image fills the screen completely, or visit our webpage for easier
+viewing.
+
+The visual world is full of phenomena that can be understood through image
+decompositions. For instance, objects look blurry when seen from a distance,
+while up close their details are highly salientâ€”two distinct perspectives
+that can be captured by a decomposition in frequency spaceÂ [49, 42]. During
+the day, we see in full color, while in dim light we perceive only
+luminanceâ€”an effect that can be appreciated with a color space
+decomposition.
+
+We present a simple method for controlling the factors of such decompositions,
+allowing a user to generate images that are perceived differently under
+different viewing conditions, yet still globally coherent. We apply this
+approach to generating a variety of perceptual illusions (Fig.Â 1). (i)
+Inspired by the classic work of OlivaÂ  _et al_.Â [42] we generate hybrid
+images, whose interpretation changes with viewing distance, which we achieve
+by controlling the generated imageâ€™s low and high frequency components. A
+decomposition into three subbands allows us to produce hybrid images with
+three different prompts, which we refer to as triple hybrids. (ii) We generate
+color images whose appearance changes when they are viewed in grayscale, a
+phenomena that naturally occurs under dim lighting. We call these color
+hybrids, and achieve this by controlling image luminance separately from its
+color. (iii) Finally, we produce images that change appearance under motion
+blur, which is achieved by using a blur kernel to decompose an image. We refer
+to these as motion hybrids.
+
+Our approach consists of a simple change to the sampling procedure of an off-
+the-shelf diffusion model. Given an image decomposition and a text prompt to
+control each component, in each step of the reverse diffusion process we
+estimate the noise multiple times: once for each component, conditioned on its
+corresponding text prompt. We then assemble a composite noise estimate by
+combining components from each individual noise estimate, obtained by applying
+the decomposition directly to the noise estimates (Fig.Â 2). Notably, our
+approach does not require finetuningÂ [67, 47] or access to auxiliary
+networks, as in guidance based methodsÂ [40, 1, 31, 31, 21, 17].
+
+We also show that we can take components from existing images, and generate
+the remaining components conditioned on text. This recovers a simple method to
+solve inverse problems, and is highly related to prior work on using diffusion
+models for solving inverse problemsÂ [54, 28, 8, 10, 9, 64, 34, 53]. We apply
+this technique to producing hybrid images from real images. Finally, we show
+that using certain decompositions with our method recovers prior techniques
+for spatialÂ [2] and compositionalÂ [32] control over text prompts.
+
+In summary, our contributions are as follows:
+
+  * âˆ™âˆ™\bulletâˆ™
+
+Given a decomposition of an image into a sum of components, we propose a zero-
+shot adaptation of diffusion models to control these components during image
+generation.
+
+  * âˆ™âˆ™\bulletâˆ™
+
+Using our method, we produce a variety of perceptual illusions, such as images
+that change appearance under different viewing distances (hybrid images),
+illumination conditions (color hybrids), and motion blurring (motion hybrids).
+Each of these illusions corresponds to a different image decomposition.
+
+  * âˆ™âˆ™\bulletâˆ™
+
+We provide quantitative evaluations comparing our hybrid images to those
+produced by traditional methods, and show that our results are better.
+
+  * âˆ™âˆ™\bulletâˆ™
+
+We give an analysis and intuition for how and why our method works.
+
+  * âˆ™âˆ™\bulletâˆ™
+
+We show a simple extension of our method allows us to solve inverse problems,
+and we apply this approach to synthesizing hybrid images from real images.
+
+##  2 Related Work
+
+Diffusion models. Diffusion modelsÂ [51, 25, 54, 11, 52] are trained to
+denoise data corrupted by added Gaussian noise. This is achieved by estimating
+the noise in noisy data, potentially with some additional conditioning, such
+as with text embeddings. To sample data from a diffusion model, pure Gaussian
+noise is iteratively denoised until a clean image remains. Each denoising step
+consists of an update that removes a portion of the predicted noise from the
+noisy image, such as DDPMÂ [25] or DDIMÂ [52]. One noteworthy application of
+diffusion models is for text-conditional image generationÂ [40, 46, 29, 48],
+which we build our method on top of.
+
+Diffusion model control. Diffusion models are capable of both generating and
+editing images conditioned on text prompts. By modifying the reverse processÂ
+[35, 18, 2, 68, 63], finetuningÂ [67, 47], performing text inversionÂ [52, 37,
+26, 61, 65], swapping attention mapsÂ [23, 14, 59], supplying instructionsÂ
+[4], or using guidanceÂ [14, 44, 31, 1, 40, 21], modifying the style,
+location, and appearance of content in an image has become a relatively
+accessible task. Another line of work on compositional generationÂ [12, 33, 2,
+63] shows that diffusion models can generate images that conform to
+compositions of text prompts. Our work builds upon this, and shows that
+similar techniques can be applied to prompting individual components of an
+image to produce perceptual illusions. Our work is also similar to WangÂ  _et
+al_.Â [63], in which a diffusion model is used to generate stacks of images
+that emulate a zooming video. However, we focus on generating only a single
+image that can be understood at multiple resolutions.
+
+Computational optical illusions. Optical illusions are entertaining, but can
+also serve as windows into human and machine perceptionÂ [24, 62, 19, 39, 27,
+56, 20, 13]. As such, much work has gone into developing computational methods
+for generating optical illusionsÂ [16, 43, 22, 6, 42, 18, 58, 60, 5, 7]. In
+classic work, Oliva _et al_. introduced hybrid imagesÂ [42], which are images
+that change their appearance depending on viewing distance or durationÂ [49].
+These images work by exploiting the multiscale processing of human perceptionÂ
+[41, 50]. By aligning low frequency components of one image and high frequency
+components of another image, the observer perceives the image as the former
+when seen from far away and as the latter when seen up close. By contrast, our
+approach generates hybrid images from scratch with a diffusion model, as
+opposed to fusing together two existing images, and thus avoids manual
+alignment steps and the need to find appropriate images, and also leads to
+fewer artifacts.
+
+Artists and researchers have recently used text-conditioned image diffusion
+models to generate optical illusions. For example, a pseudonymous artistÂ [60]
+adapted a QR code generation modelÂ [30, 67] to create images that subtly
+match a target template. While these are also images with multiple
+interpretations, they are restricted to binary mask templates and require a
+specialized finetuned model. BurgertÂ  _et al_.Â [5] use score distillation
+samplingÂ [45] to generate images that match other prompts when viewed from
+different orientations or overlaid on top of each other. Other methods such as
+TancikÂ [58] and Geng _et al_.Â [18] use off-the-shelf diffusion modelsÂ [46,
+29] to generate multi-view optical illusions that change appearance upon
+transformations such as rotations, flips, permutations, skews, and color
+inversions. These methods work by transforming the noisy image multiple ways
+during the reverse diffusion process, denoising each transformed version, then
+averaging the noise estimates together. However, many types of
+transformations, like the multiscale processing considered in hybrid images,
+fail because they perturb the noise distributionÂ [18]. Like these approaches,
+our work also changes the reverse diffusion process to produce images that
+have multiple interpretations. However, our approach manipulates the noise
+estimate rather than the noisy image, enabling us to handle illusions that
+prior work cannot. Please see AppendixÂ 0.G for additional discussion and
+results.
+
+##  3 Method
+
+For a given decomposition of an image into components, our method allows for
+control of each of these components through text conditioning. We achieve this
+by modifying the sampling procedure of a text-to-image diffusion model.
+
+###  3.1 Preliminaries: Diffusion Models
+
+Diffusion models sample from a distribution by iteratively denoising noisy
+data. Over Tğ‘‡Titalic_T timesteps, they denoise pure random Gaussian noise,
+ğ±Tsubscriptğ±ğ‘‡{\mathbf{x}}_{T}bold_x start_POSTSUBSCRIPT italic_T
+end_POSTSUBSCRIPT, until a clean image, ğ±0subscriptğ±0{\mathbf{x}}_{0}bold_x
+start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT, is produced at the final step. At
+intermediate timesteps, a variance schedule is followed such that the noisy
+image at timestep tğ‘¡titalic_t is of the form
+
+| ğ±t=Î±tâ¢ğ±0+1âˆ’Î±tâ¢Ïµ,subscriptğ±ğ‘¡subscriptğ›¼ğ‘¡subscriptğ±01subscriptğ›¼ğ‘¡italic-Ïµ{\mathbf{x}}_{t}=\sqrt{\alpha_{t}}{\mathbf{x}}_{0}+\sqrt{1-\alpha_{t}}\epsilon,bold_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT = square-root start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG bold_x start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT + square-root start_ARG 1 - italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG italic_Ïµ , |  | (1)  
+---|---|---|---  
+  
+where Ïµâˆ¼ğ’©â¢(0,ğˆ)similar-toitalic-
+Ïµğ’©0ğˆ\epsilon\sim\mathcal{N}(0,\mathbf{I})italic_Ïµ âˆ¼ caligraphic_N ( 0 ,
+bold_I ) is a sample from a standard Gaussian distribution, and
+Î±tsubscriptğ›¼ğ‘¡\alpha_{t}italic_Î± start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT is a predetermined variance schedule. To sample
+ğ±tâˆ’1subscriptğ±ğ‘¡1{\mathbf{x}}_{t-1}bold_x start_POSTSUBSCRIPT italic_t -
+1 end_POSTSUBSCRIPT from ğ±tsubscriptğ±ğ‘¡{\mathbf{x}}_{t}bold_x
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT the diffusion model,
+ÏµÎ¸â¢(â‹…,â‹…,â‹…)subscriptitalic-
+Ïµğœƒâ‹…â‹…â‹…\epsilon_{\theta}(\cdot,\cdot,\cdot)italic_Ïµ
+start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT ( â‹… , â‹… , â‹… ), predicts
+the noise in ğ±tsubscriptğ±ğ‘¡{\mathbf{x}}_{t}bold_x start_POSTSUBSCRIPT
+italic_t end_POSTSUBSCRIPT, conditioned on the timestep tğ‘¡titalic_t and
+optionally on context yğ‘¦yitalic_y, such as a text prompt embedding.
+Afterwards, an update step,
+ğšğš™ğšğšŠğšğšâ¢(â‹…,â‹…)ğšğš™ğšğšŠğšğšâ‹…â‹…\texttt{update}(\cdot,\cdot)update
+( â‹… , â‹… ), is applied which removes a portion of the estimated noise,
+ÏµÎ¸:-ÏµÎ¸â¢(ğ±t,y,t):-subscriptitalic-Ïµğœƒsubscriptitalic-
+Ïµğœƒsubscriptğ±ğ‘¡ğ‘¦ğ‘¡\epsilon_{\theta}\coloneq\epsilon_{\theta}({\mathbf{x}}_{t},y,t)italic_Ïµ
+start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT :- italic_Ïµ
+start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT ( bold_x start_POSTSUBSCRIPT
+italic_t end_POSTSUBSCRIPT , italic_y , italic_t ), from the noisy image
+ğ±tsubscriptğ±ğ‘¡{\mathbf{x}}_{t}bold_x start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT. The exact implementation of this step depends on the
+specifics of the method used, but it isâ€”critically for our methodâ€”often a
+linear combination of ğ±tsubscriptğ±ğ‘¡{\mathbf{x}}_{t}bold_x
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT and ÏµÎ¸subscriptitalic-
+Ïµğœƒ\epsilon_{\theta}italic_Ïµ start_POSTSUBSCRIPT italic_Î¸
+end_POSTSUBSCRIPT (and possibly noise,
+ğ³âˆ¼ğ’©(0,ğˆ))\mathbf{z}\sim\mathcal{N}(0,\mathbf{I}))bold_z âˆ¼
+caligraphic_N ( 0 , bold_I ) ). For example, DDIMÂ [52] (with
+Ïƒt=0subscriptğœğ‘¡0\sigma_{t}=0italic_Ïƒ start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT = 0) performs the update as:
+
+| ğ±tâˆ’1=ğšğš™ğšğšŠğšğšâ¢(ğ±t,ÏµÎ¸)=Î±tâˆ’1â¢(ğ±tâˆ’1âˆ’Î±tâ¢ÏµÎ¸Î±t)+1âˆ’Î±tâˆ’1â¢ÏµÎ¸.subscriptğ±ğ‘¡1ğšğš™ğšğšŠğšğšsubscriptğ±ğ‘¡subscriptitalic-Ïµğœƒsubscriptğ›¼ğ‘¡1subscriptğ±ğ‘¡1subscriptğ›¼ğ‘¡subscriptitalic-Ïµğœƒsubscriptğ›¼ğ‘¡1subscriptğ›¼ğ‘¡1subscriptitalic-Ïµğœƒ{\mathbf{x}}_{t-1}=\texttt{update}({\mathbf{x}}_{t},\epsilon_{\theta})=\sqrt{% \alpha_{t-1}}\left(\frac{{\mathbf{x}}_{t}-\sqrt{1-\alpha_{t}}\epsilon_{\theta}% }{\sqrt{\alpha_{t}}}\right)+\sqrt{1-\alpha_{t-1}}\epsilon_{\theta}.bold_x start_POSTSUBSCRIPT italic_t - 1 end_POSTSUBSCRIPT = update ( bold_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT , italic_Ïµ start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT ) = square-root start_ARG italic_Î± start_POSTSUBSCRIPT italic_t - 1 end_POSTSUBSCRIPT end_ARG ( divide start_ARG bold_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT - square-root start_ARG 1 - italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG italic_Ïµ start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT end_ARG start_ARG square-root start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG end_ARG ) + square-root start_ARG 1 - italic_Î± start_POSTSUBSCRIPT italic_t - 1 end_POSTSUBSCRIPT end_ARG italic_Ïµ start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT . |  | (2)  
+---|---|---|---  
+  
+###  3.2 Factorized Diffusion
+
+![Refer to caption](x2.png) Figure 2: Factorized Diffusion. Given an image
+decomposition, we control components of the decomposition through text
+conditioning during image generation. To do this, we modify the sampling
+procedure of a pretrained diffusion model. Specifically, at each denoising
+step, tğ‘¡titalic_t, we construct a new noise estimate, Ïµ~normal-~italic-
+Ïµ\tilde{\epsilon}over~ start_ARG italic_Ïµ end_ARG, to use for denoising,
+whose components come from components of Ïµisubscriptitalic-
+Ïµğ‘–\epsilon_{i}italic_Ïµ start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT,
+which are noise estimates conditioned on different prompts. Here, we show a
+decomposition into three frequency subbands, used for creating triple hybrid
+images, but we consider a number of other decompositions.
+
+An overview of our method can be found in Fig.Â 2. Our method works by
+manipulating the noise estimate during the reverse diffusion process such that
+different components of the estimate are conditioned on different prompts.
+Given a decomposition of an image,
+ğ±âˆˆâ„3Ã—HÃ—Wğ±superscriptâ„3ğ»ğ‘Š{\mathbf{x}}\in\mathbb{R}^{3\times H\times
+W}bold_x âˆˆ blackboard_R start_POSTSUPERSCRIPT 3 Ã— italic_H Ã— italic_W
+end_POSTSUPERSCRIPT, into the sum of Nğ‘Nitalic_N components,
+
+| ğ±=âˆ‘iNfiâ¢(ğ±),ğ±superscriptsubscriptğ‘–ğ‘subscriptğ‘“ğ‘–ğ±{\mathbf{x}}=\sum_{i}^{N}f_{i}({\mathbf{x}}),bold_x = âˆ‘ start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_N end_POSTSUPERSCRIPT italic_f start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ( bold_x ) , |  | (3)  
+---|---|---|---  
+  
+where each fiâ¢(ğ±)subscriptğ‘“ğ‘–ğ±f_{i}({\mathbf{x}})italic_f
+start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ( bold_x ) is a component, we
+can correspond to each component a different text prompt
+yisubscriptğ‘¦ğ‘–y_{i}italic_y start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT.
+At each step of the reverse diffusion process, instead of computing a single
+noise estimate we compute Nğ‘Nitalic_Nâ€”one conditioned on each
+yisubscriptğ‘¦ğ‘–y_{i}italic_y start_POSTSUBSCRIPT italic_i
+end_POSTSUBSCRIPTâ€”which we denote by Ïµi=ÏµÎ¸â¢(ğ±t,yi,t)subscriptitalic-
+Ïµğ‘–subscriptitalic-
+Ïµğœƒsubscriptğ±ğ‘¡subscriptğ‘¦ğ‘–ğ‘¡\epsilon_{i}=\epsilon_{\theta}({\mathbf{x}}_{t},y_{i},t)italic_Ïµ
+start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT = italic_Ïµ start_POSTSUBSCRIPT
+italic_Î¸ end_POSTSUBSCRIPT ( bold_x start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT , italic_y start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ,
+italic_t ). We then construct a composite noise estimate Ïµ~~italic-
+Ïµ\tilde{\epsilon}over~ start_ARG italic_Ïµ end_ARG made up of components from
+each Ïµisubscriptitalic-Ïµğ‘–\epsilon_{i}italic_Ïµ start_POSTSUBSCRIPT
+italic_i end_POSTSUBSCRIPT:
+
+| Ïµ~=âˆ‘fiâ¢(Ïµi).~italic-Ïµsubscriptğ‘“ğ‘–subscriptitalic-Ïµğ‘–\tilde{\epsilon}=\sum f_{i}(\epsilon_{i}).over~ start_ARG italic_Ïµ end_ARG = âˆ‘ italic_f start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ( italic_Ïµ start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ) . |  | (4)  
+---|---|---|---  
+  
+This new noise estimate, Ïµ~~italic-Ïµ\tilde{\epsilon}over~ start_ARG
+italic_Ïµ end_ARG, is used to perform the diffusion update step. In effect,
+each component of the image is denoised while being conditioned by a different
+text prompt, resulting in a clean image whose components are conditioned on
+the different prompts. We refer to this technique as factorized diffusion.
+
+As noted in Sec.Â 2, our method is similar to recent work by TancikÂ [58] and
+GengÂ  _et al_.Â [18] in that we modify noise estimates with the aim of
+generating visual illusions. However, our method differs in that we modify
+only the noise estimate, and not the input to the diffusion model,
+ğ±tsubscriptğ±ğ‘¡{\mathbf{x}}_{t}bold_x start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT. As a result, our method produces a different class of
+perceptual illusions from prior work. Please see AppendixÂ 0.G for additional
+discussion and results.
+
+###  3.3 Analysis of Factorized Diffusion
+
+To give intuition for why our method works, we suppose that our update
+function
+ğšğš™ğšğšŠğšğšâ¢(â‹…,â‹…)ğšğš™ğšğšŠğšğšâ‹…â‹…\texttt{update}(\cdot,\cdot)update
+( â‹… , â‹… ) is a linear combination of the noisy image
+ğ±tsubscriptğ±ğ‘¡{\mathbf{x}}_{t}bold_x start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT and the noise estimate ÏµÎ¸subscriptitalic-
+Ïµğœƒ\epsilon_{\theta}italic_Ïµ start_POSTSUBSCRIPT italic_Î¸
+end_POSTSUBSCRIPT, as is commonly the caseÂ 111The update may also include
+adding random noise, ğ³âˆ¼ğ’©â¢(0,ğˆ)similar-
+toğ³ğ’©0ğˆ\mathbf{z}\sim\mathcal{N}(0,\mathbf{I})bold_z âˆ¼ caligraphic_N ( 0
+, bold_I ), in which case our analysis still holds with a modification to the
+argument, discussed in AppendixÂ 0.H.Â [52, 25]. The update function also
+depends on tğ‘¡titalic_t, which we omit for brevity. We may then decompose the
+update step as
+
+| ğ±tâˆ’1subscriptğ±ğ‘¡1\displaystyle\mathbf{x}_{t-1}bold_x start_POSTSUBSCRIPT italic_t - 1 end_POSTSUBSCRIPT | =ğšğš™ğšğšŠğšğšâ¢(ğ±t,ÏµÎ¸)absentğšğš™ğšğšŠğšğšsubscriptğ±ğ‘¡subscriptitalic-Ïµğœƒ\displaystyle=\texttt{update}(\mathbf{x}_{t},\epsilon_{\theta})= update ( bold_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT , italic_Ïµ start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT ) |  | (5)  
+---|---|---|---|---  
+|  | =ğšğš™ğšğšŠğšğšâ¢(âˆ‘fiâ¢(ğ±t),âˆ‘fiâ¢(ÏµÎ¸))absentğšğš™ğšğšŠğšğšsubscriptğ‘“ğ‘–subscriptğ±ğ‘¡subscriptğ‘“ğ‘–subscriptitalic-Ïµğœƒ\displaystyle=\texttt{update}\left(\sum f_{i}(\mathbf{x}_{t}),\sum f_{i}(% \epsilon_{\theta})\right)= update ( âˆ‘ italic_f start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ( bold_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ) , âˆ‘ italic_f start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ( italic_Ïµ start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT ) ) |  | (6)  
+|  | =âˆ‘iğšğš™ğšğšŠğšğšâ¢(fiâ¢(ğ±t),fiâ¢(ÏµÎ¸))absentsubscriptğ‘–ğšğš™ğšğšŠğšğšsubscriptğ‘“ğ‘–subscriptğ±ğ‘¡subscriptğ‘“ğ‘–subscriptitalic-Ïµğœƒ\displaystyle=\sum_{i}\texttt{update}(f_{i}(\mathbf{x}_{t}),f_{i}(\epsilon_{% \theta}))= âˆ‘ start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT update ( italic_f start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ( bold_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ) , italic_f start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ( italic_Ïµ start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT ) ) |  | (7)  
+  
+where the first equality is by definition of the update step, the second
+equality is by applying the image decomposition, and the third equality is by
+linearity of the update function. Eq.Â 7 tells us that an update step on
+ğ±tsubscriptğ±ğ‘¡{\mathbf{x}}_{t}bold_x start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT, with ÏµÎ¸subscriptitalic-Ïµğœƒ\epsilon_{\theta}italic_Ïµ
+start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT, can be interpreted as the sum
+of updates on the components of ğ±tsubscriptğ±ğ‘¡{\mathbf{x}}_{t}bold_x
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT and of ÏµÎ¸subscriptitalic-
+Ïµğœƒ\epsilon_{\theta}italic_Ïµ start_POSTSUBSCRIPT italic_Î¸
+end_POSTSUBSCRIPT. Our method can be understood as using different
+conditioning on each of these components. Written explicitly, the update our
+method uses is
+
+| ğ±tâˆ’1=âˆ‘iNğšğš™ğšğšŠğšğš(fi(ğ±t),fi(ÏµÎ¸(ğ±t,yi,t)).{\mathbf{x}}_{t-1}=\sum_{i}^{N}\texttt{update}(f_{i}({\mathbf{x}}_{t}),f_{i}(% \epsilon_{\theta}({\mathbf{x}}_{t},y_{i},t)).bold_x start_POSTSUBSCRIPT italic_t - 1 end_POSTSUBSCRIPT = âˆ‘ start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_N end_POSTSUPERSCRIPT update ( italic_f start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ( bold_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ) , italic_f start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ( italic_Ïµ start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT ( bold_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT , italic_y start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT , italic_t ) ) . |  | (8)  
+---|---|---|---  
+  
+Moreover, let us write out the update step explicitly as
+
+| ğ±tâˆ’1=ğšğš™ğšğšŠğšğšâ¢(ğ±t,ÏµÎ¸)=Ï‰tâ¢ğ±t+Î³tâ¢ÏµÎ¸,subscriptğ±ğ‘¡1ğšğš™ğšğšŠğšğšsubscriptğ±ğ‘¡subscriptitalic-Ïµğœƒsubscriptğœ”ğ‘¡subscriptğ±ğ‘¡subscriptğ›¾ğ‘¡subscriptitalic-Ïµğœƒ{\mathbf{x}}_{t-1}=\texttt{update}({\mathbf{x}}_{t},\epsilon_{\theta})=\omega_% {t}{\mathbf{x}}_{t}+\gamma_{t}\epsilon_{\theta},bold_x start_POSTSUBSCRIPT italic_t - 1 end_POSTSUBSCRIPT = update ( bold_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT , italic_Ïµ start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT ) = italic_Ï‰ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT bold_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT + italic_Î³ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïµ start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT , |  | (9)  
+---|---|---|---  
+  
+for Ï‰tsubscriptğœ”ğ‘¡\omega_{t}italic_Ï‰ start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT and Î³tsubscriptğ›¾ğ‘¡\gamma_{t}italic_Î³
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT determined by the variance
+schedule and scheduler. Then if the fisubscriptğ‘“ğ‘–f_{i}italic_f
+start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPTâ€™s are linear, we have
+
+| fiâ¢(ğ±tâˆ’1)subscriptğ‘“ğ‘–subscriptğ±ğ‘¡1\displaystyle f_{i}({\mathbf{x}}_{t-1})italic_f start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ( bold_x start_POSTSUBSCRIPT italic_t - 1 end_POSTSUBSCRIPT ) | =fiâ¢(ğšğš™ğšğšŠğšğšâ¢(ğ±t,ÏµÎ¸))absentsubscriptğ‘“ğ‘–ğšğš™ğšğšŠğšğšsubscriptğ±ğ‘¡subscriptitalic-Ïµğœƒ\displaystyle=f_{i}(\texttt{update}({\mathbf{x}}_{t},\epsilon_{\theta}))= italic_f start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ( update ( bold_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT , italic_Ïµ start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT ) ) |  | (10)  
+---|---|---|---|---  
+|  | =fiâ¢(Ï‰tâ¢ğ±t+Î³tâ¢ÏµÎ¸)absentsubscriptğ‘“ğ‘–subscriptğœ”ğ‘¡subscriptğ±ğ‘¡subscriptğ›¾ğ‘¡subscriptitalic-Ïµğœƒ\displaystyle=f_{i}(\omega_{t}{\mathbf{x}}_{t}+\gamma_{t}\epsilon_{\theta})= italic_f start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ( italic_Ï‰ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT bold_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT + italic_Î³ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïµ start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT ) |  | (11)  
+|  | =Ï‰tâ¢fiâ¢(ğ±t)+Î³tâ¢fiâ¢(ÏµÎ¸)absentsubscriptğœ”ğ‘¡subscriptğ‘“ğ‘–subscriptğ±ğ‘¡subscriptğ›¾ğ‘¡subscriptğ‘“ğ‘–subscriptitalic-Ïµğœƒ\displaystyle=\omega_{t}f_{i}({\mathbf{x}}_{t})+\gamma_{t}f_{i}(\epsilon_{% \theta})= italic_Ï‰ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_f start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ( bold_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ) + italic_Î³ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_f start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ( italic_Ïµ start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT ) |  | (12)  
+|  | =ğšğš™ğšğšŠğšğšâ¢(fiâ¢(ğ±t),fiâ¢(ÏµÎ¸))absentğšğš™ğšğšŠğšğšsubscriptğ‘“ğ‘–subscriptğ±ğ‘¡subscriptğ‘“ğ‘–subscriptitalic-Ïµğœƒ\displaystyle=\texttt{update}(f_{i}({\mathbf{x}}_{t}),f_{i}(\epsilon_{\theta}))= update ( italic_f start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ( bold_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ) , italic_f start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ( italic_Ïµ start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT ) ) |  | (13)  
+  
+meaning that updating the iğ‘–iitalic_ith component of
+ğ±tsubscriptğ±ğ‘¡{\mathbf{x}}_{t}bold_x start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT with the iğ‘–iitalic_ith component of ÏµÎ¸subscriptitalic-
+Ïµğœƒ\epsilon_{\theta}italic_Ïµ start_POSTSUBSCRIPT italic_Î¸
+end_POSTSUBSCRIPT will only affect the iğ‘–iitalic_ith component of
+ğ±tâˆ’1subscriptğ±ğ‘¡1{\mathbf{x}}_{t-1}bold_x start_POSTSUBSCRIPT italic_t -
+1 end_POSTSUBSCRIPT.
+
+###  3.4 Decompositions Considered
+
+We present details for the decompositions that we consider in this paper.
+Results for all decompositions are presented and discussed in Sec.Â 4.
+
+####  3.4.1 Spatial frequencies.
+
+We consider factorizing an image into frequency subbands, and conditioning the
+subbands on different prompts, with the goal of producing hybrid imagesÂ [42].
+First, we consider a decomposition into two components:
+
+| ğ±=ğ±âˆ’GÏƒâ¢(ğ±)âŸfhighâ¢(ğ±)+GÏƒâ¢(ğ±)âŸflowâ¢(ğ±),ğ±subscriptâŸğ±subscriptğºğœğ±subscriptğ‘“highğ±subscriptâŸsubscriptğºğœğ±subscriptğ‘“lowğ±{\mathbf{x}}=\underbrace{{\mathbf{x}}-G_{\sigma}({\mathbf{x}})}_{f_{\text{high% }}({\mathbf{x}})}+\underbrace{G_{\sigma}({\mathbf{x}})}_{f_{\text{low}}({% \mathbf{x}})},bold_x = underâŸ start_ARG bold_x - italic_G start_POSTSUBSCRIPT italic_Ïƒ end_POSTSUBSCRIPT ( bold_x ) end_ARG start_POSTSUBSCRIPT italic_f start_POSTSUBSCRIPT high end_POSTSUBSCRIPT ( bold_x ) end_POSTSUBSCRIPT + underâŸ start_ARG italic_G start_POSTSUBSCRIPT italic_Ïƒ end_POSTSUBSCRIPT ( bold_x ) end_ARG start_POSTSUBSCRIPT italic_f start_POSTSUBSCRIPT low end_POSTSUBSCRIPT ( bold_x ) end_POSTSUBSCRIPT , |  | (14)  
+---|---|---|---  
+  
+where GÏƒsubscriptğºğœG_{\sigma}italic_G start_POSTSUBSCRIPT italic_Ïƒ
+end_POSTSUBSCRIPT is a low pass filter implemented as a Gaussian blur with
+standard deviation Ïƒğœ\sigmaitalic_Ïƒ, and
+ğ±âˆ’GÏƒâ¢(ğ±)ğ±subscriptğºğœğ±{\mathbf{x}}-G_{\sigma}({\mathbf{x}})bold_x -
+italic_G start_POSTSUBSCRIPT italic_Ïƒ end_POSTSUBSCRIPT ( bold_x ) acts as a
+high pass of ğ±ğ±{\mathbf{x}}bold_x. For a decomposition into three subbands,
+to make the triple hybrid images in Fig.Â 1, components are levels of a
+Laplacian pyramid which we define as
+
+| ğ±=ğ±âˆ’GÏƒ1â¢(ğ±)âŸfhighâ¢(ğ±)+GÏƒ1â¢(ğ±)âˆ’GÏƒ2â¢(GÏƒ1â¢(ğ±))âŸfmedâ¢(ğ±)+GÏƒ2â¢(GÏƒ1â¢(ğ±))âŸflowâ¢(ğ±)ğ±subscriptâŸğ±subscriptğºsubscriptğœ1ğ±subscriptğ‘“highğ±subscriptâŸsubscriptğºsubscriptğœ1ğ±subscriptğºsubscriptğœ2subscriptğºsubscriptğœ1ğ±subscriptğ‘“medğ±subscriptâŸsubscriptğºsubscriptğœ2subscriptğºsubscriptğœ1ğ±subscriptğ‘“lowğ±{\mathbf{x}}=\underbrace{{\mathbf{x}}-G_{\sigma_{1}}({\mathbf{x}})}_{f_{\text{% high}}({\mathbf{x}})}+\underbrace{G_{\sigma_{1}}({\mathbf{x}})-G_{\sigma_{2}}(% G_{\sigma_{1}}({\mathbf{x}}))}_{f_{\text{med}}({\mathbf{x}})}+\underbrace{G_{% \sigma_{2}}(G_{\sigma_{1}}({\mathbf{x}}))}_{f_{\text{low}}({\mathbf{x}})}bold_x = underâŸ start_ARG bold_x - italic_G start_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT end_POSTSUBSCRIPT ( bold_x ) end_ARG start_POSTSUBSCRIPT italic_f start_POSTSUBSCRIPT high end_POSTSUBSCRIPT ( bold_x ) end_POSTSUBSCRIPT + underâŸ start_ARG italic_G start_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT end_POSTSUBSCRIPT ( bold_x ) - italic_G start_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT end_POSTSUBSCRIPT ( italic_G start_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT end_POSTSUBSCRIPT ( bold_x ) ) end_ARG start_POSTSUBSCRIPT italic_f start_POSTSUBSCRIPT med end_POSTSUBSCRIPT ( bold_x ) end_POSTSUBSCRIPT + underâŸ start_ARG italic_G start_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT end_POSTSUBSCRIPT ( italic_G start_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT end_POSTSUBSCRIPT ( bold_x ) ) end_ARG start_POSTSUBSCRIPT italic_f start_POSTSUBSCRIPT low end_POSTSUBSCRIPT ( bold_x ) end_POSTSUBSCRIPT |  | (15)  
+---|---|---|---  
+  
+where Ïƒ1subscriptğœ1\sigma_{1}italic_Ïƒ start_POSTSUBSCRIPT 1
+end_POSTSUBSCRIPT and Ïƒ2subscriptğœ2\sigma_{2}italic_Ïƒ start_POSTSUBSCRIPT 2
+end_POSTSUBSCRIPT roughly define cutoffs for the low, medium, and high passes.
+
+####  3.4.2 Color spaces.
+
+We also consider decomposition by color space, with the goal of creating color
+hybridsâ€”images with different interpretations when seen in grayscale or
+color. Similarly to the CIELAB color space, we decompose an image into a
+lightness component, L, and a chromaticity component ab. CIELAB seeks to
+represent colors in a perceptually uniform space, and therefore requires
+nonlinear transformations of RGB values. Instead, we use a simple linear
+decomposition. Our L component is a channel-wise average of all the pixels
+
+| fgrayâ¢(ğ±)=13â¢âˆ‘câˆˆ{R,G,B}ğ±c,subscriptğ‘“grayğ±13subscriptğ‘ğ‘…ğºğµsubscriptğ±ğ‘f_{\text{gray}}({\mathbf{x}})=\frac{1}{3}\sum_{c\in\\{R,G,B\\}}{\mathbf{x}}_{c},italic_f start_POSTSUBSCRIPT gray end_POSTSUBSCRIPT ( bold_x ) = divide start_ARG 1 end_ARG start_ARG 3 end_ARG âˆ‘ start_POSTSUBSCRIPT italic_c âˆˆ { italic_R , italic_G , italic_B } end_POSTSUBSCRIPT bold_x start_POSTSUBSCRIPT italic_c end_POSTSUBSCRIPT , |  | (16)  
+---|---|---|---  
+  
+where ğ±csubscriptğ±ğ‘{\mathbf{x}}_{c}bold_x start_POSTSUBSCRIPT italic_c
+end_POSTSUBSCRIPT are the color channels of the image, ğ±ğ±{\mathbf{x}}bold_x,
+and the resultant
+fgrayâ¢(ğ±)subscriptğ‘“grayğ±f_{\text{gray}}({\mathbf{x}})italic_f
+start_POSTSUBSCRIPT gray end_POSTSUBSCRIPT ( bold_x ) has the same shape as
+ğ±ğ±{\mathbf{x}}bold_x. We define the color component as the residual:
+
+| fcolorâ¢(ğ±)=ğ±âˆ’fgrayâ¢(ğ±).subscriptğ‘“colorğ±ğ±subscriptğ‘“grayğ±f_{\text{color}}({\mathbf{x}})={\mathbf{x}}-f_{\text{gray}}({\mathbf{x}}).italic_f start_POSTSUBSCRIPT color end_POSTSUBSCRIPT ( bold_x ) = bold_x - italic_f start_POSTSUBSCRIPT gray end_POSTSUBSCRIPT ( bold_x ) . |  | (17)  
+---|---|---|---  
+  
+####  3.4.3 Motion blurring.
+
+Motion blur may be modeled as a convolution with a blur kernel
+ğŠğŠ\mathbf{K}bold_KÂ [15, 57, 36, 3, 66, 38]. To produce images that change
+appearance when blurred, what we call motion hybrids, we study the following
+decomposition:
+
+| ğ±=ğŠ*ğ±âŸfmotionâ¢(ğ±)+ğ±âˆ’ğŠ*ğ±âŸfresâ¢(ğ±),ğ±subscriptâŸğŠğ±subscriptğ‘“motionğ±subscriptâŸğ±ğŠğ±subscriptğ‘“resğ±{\mathbf{x}}=\underbrace{\mathbf{K}*{\mathbf{x}}}_{f_{\text{motion}}({\mathbf{% x}})}+\;\;\underbrace{{\mathbf{x}}-\mathbf{K}*{\mathbf{x}}}_{f_{\text{res}}({% \mathbf{x}})},bold_x = underâŸ start_ARG bold_K * bold_x end_ARG start_POSTSUBSCRIPT italic_f start_POSTSUBSCRIPT motion end_POSTSUBSCRIPT ( bold_x ) end_POSTSUBSCRIPT + underâŸ start_ARG bold_x - bold_K * bold_x end_ARG start_POSTSUBSCRIPT italic_f start_POSTSUBSCRIPT res end_POSTSUBSCRIPT ( bold_x ) end_POSTSUBSCRIPT , |  | (18)  
+---|---|---|---  
+  
+where we have split an image into a motion blurred component and a residual
+component. We specifically study simple constant velocity motions, in which
+ğŠğŠ\mathbf{K}bold_K may be modeled as a matrix of zeros with a line of non-
+zero values. This may also be thought of as decomposing an image into an
+oriented low frequency component, and a residual component.
+
+####  3.4.4 Spatial decomposition.
+
+While our primary focus is on perceptual illusions, we also consider spatial
+masking as a decomposition. Given binary spatial masks
+ğ¦isubscriptğ¦ğ‘–\mathbf{m}_{i}bold_m start_POSTSUBSCRIPT italic_i
+end_POSTSUBSCRIPT whose disjoint union covers the entire image, we can use the
+decomposition
+
+| ğ±=âˆ‘iğ¦iâŠ™ğ±âŸfiâ¢(ğ±),ğ±subscriptğ‘–subscriptâŸdirect-productsubscriptğ¦ğ‘–ğ±subscriptğ‘“ğ‘–ğ±{\mathbf{x}}=\sum_{i}\underbrace{\mathbf{m}_{i}\odot{\mathbf{x}}}_{f_{i}({% \mathbf{x}})},bold_x = âˆ‘ start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT underâŸ start_ARG bold_m start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT âŠ™ bold_x end_ARG start_POSTSUBSCRIPT italic_f start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ( bold_x ) end_POSTSUBSCRIPT , |  | (19)  
+---|---|---|---  
+  
+where âŠ™direct-product\odotâŠ™ denotes element-wise multiplication and each
+ğ¦iâŠ™ğ±direct-productsubscriptğ¦ğ‘–ğ±\mathbf{m}_{i}\odot{\mathbf{x}}bold_m
+start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT âŠ™ bold_x is a component. The
+effect of this decomposition is to enable control of the prompts spatially.
+This is a special case of MultiDiffusionÂ [2]. We discuss this connection in
+AppendixÂ 0.E.
+
+####  3.4.5 Scaling.
+
+A final interesting decomposition is of the form
+ğ±=âˆ‘iNaiâ¢ğ±ğ±subscriptsuperscriptğ‘ğ‘–subscriptğ‘ğ‘–ğ±{\mathbf{x}}=\sum^{N}_{i}a_{i}{\mathbf{x}}bold_x
+= âˆ‘ start_POSTSUPERSCRIPT italic_N end_POSTSUPERSCRIPT start_POSTSUBSCRIPT
+italic_i end_POSTSUBSCRIPT italic_a start_POSTSUBSCRIPT italic_i
+end_POSTSUBSCRIPT bold_x, for
+âˆ‘iNai=1subscriptsuperscriptğ‘ğ‘–subscriptğ‘ğ‘–1\sum^{N}_{i}a_{i}=1âˆ‘
+start_POSTSUPERSCRIPT italic_N end_POSTSUPERSCRIPT start_POSTSUBSCRIPT
+italic_i end_POSTSUBSCRIPT italic_a start_POSTSUBSCRIPT italic_i
+end_POSTSUBSCRIPT = 1. Taking ai=1Nsubscriptğ‘ğ‘–1ğ‘a_{i}=\frac{1}{N}italic_a
+start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT = divide start_ARG 1 end_ARG
+start_ARG italic_N end_ARG recovers the compositional diffusion method of LiuÂ
+_et al_.Â [33], in which noise estimates are averaged to sample from
+conjunctions of multiple prompts.
+
+###  3.5 Inverse Problems
+
+If we know what one of the components must be in our generated image, perhaps
+extracted from some reference image
+ğ±refsubscriptğ±ref{\mathbf{x}}_{\text{ref}}bold_x start_POSTSUBSCRIPT ref
+end_POSTSUBSCRIPT, we can then fix this component while generating all other
+components with our method. This enables us to produce hybrid images from real
+images (see Figs.Â 1 andÂ 8). Without loss of generality, suppose we want to
+fix the first component. To do this, we can project
+ğ±tsubscriptğ±ğ‘¡{\mathbf{x}}_{t}bold_x start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT after every reverse process step:
+
+| ğ±tâ†f1â¢(Î±tâ¢ğ±ref+1âˆ’Î±tâ¢Ïµ)+âˆ‘i=2Nfiâ¢(ğ±t)â†subscriptğ±ğ‘¡subscriptğ‘“1subscriptğ›¼ğ‘¡subscriptğ±ref1subscriptğ›¼ğ‘¡italic-Ïµsuperscriptsubscriptğ‘–2ğ‘subscriptğ‘“ğ‘–subscriptğ±ğ‘¡{\mathbf{x}}_{t}\leftarrow f_{1}\left(\sqrt{\alpha_{t}}{\mathbf{x}}_{\text{ref% }}+\sqrt{1-\alpha_{t}}\epsilon\right)+\sum_{i=2}^{N}f_{i}({\mathbf{x}}_{t})bold_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT â† italic_f start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT ( square-root start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG bold_x start_POSTSUBSCRIPT ref end_POSTSUBSCRIPT + square-root start_ARG 1 - italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG italic_Ïµ ) + âˆ‘ start_POSTSUBSCRIPT italic_i = 2 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_N end_POSTSUPERSCRIPT italic_f start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ( bold_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ) |  | (20)  
+---|---|---|---  
+  
+where Ïµâˆ¼ğ’©â¢(0,ğˆ)similar-toitalic-
+Ïµğ’©0ğˆ\epsilon\sim\mathcal{N}(0,\mathbf{I})italic_Ïµ âˆ¼ caligraphic_N ( 0 ,
+bold_I ), and Î±tsubscriptğ›¼ğ‘¡\alpha_{t}italic_Î± start_POSTSUBSCRIPT
+italic_t end_POSTSUBSCRIPT is determined by the variance schedule. The
+argument of f1subscriptğ‘“1f_{1}italic_f start_POSTSUBSCRIPT 1
+end_POSTSUBSCRIPT is a sample from the forward process, given the reference
+imageâ€”that is, a noisy version of
+ğ±refsubscriptğ±ref{\mathbf{x}}_{\text{ref}}bold_x start_POSTSUBSCRIPT ref
+end_POSTSUBSCRIPT with the correct amount of noise for timestep tğ‘¡titalic_t.
+Essentially, we project ğ±tsubscriptğ±ğ‘¡{\mathbf{x}}_{t}bold_x
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT such that its first component
+matches that of ğ±refsubscriptğ±ref{\mathbf{x}}_{\text{ref}}bold_x
+start_POSTSUBSCRIPT ref end_POSTSUBSCRIPT. This amounts to solving a
+(noiseless) inverse problem characterized by
+ğ²=f1(ğ±\mathbf{y}=f_{1}({\mathbf{x}}bold_y = italic_f start_POSTSUBSCRIPT 1
+end_POSTSUBSCRIPT ( bold_x). Much work has gone into developing methods to
+solve inverse problems using diffusion models as priors, and this extension of
+our method can be viewed as a simplified version of prior workÂ [28, 8, 64,
+53, 34].
+
+##  4 Results
+
+We provide results organized by decomposition, followed by results on inverse
+problems, and then random samples. Additional implementation details can be
+found in AppendixÂ 0.A, and additional results can be found in AppendixÂ 0.K.
+
+###  4.1 Hybrid Images
+
+We show qualitative results in Fig.Â 1, Fig.Â 3, and Fig.Â 4, as well as in
+Fig.Â 16 in the appendix. As can be seen, our method produces high quality
+hybrid images. Interestingly, we were also able to produce hybrid images with
+three different prompts (Figs.Â 1 andÂ 14) by using the Laplacian pyramid
+decomposition (Eq.Â 15). While prior workÂ [55] has attempted to generate
+these triple hybrids with traditional methods, our method far exceeds their
+results in terms of quality and recognizability (for details, see AppendixÂ
+0.C).
+
+![Refer to caption](x3.png) Figure 3: Effect of Ïƒğœ\sigmaitalic_Ïƒ. We show a
+linear sweep over the Ïƒğœ\sigmaitalic_Ïƒ value used in our hybrid
+decomposition. A lower Ïƒğœ\sigmaitalic_Ïƒ results in the low pass prompt
+being more prominent, and vice-versa. In between lies hybrid images. Best
+viewed digitally, with zoom.
+
+####  4.1.1 Effect of blur kernel.
+
+In Fig.Â 3 we show how the strength of the Gaussian blur, Ïƒğœ\sigmaitalic_Ïƒ,
+affects results. A lower Ïƒğœ\sigmaitalic_Ïƒ value corresponds to a higher
+cut-off frequency on the low-pass filter, and results in the low-pass prompt
+being more prominently featured. Interpolating between Ïƒğœ\sigmaitalic_Ïƒ
+values gives hybrid images.
+
+####  4.1.2 Comparisons to OlivaÂ  _et al_.Â [42].
+
+In Fig.Â 4 we qualitatively compare our method to samples from OlivaÂ  _et
+al_.Â [42]. We directly take samples fromÂ [42], and manually create prompts
+to generate corresponding hybrids using our method. As can be seen, our
+hybrids are considerably more realistic, while containing the desired prompts
+at different viewing distances. One advantage our technique has is that the
+low frequency and high frequency components are generated with knowledge of
+each other, as the diffusion model is given the entire image. This is in
+contrast to the hybrid images of OlivaÂ  _et al_., in which frequency
+components are extracted from two independent images and combined. Moreover,
+these two images must be found and made to align manually, whereas our method
+simply generates low and high frequency components that align well.
+
+![Refer to caption](x4.png) Figure 4: Comparison to OlivaÂ  _et al_.Â [42].
+We take hybrid images from OlivaÂ  _et al_.Â [42], and generate our own
+versions. Left is from our method, and right is from OlivaÂ  _et al_.â€™s. As
+can be seen, our method produces much more realistic images while still
+containing both subjects. Best viewed digitally, with zoom. Table 1: Human
+Studies. We compare our hybrid images and OlivaÂ  _et al_.â€™s with a two-
+alternative forced choice test. Participants were shown results from Fig.Â 4,
+and were asked which images better contained the prompts, and which were of
+higher overall quality. Percentages denote the proportion that chose our
+method. Please see AppendixÂ 0.B for additional details. We find that our
+method is rated as both higher in quality and better aligned with the prompts.
+(N=77ğ‘77N=77italic_N = 77)
+
+| (a) | (b) | (c) | (d) | (e) | (f) | (g) | (h) | Average  
+---|---|---|---|---|---|---|---|---|---  
+High Prompt | 70.1% | 81.8% | 63.6% | 51.9% | 61.0% | 53.2% | 70.1% | 54.5% | 63.3%  
+Low Prompt | 83.1% | 84.4% | 74.0% | 87.0% | 93.5% | 87.0% | 75.3% | 81.8% | 83.3%  
+Quality | 92.2% | 87.0% | 83.1% | 77.9% | 85.7% | 79.2% | 92.2% | 33.8% | 78.9%  
+  
+Table 2: Hybrid Image CLIP Evaluation. We evaluate hybrid images by reporting
+the maximum clip score over different amounts of blurring. We report the max
+to compensate for the fact that different hybrid images may be best viewed at
+different resolutions. Please see Fig.Â 4 for the referenced hybrid images,
+and AppendixÂ 0.D for metric implementation details.
+
+| Method | (a) | (b) | (c) | (d) | (e) | (f) | (g) | (h) | Average  
+---|---|---|---|---|---|---|---|---|---|---  
+Low Pass | OlivaÂ  _et al_.Â [42] | 0.268 | 0.258 | 0.316 | 0.250 | 0.237 | 0.264 | 0.257 | 0.241 | 0.261  
+Ours | 0.286 | 0.252 | 0.307 | 0.273 | 0.275 | 0.260 | 0.244 | 0.269 | 0.271  
+High Pass | OlivaÂ  _et al_.Â [42] | 0.297 | 0.230 | 0.306 | 0.272 | 0.276 | 0.306 | 0.260 | 0.231 | 0.272  
+Ours | 0.321 | 0.242 | 0.301 | 0.258 | 0.292 | 0.324 | 0.320 | 0.277 | 0.292  
+  
+We also provide quantitative comparisons between our hybrid images and those
+of OlivaÂ  _et al_.Â [42]. In Tab.Â 1 we show results of a two-alternative
+forced choice (2AFC) study, in which human participants are asked to choose
+between our hybrid images or OlivaÂ  _et al_.â€™s. Participants of the study
+were asked which image better contained the prompts, and which of the images
+were of higher overall quality. For details, please see AppendixÂ 0.B. We find
+that participants consistently choose our images as being both higher in
+quality and better containing the prompts.
+
+Finally, we present CLIP alignment scores in Tab.Â 2. To account for the fact
+that the hybrid images are best viewed at many different resolutions, we
+report the maximum CLIP score between the prompt and the image blurred by
+different amounts. Please see AppendixÂ 0.D for metric implementation details.
+We find that our method generates hybrid images with better alignment to the
+prompts.
+
+###  4.2 Other Decompositions
+
+####  4.2.1 Color hybrids.
+
+We provide qualitative color hybrid results in Fig.Â 1 and Fig.Â 5, as well as
+in Fig.Â 17 in the appendix. As can be seen, the grayscale image aligns with
+one prompt, while the color image aligns with another. For example, in the
+"rabbit"/"volcano" image from Fig.Â 5 the ears of the rabbit are repurposed as
+plumes of lava in the grayscale image. Note that it is not sufficient to
+simply add arbitrary amounts of color to a grayscale image to achieve this
+effect, as the colors added must not change the alignment of the grayscale
+image with its prompt. One interesting application of this technique is to
+produce images that appear different under bright lighting versus dim
+lightning, where human vision has a much harder time discerning color.
+
+![Refer to caption](x5.png) Figure 5: Color Hybrids. We show additional color
+hybrid results. These are images that change appearance when color is added or
+subtracted away. These images change appearance when moved from bright to dim
+lighting, in which color is harder to see. ![Refer to caption](x6.png) Figure
+6: Motion Hybrids. We show additional motion hybrid results. These are images
+that change appearance when motion blurred. Here, the motion from upper left
+to bottom right.
+
+####  4.2.2 Motion hybrids
+
+We provide qualitative motion hybrid results in Fig.Â 1 and Fig.Â 6, as well
+as in Fig.Â 15 in the appendix. These are images that change appearance when
+motion blurred. For all motion hybrids in the paper, we use a blur kernel of
+ğŠ=1kâ¢ğˆâˆˆâ„kÃ—kğŠ1ğ‘˜ğˆsuperscriptâ„ğ‘˜ğ‘˜\mathbf{K}=\frac{1}{k}\mathbf{I}\in\mathbb{R}^{k\times
+k}bold_K = divide start_ARG 1 end_ARG start_ARG italic_k end_ARG bold_I âˆˆ
+blackboard_R start_POSTSUPERSCRIPT italic_k Ã— italic_k end_POSTSUPERSCRIPT,
+with k=29ğ‘˜29k=29italic_k = 29, corresponding to a diagonal motion from upper
+left to bottom right.
+
+####  4.2.3 Spatial decomposition
+
+By decomposing an image into disjoint spatial regions and applying our method,
+we can recover a technique that is a special case of MultiDiffusionÂ [2].
+Using this method, we can effect fine-grained control over where the text
+prompts act spatially, as shown in Fig.Â 7. For additional discussion, please
+see AppendixÂ 0.E.
+
+####  4.2.4 Scaling decomposition
+
+By using the scaling decomposition with
+ai=1Nsubscriptğ‘ğ‘–1ğ‘a_{i}=\frac{1}{N}italic_a start_POSTSUBSCRIPT italic_i
+end_POSTSUBSCRIPT = divide start_ARG 1 end_ARG start_ARG italic_N end_ARG, our
+method reduces exactly to prior work on compositionality in diffusion models,
+by LiuÂ  _et al_.Â [33]. Specifically, we recover the conjunction operator
+proposed by LiuÂ  _et al_. We demonstrate this in Fig.Â 7, but refer the
+reader toÂ [33] for more examples.
+
+![Refer to caption](x7.png) Figure 7: Spatial and Scaling Decompositions.
+Special cases of our method reduce to prior work. (Left) Decomposing images
+into spatial regions recovers a special case of MultiDiffusionÂ [2], and
+allows us to assign prompts to spatial regions. (Right) Decomposing an image
+by scaling allows us to compose concepts, and recovers the method of LiuÂ  _et
+al_.Â [33]. ![Refer to caption](x8.png) Figure 8: Hybrids from Real Images. We
+show hybrid images generated from real images. We take low or high passes of
+real images, and use our method to fill in the missing component, conditioned
+on a prompt. Best viewed digitally, with zoom.
+
+###  4.3 Inverse Problems
+
+As discussed in Sec.Â 3.5, we can modify our approach to solve inverse
+problems, resulting in a technique highly similar to prior workÂ [64, 28, 10,
+8, 9, 54, 34]. While previous work investigates using diffusion priors for
+solving problems such as colorization, inpainting, super-resolution, or phase
+retrieval, we apply the idea towards generating hybrid images from real
+images. Specifically, we take low or high frequency components from a real
+image and use our method to fill in the missing components, conditioned on a
+prompt. Results are shown in Fig.Â 1 and Fig.Â 8. We also provide colorization
+results in AppendixÂ 0.J.
+
+###  4.4 Limitations and Negative Impacts
+
+![Refer to caption](x9.png) Figure 9: Random Samples. We provide random
+samples for selected prompts and decompositions. As can be seen, most random
+results are of passable quality, with some catastrophic failures, and some
+very high quality illusions. More random samples are shown in Fig.Â 18.
+
+One major limitation of our method is that the success rate is relatively low.
+While our method can produce decent images consistently, very high quality
+images are rarer. This can be seen in Fig.Â 9 and Fig.Â 18, in which we
+visualize random samples for hybrid images, color hybrids, and motion hybrids.
+We attribute this fragility to the fact that our method produces images that
+are highly out-of-distribution for the diffusion model. In addition, there is
+no mechanism by which prompts associated with one component are discouraged
+from appearing in other components. Another failure case of our method is that
+the prompt for one component may dominate the generated image. Empirically,
+the success rate of our method can be improved by carefully choosing prompt
+pairs (see AppendixÂ 0.I for additional discussion), or by manually tuning
+decomposition parameters, but we leave improving the robustness of our method
+in general to future work.
+
+The ability to better control powerful image synthesis models opens numerous
+societal and ethical considerations. We apply our method to generating
+illusions, which in some sense seeks to deceive perception, possibly leading
+to applications in misinformation. We believe this and other concerns deserve
+further study and careful thought.
+
+##  5 Conclusion
+
+We present a zero-shot method that enables control over different components
+of an image through diffusion model sampling and apply it to the task of
+creating perceptual illusions. Using our method, we synthesize hybrid images,
+hybrid images with three prompts, and new classes of illusions such as color
+hybrids and motion hybrids. We give an analysis and provide intuition for why
+our method works. For certain image decompositions, we show that our method
+reduces to prior work on compositional generation and spatial control of
+diffusion models. Finally, we make a connection to inverse problems, and use
+this insight to generate hybrid images from real images.
+
+####  5.0.1 Acknowledgements.
+
+We thank Patrick Chao, Aleksander Holynski, Richard Zhang, Trenton Chang,
+Utkarsh Singhal, Huijie Zhang, Bowen Song, Jeongsoo Park, Jeong Joon Park,
+Jeffrey Fessler, Liyue Shen, Qing Qu, Antonio Torralba, and Alexei Efros for
+helpful discussions. Daniel is supported by the National Science Foundation
+Graduate Research Fellowship under Grant No. 1841052.
+
+## References
+
+  * [1] Bansal, A., Chu, H.M., Schwarzschild, A., Sengupta, S., Goldblum, M., Geiping, J., Goldstein, T.: Universal guidance for diffusion models (2023) 
+  * [2] Bar-Tal, O., Yariv, L., Lipman, Y., Dekel, T.: Multidiffusion: Fusing diffusion paths for controlled image generation. arXiv preprint arXiv:2302.08113 (2023) 
+  * [3] Brooks, T., Barron, J.T.: Learning to synthesize motion blur. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition. pp. 6840â€“6848 (2019) 
+  * [4] Brooks, T., Holynski, A., Efros, A.A.: Instructpix2pix: Learning to follow image editing instructions. In: CVPR (2023) 
+  * [5] Burgert, R., Ranasinghe, K., Li, X., Ryoo, M.: Diffusion illusions: Hiding images in plain sight. https://ryanndagreat.github.io/Diffusion-Illusions (Mar 2023) 
+  * [6] Chandra, K., Li, T.M., Tenenbaum, J., Ragan-Kelley, J.: Designing perceptual puzzles by differentiating probabilistic programs. In: ACM SIGGRAPH 2022 Conference Proceedings. pp.Â 1â€“9 (2022) 
+  * [7] Chu, H.K., Hsu, W.H., Mitra, N.J., Cohen-Or, D., Wong, T.T., Lee, T.Y.: Camouflage images. ACM Trans. Graph. 29(4), 51â€“1 (2010) 
+  * [8] Chung, H., Kim, J., Mccann, M.T., Klasky, M.L., Ye, J.C.: Diffusion posterior sampling for general noisy inverse problems. arXiv preprint arXiv:2209.14687 (2022) 
+  * [9] Chung, H., Sim, B., Ryu, D., Ye, J.C.: Improving diffusion models for inverse problems using manifold constraints. Advances in Neural Information Processing Systems 35, 25683â€“25696 (2022) 
+  * [10] Chung, H., Sim, B., Ye, J.C.: Come-closer-diffuse-faster: Accelerating conditional diffusion models for inverse problems through stochastic contraction. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition. pp. 12413â€“12422 (2022) 
+  * [11] Dhariwal, P., Nichol, A.: Diffusion models beat gans on image synthesis. Advances in neural information processing systems 34, 8780â€“8794 (2021) 
+  * [12] Du, Y., Li, S., Mordatch, I.: Compositional visual generation with energy based models. Advances in Neural Information Processing Systems 33, 6637â€“6647 (2020) 
+  * [13] Elsayed, G., Shankar, S., Cheung, B., Papernot, N., Kurakin, A., Goodfellow, I., Sohl-Dickstein, J.: Adversarial examples that fool both computer vision and time-limited humans. Advances in neural information processing systems 31 (2018) 
+  * [14] Epstein, D., Jabri, A., Poole, B., Efros, A.A., Holynski, A.: Diffusion self-guidance for controllable image generation (2023) 
+  * [15] Fergus, R., Singh, B., Hertzmann, A., Roweis, S.T., Freeman, W.T.: Removing camera shake from a single photograph. In: Acm Siggraph 2006 Papers, pp. 787â€“794 (2006) 
+  * [16] Freeman, W.T., Adelson, E.H., Heeger, D.J.: Motion without movement. ACM Siggraph Computer Graphics 25(4), 27â€“30 (1991) 
+  * [17] Geng, D., Owens, A.: Motion guidance: Diffusion-based image editing with differentiable motion estimators. International Conference on Learning Representations (2024) 
+  * [18] Geng, D., Park, I., Owens, A.: Visual anagrams: Generating multi-view optical illusions with diffusion models. Computer Vision and Pattern Recognition (CVPR) 2024 (2024) 
+  * [19] Gomez-Villa, A., Martin, A., Vazquez-Corral, J., BertalmÃ­o, M.: Convolutional neural networks can be deceived by visual illusions. In: Proceedings of the IEEE/CVF conference on computer vision and pattern recognition. pp. 12309â€“12317 (2019) 
+  * [20] Goodfellow, I.J., Shlens, J., Szegedy, C.: Explaining and harnessing adversarial examples. arXiv preprint arXiv:1412.6572 (2014) 
+  * [21] Gu, Z., Davis, A.: Filtered-guided diffusion: Fast filter guidance for black-box diffusion models. arXiv preprint arXiv:2306.17141 (2023) 
+  * [22] Guo, R., Collins, J., deÂ Lima, O., Owens, A.: Ganmouflage: 3d object nondetection with texture fields. Computer Vision and Pattern Recognition (CVPR) (2023) 
+  * [23] Hertz, A., Mokady, R., Tenenbaum, J., Aberman, K., Pritch, Y., Cohen-Or, D.: Prompt-to-prompt image editing with cross attention control (2022) 
+  * [24] Hertzmann, A.: Visual indeterminacy in gan art. In: ACM SIGGRAPH 2020 Art Gallery, pp. 424â€“428 (2020) 
+  * [25] Ho, J., Jain, A., Abbeel, P.: Denoising diffusion probabilistic models. arXiv preprint arxiv:2006.11239 (2020) 
+  * [26] Huberman-Spiegelglas, I., Kulikov, V., Michaeli, T.: An edit friendly ddpm noise space: Inversion and manipulations. arXiv preprint arXiv:2304.06140 (2023) 
+  * [27] Jaini, P., Clark, K., Geirhos, R.: Intriguing properties of generative classifiers. arXiv preprint arXiv:2309.16779 (2023) 
+  * [28] Kawar, B., Elad, M., Ermon, S., Song, J.: Denoising diffusion restoration models. Advances in Neural Information Processing Systems 35, 23593â€“23606 (2022) 
+  * [29] Konstantinov, M., Shonenkov, A., Bakshandaeva, D., Ivanova, K.: If by deepfloyd lab at stabilityai (2023), https://github.com/deep-floyd/IF/, gitHub repository 
+  * [30] Labs, M.: Controlnet qr code monster v2 for sd-1.5 (July 2023), https://huggingface.co/monster-labs/control_v1p_sd15_qrcode_monster
+  * [31] Lee, Y., Kim, K., Kim, H., Sung, M.: Syncdiffusion: Coherent montage via synchronized joint diffusions. In: Thirty-seventh Conference on Neural Information Processing Systems (2023) 
+  * [32] Liu, N., Li, S., Du, Y., Tenenbaum, J., Torralba, A.: Learning to compose visual relations. Advances in Neural Information Processing Systems 34, 23166â€“23178 (2021) 
+  * [33] Liu, N., Li, S., Du, Y., Torralba, A., Tenenbaum, J.B.: Compositional visual generation with composable diffusion models. In: European Conference on Computer Vision. pp. 423â€“439. Springer (2022) 
+  * [34] Lugmayr, A., Danelljan, M., Romero, A., Yu, F., Timofte, R., VanÂ Gool, L.: Repaint: Inpainting using denoising diffusion probabilistic models. In: Proceedings of the IEEE/CVF conference on computer vision and pattern recognition. pp. 11461â€“11471 (2022) 
+  * [35] Meng, C., He, Y., Song, Y., Song, J., Wu, J., Zhu, J.Y., Ermon, S.: SDEdit: Guided image synthesis and editing with stochastic differential equations. In: International Conference on Learning Representations (2022) 
+  * [36] Mildenhall, B., Barron, J.T., Chen, J., Sharlet, D., Ng, R., Carroll, R.: Burst denoising with kernel prediction networks. In: Proceedings of the IEEE conference on computer vision and pattern recognition. pp. 2502â€“2510 (2018) 
+  * [37] Mokady, R., Hertz, A., Aberman, K., Pritch, Y., Cohen-Or, D.: Null-text inversion for editing real images using guided diffusion models (2022) 
+  * [38] Nayar, S.K., Ben-Ezra, M.: Motion-based motion deblurring. IEEE transactions on pattern analysis and machine intelligence 26(6), 689â€“698 (2004) 
+  * [39] Ngo, J., Sankaranarayanan, S., Isola, P.: Is clip fooled by optical illusions? (2023) 
+  * [40] Nichol, A., Dhariwal, P., Ramesh, A., Shyam, P., Mishkin, P., McGrew, B., Sutskever, I., Chen, M.: Glide: Towards photorealistic image generation and editing with text-guided diffusion models (2021) 
+  * [41] Oliva, A., Schyns, P.G.: Coarse blobs or fine edges? evidence that information diagnosticity changes the perception of complex visual stimuli. Cognitive psychology 34 (1997) 
+  * [42] Oliva, A., Torralba, A., Schyns, P.G.: Hybrid images. ACM Trans. Graph. 25(3), 527â€“532 (jul 2006). https://doi.org/10.1145/1141911.1141919, https://doi.org/10.1145/1141911.1141919
+  * [43] Owens, A., Barnes, C., Flint, A., Singh, H., Freeman, W.: Camouflaging an object from many viewpoints (2014) 
+  * [44] Parmar, G., Singh, K.K., Zhang, R., Li, Y., Lu, J., Zhu, J.Y.: Zero-shot image-to-image translation (2023) 
+  * [45] Poole, B., Jain, A., Barron, J.T., Mildenhall, B.: Dreamfusion: Text-to-3d using 2d diffusion. arXiv (2022) 
+  * [46] Rombach, R., Blattmann, A., Lorenz, D., Esser, P., Ommer, B.: High-resolution image synthesis with latent diffusion models. In: Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR) (2022), https://github.com/CompVis/latent-diffusionhttps://arxiv.org/abs/2112.10752
+  * [47] Ruiz, N., Li, Y., Jampani, V., Pritch, Y., Rubinstein, M., Aberman, K.: Dreambooth: Fine tuning text-to-image diffusion models for subject-driven generation (2022) 
+  * [48] Saharia, C., Chan, W., Saxena, S., Li, L., Whang, J., Denton, E., Ghasemipour, S.K.S., Ayan, B.K., Mahdavi, S.S., Lopes, R.G., Salimans, T., Ho, J., Fleet, D.J., Norouzi, M.: Photorealistic text-to-image diffusion models with deep language understanding (2022) 
+  * [49] Schyns, P.G., Oliva, A.: From blobs to boundary edges: Evidence for time-and spatial-scale-dependent scene recognition. Psychological science 5(4), 195â€“200 (1994) 
+  * [50] Schyns, P.G., Oliva, A.: Dr. angry and mr. smile: when categorization flexibly modifies the perception of faces in rapid visual presentations. Cognitive 69 (1999) 
+  * [51] Sohl-Dickstein, J., Weiss, E., Maheswaranathan, N., Ganguli, S.: Deep unsupervised learning using nonequilibrium thermodynamics. In: Bach, F., Blei, D. (eds.) Proceedings of the 32nd International Conference on Machine Learning. Proceedings of Machine Learning Research, vol.Â 37, pp. 2256â€“2265. PMLR, Lille, France (07â€“09 Jul 2015), https://proceedings.mlr.press/v37/sohl-dickstein15.html
+  * [52] Song, J., Meng, C., Ermon, S.: Denoising diffusion implicit models. arXiv:2010.02502 (October 2020), https://arxiv.org/abs/2010.02502
+  * [53] Song, Y., Shen, L., Xing, L., Ermon, S.: Solving inverse problems in medical imaging with score-based generative models. arXiv preprint arXiv:2111.08005 (2021) 
+  * [54] Song, Y., Sohl-Dickstein, J., Kingma, D.P., Kumar, A., Ermon, S., Poole, B.: Score-based generative modeling through stochastic differential equations. In: International Conference on Learning Representations (2021), https://openreview.net/forum?id=PxTIG12RRHS
+  * [55] Sripian, P., Yamaguchi, Y.: Hybrid image of three contents. Visual computing for industry, biomedicine, and art 3(1), Â 1â€“8 (2020) 
+  * [56] Szegedy, C., Zaremba, W., Sutskever, I., Bruna, J., Erhan, D., Goodfellow, I., Fergus, R.: Intriguing properties of neural networks. arXiv preprint arXiv:1312.6199 (2013) 
+  * [57] Takeda, H., Milanfar, P.: Removing motion blur with spaceâ€“time processing. IEEE Transactions on Image Processing 20(10), 2990â€“3000 (2011) 
+  * [58] Tancik, M.: Illusion diffusion. https://github.com/tancik/Illusion-Diffusion (Feb 2023) 
+  * [59] Tumanyan, N., Geyer, M., Bagon, S., Dekel, T.: Plug-and-play diffusion features for text-driven image-to-image translation. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR). pp. 1921â€“1930 (June 2023) 
+  * [60] Ugleh: Spiral town - different approach to qr monster. https://www.reddit.com/r/StableDiffusion/comments/16ew9fz/spiral_town_different_approach_to_qr_monster/ (September 2023), https://www.reddit.com/r/StableDiffusion/comments/16ew9fz/spiral_town_different_approach_to_qr_monster/
+  * [61] Wallace, B., Gokul, A., Naik, N.: Edict: Exact diffusion inversion via coupled transformations. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition. pp. 22532â€“22541 (2023) 
+  * [62] Wang, X., Bylinskii, Z., Hertzmann, A., Pepperell, R.: Toward quantifying ambiguities in artistic images. ACM Transactions on Applied Perception (TAP) 17(4), 1â€“10 (2020) 
+  * [63] Wang, X., Kontkanen, J., Curless, B., Seitz, S., Kemelmacher, I., Mildenhall, B., Srinivasan, P., Verbin, D., Holynski, A.: Generative powers of ten. arXiv preprint arXiv:2312.02149 (2023) 
+  * [64] Wang, Y., Yu, J., Zhang, J.: Zero-shot image restoration using denoising diffusion null-space model. arXiv preprint arXiv:2212.00490 (2022) 
+  * [65] Wu, C.H., DeÂ la Torre, F.: Unifying diffusion modelsâ€™ latent space, with applications to cyclediffusion and guidance. arXiv preprint arXiv:2210.05559 (2022) 
+  * [66] Yitzhaky, Y., Mor, I., Lantzman, A., Kopeika, N.S.: Direct method for restoration of motion-blurred images. JOSA A 15(6), 1512â€“1519 (1998) 
+  * [67] Zhang, L., Rao, A., Agrawala, M.: Adding conditional control to text-to-image diffusion models (2023) 
+  * [68] Zhang, Q., Song, J., Huang, X., Chen, Y., Liu, M.Y.: Diffcollage: Parallel generation of large content with diffusion models. arXiv preprint arXiv:2303.17076 (2023) 
+
+##  Appendix 0.A Implementation Details
+
+###  0.A.1 Pixel Diffusion Model
+
+For all experiments we use the pixel diffusion model DeepFloyd IFÂ [29], as
+opposed to more common latent diffusion models. This is because the frequency
+subband, color space, and motion decompositions are not meaningful in latent
+space. For example, averaging channels in latent space does not correspond to
+an interpretable image manipulation. Interestingly, using our method to
+construct hybrid images with a latent diffusion model, by blurring latent
+codes, works to an extent but is easily susceptible to artifacts (see
+AppendixÂ 0.F), so we opt to use a pixel diffusion model which is more
+consistent and principled.
+
+###  0.A.2 Hybrid Images
+
+DeepFloyd IFÂ [29] generates images in two stages. First at a resolution of
+64Ã—64646464\times 6464 Ã— 64 and then at 256Ã—256256256256\times 256256 Ã—
+256. Because of this, we adopt the convention that our Ïƒğœ\sigmaitalic_Ïƒ
+values are specified for the 64Ã—64646464\times 6464 Ã— 64 scale, and are
+scaled by 4Ã—4\times4 Ã— for the 256Ã—256256256256\times 256256 Ã— 256 images.
+We use a relatively large kernel size of 33333333 at both scales to minimize
+edge effects. We use Ïƒğœ\sigmaitalic_Ïƒ values ranging from
+Ïƒ=1.0ğœ1.0\sigma=1.0italic_Ïƒ = 1.0 to Ïƒ=3.0ğœ3.0\sigma=3.0italic_Ïƒ = 3.0
+for all hybrid images except for those in Fig.Â 3, in which we sweep the value
+of Ïƒğœ\sigmaitalic_Ïƒ.
+
+###  0.A.3 Triple Hybrids
+
+Triple hybrids are quite difficult to synthesize, and as such we manually
+select the sigma values and prompts to generate high-quality samples.
+Specifically, we use Ïƒ1subscriptğœ1\sigma_{1}italic_Ïƒ start_POSTSUBSCRIPT 1
+end_POSTSUBSCRIPT values from Ïƒ1=0.8subscriptğœ10.8\sigma_{1}=0.8italic_Ïƒ
+start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT = 0.8 to
+Ïƒ1=1.0subscriptğœ11.0\sigma_{1}=1.0italic_Ïƒ start_POSTSUBSCRIPT 1
+end_POSTSUBSCRIPT = 1.0 and Ïƒ2subscriptğœ2\sigma_{2}italic_Ïƒ
+start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT values from
+Ïƒ2=1.2subscriptğœ21.2\sigma_{2}=1.2italic_Ïƒ start_POSTSUBSCRIPT 2
+end_POSTSUBSCRIPT = 1.2 to Ïƒ2=2.0subscriptğœ22.0\sigma_{2}=2.0italic_Ïƒ
+start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT = 2.0 for all triple hybrids inÂ Fig.Â
+1 and Fig.Â 14.
+
+###  0.A.4 Upscaling
+
+DeepFloyd IF additionally uses a third stage which upscales from
+256Ã—256256256256\times 256256 Ã— 256 to 1024Ã—1024102410241024\times 10241024
+Ã— 1024. We also use this stage, but because it is a latent model, we do not
+apply our method. We upscale using only the prompt corresponding to the
+highest frequency component or the color component.
+
+##  Appendix 0.B Human Studies
+
+We use Amazon Mechanical Turk for the human study. 77 â€œmaster workersâ€ were
+asked the following questions for each hybrid image pair:
+
+  * âˆ™âˆ™\bulletâˆ™
+
+â€œWhich image shows [prompt_1] clearer?â€
+
+  * âˆ™âˆ™\bulletâˆ™
+
+â€œWhich image shows [prompt_2] clearer?â€
+
+  * âˆ™âˆ™\bulletâˆ™
+
+â€œWhich image is of higher quality?â€
+
+For low frequency prompt questions, we downsample the images accordingly in
+order to help participants more easily see the content. For the high frequency
+prompt questions, as well as the quality questions, we display the images at
+full resolution. Participants were shown 8 hybrid image pairs in a random
+order.
+
+![Refer to caption](x10.png) Figure 10: Prior Work on Triple Hybrid Images. We
+show the triple hybrid results from prior workÂ [55], which adapts the classic
+method ofÂ [42]. A description of what should be seen is provided underneath
+each image, going from high to low frequencies. As can be seen, these results
+are of lower quality than our results.
+
+##  Appendix 0.C Prior Triple Hybrid Methods
+
+Prior workÂ [55] attempts to create triple hybrid images by adapting the
+method of OlivaÂ  _et al_.Â [42]. As can be seen in Fig.Â 10, the results are
+not of high visual quality, and it can be hard to identify the three different
+subjects in the image, especially when compared to our results. This reflects
+the difficulty of creating these images.
+
+##  Appendix 0.D Metrics Implementation
+
+In Tab.Â 2, we report the max CLIP score over multiple image downsampling
+factors. Specifically, for each hybrid image we downsample and then upsample
+by a factor fğ‘“fitalic_f, where we choose fğ‘“fitalic_f to be a linear sweep
+of 20 values between 1 and 8. These images are then preprocessed to a size of
+224Ã—224224224224\times 224224 Ã— 224, which is the input resolution of the
+CLIP ViT-B/32 model which we use. We then take the normalized dot product
+between each resulting image embedding, and the text embedding for the
+corresponding prompt, and report the max. We report the max to account for the
+fact that different hybrid images are best seen at different downsampling
+factors.
+
+##  Appendix 0.E Connection to MultiDiffusion
+
+In Sec.Â 4.2.3 we explore Factorized Diffusion with a spatial decomposition,
+and show that it allows targeting of prompts to specific spatial regions. We
+claim that this is a special case of MultiDiffusionÂ [2]. MultiDiffusion
+updates a noisy image of arbitrary size by removing the consensus of multiple
+noise estimates over the image. Factorized Diffusion, with a spatial
+decomposition, also removes a consensus of multiple noise estimates. However,
+in our setup this consensus is formed specifically by the disjoint union of
+multiple noise estimates, and our method operates only at the resolution for
+which the diffusion model is trained, as opposed to MultiDiffusion.
+
+![Refer to caption](x11.png) Figure 11: Latent Hybrid Images. We provide
+hybrid image results using our method with Stable Diffusion v1.5, a latent
+diffusion model. As can be seen the results are passable, but suffer from
+artifacts, due to applying blurring and bandpass operations in the latent
+space.
+
+##  Appendix 0.F Hybrid Images with Latent Diffusion Models
+
+We show hybrid images resulting from using our method with Stable Diffusion
+v1.5, a latent diffusion model, in Fig.Â 11. As can be seen the results are
+decent, but have significant artifacts, due to applying bandpass filters in
+the latent space. We find that pixel diffusion models produce much higher
+quality samples.
+
+##  Appendix 0.G Synthesizing Hybrid Images with other Methods
+
+We also attempt to generate hybrid images using two recent methods: Visual
+AnagramsÂ [18] and Diffusion IllusionsÂ [5]. Results can be seen in Fig.Â 12.
+Both methods fail, which we describe and analyze below.
+
+Diffusion Illusions works by minimizing an SDSÂ [45] loss over multiple views
+of an image, paired with different prompts. We use the same high and low pass
+views as above. As can be seen in Fig.Â 12 the method produces a decent
+version of the low pass prompt, but fails to incorporate any of the high pass
+prompt. We believe this is because taking the high pass of an image moves it
+significantly out-of-distribution, rendering the SDS gradients unhelpful. Low
+passing an image alters its appearance, but keeps it relatively in-
+distribution, so as a result the method can still produce the low pass prompt.
+
+Visual Anagrams works by denoising multiple transformations of an image,
+paired with different prompts. We use a high pass and low pass transformation,
+but this fails because these operations change the statistics of the noise in
+the noisy image. As a result, the diffusion model is being fed out-of-
+distribution images, and the reverse process fails to converge, as shown in
+Fig.Â 12.
+
+![Refer to caption](x12.png) Figure 12: Other Illusion Methods. We attempt to
+create hybrid images using Visual AnagramsÂ [18] and Diffusion IllusionsÂ [5],
+two recent methods designed to generate optical illusions. As can be seen,
+both methods fail. Please see AppendixÂ 0.G for analysis. Table 3: Comparison
+to Visual AnagramsÂ [18]. We use [18] to synthesize hybrids and color hybrids,
+and report the same metrics as [18]. We use prompt pairs built from the
+CIFAR-10 classes, with 10 prompts per pair for a total of 900 samples. Our
+method performs consistently better, asÂ [18] is not designed to produce these
+kinds of illusions.
+
+Task | Method | ğ’œâ†‘â†‘ğ’œabsent\mathcal{A}\uparrowcaligraphic_A â†‘ | ğ’œ0.9â†‘â†‘subscriptğ’œ0.9absent\mathcal{A}_{0.9}\uparrowcaligraphic_A start_POSTSUBSCRIPT 0.9 end_POSTSUBSCRIPT â†‘ | ğ’œ0.95â†‘â†‘subscriptğ’œ0.95absent\mathcal{A}_{0.95}\uparrowcaligraphic_A start_POSTSUBSCRIPT 0.95 end_POSTSUBSCRIPT â†‘ | ğ’â†‘â†‘ğ’absent\mathcal{C}\uparrowcaligraphic_C â†‘ | ğ’0.9â†‘â†‘subscriptğ’0.9absent\mathcal{C}_{0.9}\uparrowcaligraphic_C start_POSTSUBSCRIPT 0.9 end_POSTSUBSCRIPT â†‘ | ğ’0.95â†‘â†‘subscriptğ’0.95absent\mathcal{C}_{0.95}\uparrowcaligraphic_C start_POSTSUBSCRIPT 0.95 end_POSTSUBSCRIPT â†‘  
+---|---|---|---|---|---|---|---  
+Hybrid Images | Visual AnagramsÂ [18] | 0.226 | 0.237 | 0.240 | 0.500 | 0.520 | 0.525  
+Ours | 0.237 | 0.263 | 0.271 | 0.536 | 0.630 | 0.651  
+Color Hybrids | Visual AnagramsÂ [18] | 0.223 | 0.232 | 0.234 | 0.500 | 0.537 | 0.547  
+Ours | 0.231 | 0.260 | 0.269 | 0.512 | 0.562 | 0.586  
+  
+Finally, we also quantitatively evaluate hybrid and color hybrids generated
+using GengÂ  _et al_. [18] against our proposed method, with results shown in
+Tab.Â 3. As prompts, we use all pairs of CIFAR-10 classes, and sample 10
+images per prompt pair for a total of 900 samples. We use the same metrics asÂ
+[18], and we find that our method does better consistently, asÂ [18] was not
+designed to generate these illusions.
+
+##  Appendix 0.H Further Analysis of Factorized Diffusion
+
+As discussed in Sec.Â 3.3, our analysis assumes that the update step is a
+linear combination of the noisy image, ğ±tsubscriptğ±ğ‘¡{\mathbf{x}}_{t}bold_x
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT, and the noise estimate,
+ÏµÎ¸subscriptitalic-Ïµğœƒ\epsilon_{\theta}italic_Ïµ start_POSTSUBSCRIPT
+italic_Î¸ end_POSTSUBSCRIPT. However, many commonly used update steps also
+involve adding random noise ğ³âˆ¼ğ’©â¢(0,ğˆ)similar-
+toğ³ğ’©0ğˆ\mathbf{z}\sim\mathcal{N}(0,\mathbf{I})bold_z âˆ¼ caligraphic_N ( 0
+, bold_I ), such as DDPMÂ [25]. To deal with this, we can view the update step
+as a composition of two steps:
+
+| ğ±tâˆ’1subscriptğ±ğ‘¡1\displaystyle{\mathbf{x}}_{t-1}bold_x start_POSTSUBSCRIPT italic_t - 1 end_POSTSUBSCRIPT | =ğšğš™ğšğšŠğšğšâ¢(ğ±t,ÏµÎ¸)absentğšğš™ğšğšŠğšğšsubscriptğ±ğ‘¡subscriptitalic-Ïµğœƒ\displaystyle=\texttt{update}({\mathbf{x}}_{t},\epsilon_{\theta})= update ( bold_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT , italic_Ïµ start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT ) |  | (21)  
+---|---|---|---|---  
+|  | =updateâ€™â¢(ğ±t,ÏµÎ¸)+Ïƒzâ¢ğ³.absentupdateâ€™subscriptğ±ğ‘¡subscriptitalic-Ïµğœƒsubscriptğœğ‘§ğ³\displaystyle=\texttt{update'}({\mathbf{x}}_{t},\epsilon_{\theta})+\sigma_{z}% \mathbf{z}.= updateâ€™ ( bold_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT , italic_Ïµ start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT ) + italic_Ïƒ start_POSTSUBSCRIPT italic_z end_POSTSUBSCRIPT bold_z . |  | (22)  
+  
+The first is now a linear combination of
+ğ±tsubscriptğ±ğ‘¡{\mathbf{x}}_{t}bold_x start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT and ÏµÎ¸subscriptitalic-Ïµğœƒ\epsilon_{\theta}italic_Ïµ
+start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT, and the second adds in the
+noise ğ³ğ³\mathbf{z}bold_z. Our analysis then applies to just the updateâ€™
+function.
+
+##  Appendix 0.I Choosing Prompts
+
+We find that carefully choosing prompts can generate higher quality illusions.
+For example, the success rate and quality of samples are much higher when at
+least one prompt is of a â€œflexibleâ€ subject, such as "houseplants" or "a
+canyon". In addition, we found biases specific to decompositions. Prompts with
+the style "photo of..." performed better for hybrid and motion hybrid images.
+We suspect this is because photos tend to have ample amounts of both high and
+low frequency content, as opposed to styles such as "oil paintings" or
+"watercolors", which tend to lack higher frequency content. For color hybrids,
+we found that using the style of "watercolor" produced better results, perhaps
+because of the styleâ€™s emphasis on color.
+
+![Refer to caption](x13.png) Figure 13: Colorization. Our method can also be
+used to solve inverse problems, such as colorization. We show grayscale images
+that we wish to colorize on the left. The color component is then generated
+conditioned on the text prompts displayed.
+
+##  Appendix 0.J Colorization
+
+We also show colorization results in Fig.Â 13, using our method as an inverse
+problem solver, as discussed in Sec.Â 3.5. Specifically, we use the color
+space decomposition introduced in Sec.Â 3.4. During diffusion model sampling
+we hold the grayscale component fixed to the grayscale component of a real
+image that we want to colorize, and generate the color component. Note that
+this is highly similar to prior workÂ [54, 28, 9].
+
+##  Appendix 0.K Additional Results
+
+In this section, we provide additional qualitative results. Additional results
+for hybrid images and triple hybrids are shown in Fig.Â 16 and Fig.Â 14
+respectively. In Fig.Â 15 and Fig.Â 17, we provide more examples of motion and
+color hybrids, respectively. Finally, we provide more random samples for
+hybrid images, color hybrids, and motion hybrids in Fig.Â 18.
+
+![Refer to caption](x14.png) Figure 14: Triple Hybrids. We provide more triple
+hybrid results. Best viewed digitally, using zoom. ![Refer to
+caption](x15.png) Figure 15: Motion Hybrids. We show more motion hybrid
+results. These are images that change appearance when motion blurred. Here,
+the motion is from upper left to bottom right. ![Refer to caption](x16.png)
+Figure 16: Hybrid Images. We show more hybrid image results. For easier
+viewing, we provide insets of each hybrid image at lower resolution, along
+with the corresponding prompt. Best viewed digitally, with zoom. ![Refer to
+caption](x17.png) Figure 17: Color Hybrids. We show more color hybrid results,
+with grayscale images placed above their colorized version. ![Refer to
+caption](x18.png) Figure 18: Random Samples. We provide random samples of
+hybrid images, color hybrids, and motion hybrids for selected prompts.

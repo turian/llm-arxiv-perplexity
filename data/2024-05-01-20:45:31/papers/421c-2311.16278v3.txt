@@ -1,0 +1,856 @@
+  1. I Introduction
+  2. II Related Works
+    1. II-A Vehicle Re-ID
+    2. II-B Pose Guided Vehicle Image Synthesis
+  3. III Proposed Approach
+    1. III-A Overview
+    2. III-B VehicleGAN
+      1. III-B1 Pose Estimation
+      2. III-B2 AutoReconstruction as Self-Supervision
+      3. III-B3 Pair-flexible Settings
+      4. III-B4 Supervised Learning with Paired Data
+      5. III-B5 Unsupervised Learning with Unpaired Data
+    3. III-C Joint Metric Learning
+      1. III-C1 Unified Target Pose
+      2. III-C2 Re-ID Model
+      3. III-C3 Loss Functions
+  4. IV Experiments
+    1. IV-A Datasets and Evaluations
+      1. IV-A1 VehicleGAN Experiments Setting
+      2. IV-A2 Datasets
+      3. IV-A3 Evaluation Metrics
+    2. IV-B Implementation Details
+      1. IV-B1 VehicleGAN
+      2. IV-B2 Re-ID model
+    3. IV-C Comparison for Pose Guided Vehicle Image Synthesis
+    4. IV-D Comparison for Vehicle Re-ID
+  5. V Conclusions
+
+License: arXiv.org perpetual non-exclusive license
+
+arXiv:2311.16278v3 [cs.CV] 17 Apr 2024
+
+# VehicleGAN: Pair-flexible Pose Guided Image Synthesis for Vehicle Re-
+identification
+
+Baolu Liâ€ â€ {}^{\dagger}start_FLOATSUPERSCRIPT â€ end_FLOATSUPERSCRIPT, Ping
+Liuâ€ â€ {}^{\dagger}start_FLOATSUPERSCRIPT â€ end_FLOATSUPERSCRIPT, Lan Fu,
+Jinlong Li, Jianwu Fang, Zhigang Xu*{}^{*}start_FLOATSUPERSCRIPT *
+end_FLOATSUPERSCRIPT, Hongkai Yu*{}^{*}start_FLOATSUPERSCRIPT *
+end_FLOATSUPERSCRIPT Baolu Li and Zhigang Xu are with Changâ€™an University,
+Xiâ€™an 710064, China. Ping Liu is with the Center for Frontier AI Research
+(CFAR), Agency for Science, Technology, and Research (A*STAR), Singapore
+138634. Lan Fu is with University of South Carolina, Columbia 29201, SC, USA.
+Jianwu Fang is with Xiâ€™an Jiaotong University, Xiâ€™an 710049, China. Baolu
+Li, Jinlong Li, and Hongkai Yu are with Cleveland State University, Cleveland,
+OH 44115, USA.â€ â€ {\dagger}â€  indicates co-first authors. * Co-
+corresponding authors: Zhigang Xu (xuzhigang@chd.edu.cn), Hongkai Yu
+(h.yu19@csuohio.edu).
+
+###### Abstract
+
+Vehicle Re-identification (Re-ID) has been broadly studied in the last decade;
+however, the different camera view angles leading to confused discrimination
+in the feature subspace for the vehicles of various poses, is still
+challenging for the Vehicle Re-ID models in the real world. To promote the
+Vehicle Re-ID models, this paper proposes to synthesize a large number of
+vehicle images in the target pose, whose idea is to project the vehicles of
+diverse poses into the unified target pose so as to enhance feature
+discrimination. Considering that the paired data of the same vehicles in
+different traffic surveillance cameras might be not available in the real
+world, we propose the first Pair-flexible Pose Guided Image Synthesis method
+for Vehicle Re-ID, named as VehicleGAN in this paper, which works for both
+supervised and unsupervised settings without the knowledge of geometric 3D
+models. Because of the feature distribution difference between real and
+synthetic data, simply training a traditional metric learning based Re-ID
+model with data-level fusion (_i.e_., data augmentation) is not satisfactory,
+therefore we propose a new Joint Metric Learning (JML) via effective feature-
+level fusion from both real and synthetic data. Intensive experimental results
+on the public VeRi-776 and VehicleID datasets prove the accuracy and
+effectiveness of our proposed VehicleGAN and JML.
+
+###### Index Terms:
+
+Vehicle Re-identification, Joint Metric Learning, Pose Guided Image Synthesis
+
+##  I Introduction
+
+Many tasks and functions in the intelligent transportation systemsÂ [1, 2, 3,
+4, 5, 6, 7, 8, 9, 10, 11, 12, 13] involve the detection or identification of
+vehicles. Vehicle Re-identification (Re-ID) is an important task in
+intelligent transportation systems, as it allows for the retrieval of the same
+vehicle from multiple non-overlapping cameras. With the availability of
+vehicle surveillance datasetsÂ [14, 15, 16], many vehicle Re-ID methodsÂ [17,
+18, 19] have been proposed, which have gained wide interest among the research
+communities of foundation intelligence, human-machine systems, and
+transportationÂ [20, 8, 21].
+
+However, the large viewpoint divergence of vehicle images caused by different
+camera views in the real world makes significant challenges for vehicle Re-ID
+modelsÂ [22, 14]. As shown in Fig.Â 1, the same vehicles of diverse poses are
+ambiguous in an embedded feature subspace, leading to identification
+difficulties, while the feature discrimination could be enhanced if the
+vehicle images could be projected to the same target pose. Inspired by our
+discovery of Fig.Â 1, this paper proposes to project the vehicles of diverse
+poses into the unified target pose.
+
+![Refer to caption](x1.png) Figure 1: Enhanced discrimination by synthesizing
+vehicle images to a unified target pose by our VehicleGAN. (a) Vehicle images
+in the VeRi-776Â [14]. (b) Corresponding synthesized vehicle images by
+VehicleGAN.
+
+To tackle the pose-varied vehicle images effectively, the controllable
+various-view synthesis of vehicle images has been investigatedÂ [23], which
+aims to synthesize the images of a vehicle at a target pose. Existing methods
+can be divided into 3D-based and 2D-based approaches. Those 3D-based
+approachesÂ [24] utilize the geometric 3D model to synthesize images, which
+might be not available or prone to errors in the real traffic surveillance
+scenarios due to the lack of camera parameters and diverse vehicle poses. The
+2D-based methodsÂ [23] use paired 2D images of the same vehicle in different
+cameras to supervise neural networks to learn the transformation of the
+vehicle to the target pose. They suffered from the manual annotation cost of
+the same vehicles in different cameras. Therefore, no matter the existing 3D
+or 2D methods have significant drawbacks in the real world.
+
+Differently, this paper proposes the first Pair-flexible Pose Guided Image
+Synthesis method for Vehicle Re-ID, named as VehicleGAN, which works for both
+supervised and unsupervised settings without the knowledge of geometric 3D
+models. 1) We design a novel Generative Adversarial Network (GAN) based end-
+to-end framework for pose guided vehicle image synthesis, which takes the 2D
+vehicle image in the original pose and the target 2D pose as inputs and then
+directly outputs the new synthesized 2D vehicle image in the target pose.
+Using the 2D target pose as a condition to control the Generative Artificial
+Intelligence (AI), the proposed method gets rid of using the geometric 3D
+model. 2) The proposed VehicleGAN works for both supervised (paired images of
+same vehicle) and unsupervised (unpaired images of same vehicle) settings, so
+it is called Pair-flexible in this paper. For the pose guided image synthesis
+in the current vehicle Re-ID research community, the supervised (paired)
+setting is easy for training the Generative AI model, however, the
+unsupervised (unpaired) setting is challenging. 3) To solve the challenging
+unsupervised problem, we proposed a novel method AutoReconstruction to
+transfer the vehicle image in the original pose to the target pose and then
+transfer it back to reconstruct itself as self-supervision. In this way, the
+paired images of the same vehicles in different cameras are not required to
+train the Generative AI model.
+
+After getting the synthesized vehicle images in different poses, simply
+training a traditional metric learning based Re-ID model with the direct data-
+level fusion of real and synthetic images (_i.e_., data augmentation) is not
+satisfactory. This is because of the feature distribution difference between
+real and synthetic data. To solve this problem, we propose a novel Joint
+Metric Learning (JML) via effective feature-level fusion from both real and
+synthetic data. We conduct intensive experiments on the public VeRi-776Â [14]
+and VehicleIDÂ [15] datasets, whose results display the accuracy and
+effectiveness of our proposed VehicleGAN and JML. The main contributions are
+summarized as follows.
+
+  * â€¢
+
+This paper proposes a novel method to project the vehicles of diverse poses
+into the unified target pose to enhance vehicle Re-ID accuracy.
+
+  * â€¢
+
+This paper proposes the first Pair-flexible Pose Guided Image Synthesis method
+for Vehicle Re-ID, called VehicleGAN, which works for both supervised and
+unsupervised settings without the knowledge of geometric 3D models.
+
+  * â€¢
+
+This paper proposes a new Joint Metric Learning (JML) via effective feature-
+level fusion from both real and synthetic data to overcome the shortcomings of
+the real-and-synthetic feature distribution difference.
+
+##  II Related Works
+
+###  II-A Vehicle Re-ID
+
+Benefiting from a series of public datasets and benchmarksÂ [14, 15], vehicle
+Re-ID has made significant progress over the past decade. All the previous
+works of vehicle Re-ID task are to enhance the feature discrimination of
+vehicles in different cameras. On the one hand, some previous worksÂ [25] aim
+to learn supplemental features of the local vehicle regions to reinforce the
+global features. On the other hand, some previous worksÂ [26] focus on
+designing more powerful neural network structures to enhance feature
+discrimination. Different with existing feature enhancement works, this paper
+proposes to project the vehicles of diverse poses into the unified pose so as
+to enhance feature discrimination for vehicle Re-ID.
+
+###  II-B Pose Guided Vehicle Image Synthesis
+
+Pose Guided Vehicle Image Synthesis allows vehicles to synthesize novel views
+based on pose. Previous works can be mainly divided into 3D-based and 2D-based
+approaches. Those 3D-based methodsÂ [24]rely on 3D model of vehicle or
+parameters of camera to achieve perspective conversion. 3D-based methods are
+limited by the difficulty to obtain detailed 3D models or accurate camera
+parameters in real scenes. Benefited from the Generative AI, the 2D-based
+methodsÂ [23] learn the experience of view synthesis from paired 2D images in
+various poses. These 2D-based methods can more easily extract poses from
+pictures, which will be more advantageous in the real world. However, since
+they require ground-truth to supervise the learning, the paired images of same
+vehicle need to be manually identified. Differently, our proposed method is
+less constrained in the real world and can be unsupervised without the need
+for identity annotations.
+
+![Refer to caption](x2.png) Figure 2: The pipeline of the proposed Joint
+Metric Learning using the proposed VehicleGAN.
+MRsubscriptMR\mathrm{M_{R}}roman_M start_POSTSUBSCRIPT roman_R
+end_POSTSUBSCRIPT: Re-ID model for real images.
+MSsubscriptMS\mathrm{M_{S}}roman_M start_POSTSUBSCRIPT roman_S
+end_POSTSUBSCRIPT: Re-ID model for synthetic images. The Unified Pose part
+represents the synthetic images with the same target pose by the proposed
+VehicleGAN (pre-trained). The real and synthetic features are fused for joint
+training and testing. ![Refer to caption](x3.png) Figure 3: The detailed
+pipeline of the proposed VehicleGAN with the idea of AutoReconstruction. The
+input of the generator is the channel-wise concatenation of the original image
+and the target pose, and the output of the generator is the synthesized image
+of the original image in the target pose. Unsupervised setting (unpaired data)
+is shown in this example.
+
+##  III Proposed Approach
+
+###  III-A Overview
+
+The Fig.Â 2 shows the whole framework of the proposed VehicleGAN guided
+vehicle Re-ID via Joint Metric Learning. The framework includes two stages:
+VehicleGAN and Joint Metric Learning. The former is an encoder-decoder based
+Generative Adversarial Networks (GAN) for pose guided vehicle image synthesis,
+and the latter consists of two branches: a Re-ID model for real images
+(MRsubscriptMR\mathrm{M_{R}}roman_M start_POSTSUBSCRIPT roman_R
+end_POSTSUBSCRIPT) and the other Re-ID model for synthetic images
+(MSsubscriptMS\mathrm{M_{S}}roman_M start_POSTSUBSCRIPT roman_S
+end_POSTSUBSCRIPT). The VehicleGAN aims to generate an image with a target
+pose given an original vehicle image as input. The two Re-ID models (_i.e_.,
+MRsubscriptMR\mathrm{M_{R}}roman_M start_POSTSUBSCRIPT roman_R
+end_POSTSUBSCRIPT and MSsubscriptMS\mathrm{M_{S}}roman_M start_POSTSUBSCRIPT
+roman_S end_POSTSUBSCRIPT) do not share weights due to their feature
+differences. With the synthetic vehicle images in the unified target pose
+generated by VehicleGAN, the MSsubscriptMS\mathrm{M_{S}}roman_M
+start_POSTSUBSCRIPT roman_S end_POSTSUBSCRIPT learns to identify pose-
+invariant features, while the MRsubscriptMR\mathrm{M_{R}}roman_M
+start_POSTSUBSCRIPT roman_R end_POSTSUBSCRIPT learns to recognize features
+from real images. The MRsubscriptMR\mathrm{M_{R}}roman_M start_POSTSUBSCRIPT
+roman_R end_POSTSUBSCRIPT and MSsubscriptMS\mathrm{M_{S}}roman_M
+start_POSTSUBSCRIPT roman_S end_POSTSUBSCRIPT are trained by Joint Metric
+Learning. The training of the whole pipeline of VehicleGAN can be implemented
+in an unsupervised way or a supervised way, which is named as Pair-flexible
+here.
+
+###  III-B VehicleGAN
+
+Our VehicleGAN aims to generate synthetic images of a same vehicle under a
+specific target pose. As shown in Fig.Â 3, the VehicleGAN includes one
+generator and two discriminators. Given an original image
+Iosubscriptğ¼ğ‘œI_{o}italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT
+and an image Itsubscriptğ¼ğ‘¡I_{t}italic_I start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT with the target pose, we first extract the target pose
+Ptsubscriptğ‘ƒğ‘¡P_{t}italic_P start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT
+via a pose estimator Ïˆğœ“\psiitalic_Ïˆ, _i.e_.,
+Pt=Ïˆâ¢(It)subscriptğ‘ƒğ‘¡ğœ“subscriptğ¼ğ‘¡P_{t}=\psi(I_{t})italic_P
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT = italic_Ïˆ ( italic_I
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ). Then, a synthetic image
+Iotsuperscriptsubscriptğ¼ğ‘œğ‘¡I_{o}^{t}italic_I start_POSTSUBSCRIPT italic_o
+end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT will be
+generated via the generator GğºGitalic_G, _i.e_.,
+Iot=Gâ¢(Io,Pt)=Gâ¢(Io,Ïˆâ¢(It))superscriptsubscriptğ¼ğ‘œğ‘¡ğºsubscriptğ¼ğ‘œsubscriptğ‘ƒğ‘¡ğºsubscriptğ¼ğ‘œğœ“subscriptğ¼ğ‘¡I_{o}^{t}=G(I_{o},P_{t})=G(I_{o},\psi(I_{t}))italic_I
+start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t
+end_POSTSUPERSCRIPT = italic_G ( italic_I start_POSTSUBSCRIPT italic_o
+end_POSTSUBSCRIPT , italic_P start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT )
+= italic_G ( italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT ,
+italic_Ïˆ ( italic_I start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ) ).
+Iotsuperscriptsubscriptğ¼ğ‘œğ‘¡I_{o}^{t}italic_I start_POSTSUBSCRIPT italic_o
+end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT denotes
+an image which has the content of image Iosubscriptğ¼ğ‘œI_{o}italic_I
+start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT as well as the target pose of
+image Itsubscriptğ¼ğ‘¡I_{t}italic_I start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT. A discriminator Dtsubscriptğ·ğ‘¡D_{t}italic_D
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT is to distinguish the synthetic
+fake Iotsuperscriptsubscriptğ¼ğ‘œğ‘¡I_{o}^{t}italic_I start_POSTSUBSCRIPT
+italic_o end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT
+from the real Itsubscriptğ¼ğ‘¡I_{t}italic_I start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT. By our proposed AutoReconstruction, we reuse the generator
+to transfer Iotsuperscriptsubscriptğ¼ğ‘œğ‘¡I_{o}^{t}italic_I
+start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t
+end_POSTSUPERSCRIPT back to an image
+Ioosuperscriptsubscriptğ¼ğ‘œğ‘œI_{o}^{o}italic_I start_POSTSUBSCRIPT italic_o
+end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_o end_POSTSUPERSCRIPT with the
+content and pose of the original image Iosubscriptğ¼ğ‘œI_{o}italic_I
+start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT. The other discriminator
+Dosubscriptğ·ğ‘œD_{o}italic_D start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT
+is to distinguish the synthetic fake
+Ioosuperscriptsubscriptğ¼ğ‘œğ‘œI_{o}^{o}italic_I start_POSTSUBSCRIPT italic_o
+end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_o end_POSTSUPERSCRIPT from the
+real Iosubscriptğ¼ğ‘œI_{o}italic_I start_POSTSUBSCRIPT italic_o
+end_POSTSUBSCRIPT. Because of the proposed AutoReconstruction, we can
+supervisedly or unsupervisedly train the whole VehicleGAN pipeline.
+
+####  III-B1 Pose Estimation
+
+Here, we use 20 keypointsÂ [25] annotated on the VeRi-776Â [14] dataset to
+represent the vehicle pose. These keypoints are some discriminative positions
+on the vehicle, _e.g_., wheels, lights, and license plates. Specifically, we
+adopt the Deconvolution Head NetworkÂ [27] as Ïˆğœ“\psiitalic_Ïˆ to estimate
+the vehicle pose by outputting a response map for each of the 20 keypoints.
+The response maps have Gaussian-like responses around the locations of
+keypoints. Given a target image Itsubscriptğ¼ğ‘¡I_{t}italic_I
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT, the output pose response map
+is Pt=Ïˆâ¢(It)subscriptğ‘ƒğ‘¡ğœ“subscriptğ¼ğ‘¡P_{t}=\psi(I_{t})italic_P
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT = italic_Ïˆ ( italic_I
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ) with 20 channels.
+
+####  III-B2 AutoReconstruction as Self-Supervision
+
+Given an original vehicle image Iosubscriptğ¼ğ‘œI_{o}italic_I
+start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT, and a target vehicle image
+Itsubscriptğ¼ğ‘¡I_{t}italic_I start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT,
+the generator aims to synthesize a vehicle image with
+Iosubscriptğ¼ğ‘œI_{o}italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT
+content in the Itsubscriptğ¼ğ‘¡I_{t}italic_I start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT pose. The input of the generator is the concatenation of the
+original image and the target pose. The generator adopts an encoder-decoder
+based network like PN-GANÂ [28]. Reversely, the synthesized
+Iotsuperscriptsubscriptğ¼ğ‘œğ‘¡I_{o}^{t}italic_I start_POSTSUBSCRIPT italic_o
+end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT will go
+through the generator to reconstruct the original image using the pose of
+Iosubscriptğ¼ğ‘œI_{o}italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT,
+which generates the reconstructed image
+Ioosuperscriptsubscriptğ¼ğ‘œğ‘œI_{o}^{o}italic_I start_POSTSUBSCRIPT italic_o
+end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_o end_POSTSUPERSCRIPT. The
+Original-to-Target and Target-to-Original bidirectional image transfer is
+named as Autoreconstruction in this paper. Because of the designed
+Autoreconstruction, the original Iosubscriptğ¼ğ‘œI_{o}italic_I
+start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT and reconstructed
+Ioosuperscriptsubscriptğ¼ğ‘œğ‘œI_{o}^{o}italic_I start_POSTSUBSCRIPT italic_o
+end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_o end_POSTSUPERSCRIPT can be
+forced to be identical as self-supervision.
+
+####  III-B3 Pair-flexible Settings
+
+The optimization of our VehicleGAN can be performed in either supervised or
+unsupervised way. When the original image Iosubscriptğ¼ğ‘œI_{o}italic_I
+start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT and the target image
+Itsubscriptğ¼ğ‘¡I_{t}italic_I start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT
+are from the same vehicle, the corresponding ground truth image of the
+generated image Iotsuperscriptsubscriptğ¼ğ‘œğ‘¡I_{o}^{t}italic_I
+start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t
+end_POSTSUPERSCRIPT will be Itsubscriptğ¼ğ‘¡I_{t}italic_I start_POSTSUBSCRIPT
+italic_t end_POSTSUBSCRIPT, which can provide full supervision information for
+training. Meanwhile, the original image Iosubscriptğ¼ğ‘œI_{o}italic_I
+start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT and the target image
+Itsubscriptğ¼ğ‘¡I_{t}italic_I start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT
+can be from different vehicles (unpaired) for unsupervised learning. This
+advanced pair-flexible setting is excellent for real-world usages.
+
+####  III-B4 Supervised Learning with Paired Data
+
+To optimize the whole pipeline, we adopt four loss functions: adversarial
+loss, pose loss, identity-preserving loss and reconstruction loss. Please note
+that the loss functions using the paired data of the same identity are denoted
+as ğ”ğ”\mathfrak{L}fraktur_L (supervised), while other loss functions are
+denoted as â„’â„’\mathcal{L}caligraphic_L (unsupervised) in this paper.
+
+Adversarial Loss: The adversarial losses
+â„’aâ¢dâ¢v1subscriptâ„’ğ‘ğ‘‘subscriptğ‘£1\mathcal{L}_{adv_{1}}caligraphic_L
+start_POSTSUBSCRIPT italic_a italic_d italic_v start_POSTSUBSCRIPT 1
+end_POSTSUBSCRIPT end_POSTSUBSCRIPT and
+â„’aâ¢dâ¢v2subscriptâ„’ğ‘ğ‘‘subscriptğ‘£2\mathcal{L}_{adv_{2}}caligraphic_L
+start_POSTSUBSCRIPT italic_a italic_d italic_v start_POSTSUBSCRIPT 2
+end_POSTSUBSCRIPT end_POSTSUBSCRIPT aim to make the synthetic images more
+similar to the real images. In specific, we want to align the generated images
+Iotsuperscriptsubscriptğ¼ğ‘œğ‘¡I_{o}^{t}italic_I start_POSTSUBSCRIPT italic_o
+end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT with
+Itsubscriptğ¼ğ‘¡I_{t}italic_I start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT
+and Ioosuperscriptsubscriptğ¼ğ‘œğ‘œI_{o}^{o}italic_I start_POSTSUBSCRIPT
+italic_o end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_o end_POSTSUPERSCRIPT
+with Iosubscriptğ¼ğ‘œI_{o}italic_I start_POSTSUBSCRIPT italic_o
+end_POSTSUBSCRIPT via
+â„’aâ¢dâ¢v1subscriptâ„’ğ‘ğ‘‘subscriptğ‘£1\mathcal{L}_{adv_{1}}caligraphic_L
+start_POSTSUBSCRIPT italic_a italic_d italic_v start_POSTSUBSCRIPT 1
+end_POSTSUBSCRIPT end_POSTSUBSCRIPT and
+â„’aâ¢dâ¢v2subscriptâ„’ğ‘ğ‘‘subscriptğ‘£2\mathcal{L}_{adv_{2}}caligraphic_L
+start_POSTSUBSCRIPT italic_a italic_d italic_v start_POSTSUBSCRIPT 2
+end_POSTSUBSCRIPT end_POSTSUBSCRIPT, respectively. We adopt two discriminators
+to perform the distribution alignment to distinguish real or fake. The
+optimizing object function is
+
+| â„’aâ¢dâ¢v1subscriptâ„’ğ‘ğ‘‘subscriptğ‘£1\displaystyle\mathcal{L}_{adv_{1}}caligraphic_L start_POSTSUBSCRIPT italic_a italic_d italic_v start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT end_POSTSUBSCRIPT | =ğ”¼Itâˆ¼pdâ¢aâ¢tâ¢aâ¢(It)â¢[logâ¢Dtâ¢(It)]absentsubscriptğ”¼similar-tosubscriptğ¼ğ‘¡subscriptğ‘ğ‘‘ğ‘ğ‘¡ğ‘subscriptğ¼ğ‘¡delimited-[]logsubscriptğ·ğ‘¡subscriptğ¼ğ‘¡\displaystyle=\mathbb{E}_{I_{t}\sim p_{data}(I_{t})}[\mathrm{log}D_{t}(I_{t})]= blackboard_E start_POSTSUBSCRIPT italic_I start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT âˆ¼ italic_p start_POSTSUBSCRIPT italic_d italic_a italic_t italic_a end_POSTSUBSCRIPT ( italic_I start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ) end_POSTSUBSCRIPT [ roman_log italic_D start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ( italic_I start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ) ] |   
+---|---|---|---  
+|  | +ğ”¼Iotâˆ¼pdâ¢aâ¢tâ¢aâ¢(Iot)â¢[logâ¢(1âˆ’Dtâ¢(Gâ¢(Io,Pt)))],subscriptğ”¼similar-tosuperscriptsubscriptğ¼ğ‘œğ‘¡subscriptğ‘ğ‘‘ğ‘ğ‘¡ğ‘superscriptsubscriptğ¼ğ‘œğ‘¡delimited-[]log1subscriptğ·ğ‘¡ğºsubscriptğ¼ğ‘œsubscriptğ‘ƒğ‘¡\displaystyle+\mathbb{E}_{I_{o}^{t}\sim p_{data}(I_{o}^{t})}[\mathrm{log}(1-D_% {t}(G(I_{o},P_{t})))],\+ blackboard_E start_POSTSUBSCRIPT italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT âˆ¼ italic_p start_POSTSUBSCRIPT italic_d italic_a italic_t italic_a end_POSTSUBSCRIPT ( italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT ) end_POSTSUBSCRIPT [ roman_log ( 1 - italic_D start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ( italic_G ( italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT , italic_P start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ) ) ) ] , |  | (1)  
+| â„’aâ¢dâ¢v2subscriptâ„’ğ‘ğ‘‘subscriptğ‘£2\displaystyle\mathcal{L}_{adv_{2}}caligraphic_L start_POSTSUBSCRIPT italic_a italic_d italic_v start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT end_POSTSUBSCRIPT | =ğ”¼Ioâˆ¼pdâ¢aâ¢tâ¢aâ¢(Io)â¢[logâ¢Doâ¢(Io)]absentsubscriptğ”¼similar-tosubscriptğ¼ğ‘œsubscriptğ‘ğ‘‘ğ‘ğ‘¡ğ‘subscriptğ¼ğ‘œdelimited-[]logsubscriptğ·ğ‘œsubscriptğ¼ğ‘œ\displaystyle=\mathbb{E}_{I_{o}\sim p_{data}(I_{o})}[\mathrm{log}D_{o}(I_{o})]= blackboard_E start_POSTSUBSCRIPT italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT âˆ¼ italic_p start_POSTSUBSCRIPT italic_d italic_a italic_t italic_a end_POSTSUBSCRIPT ( italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT ) end_POSTSUBSCRIPT [ roman_log italic_D start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT ( italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT ) ] |   
+|  | +ğ”¼Iooâˆ¼pdâ¢aâ¢tâ¢aâ¢(Ioo)â¢[logâ¢(1âˆ’Doâ¢(Gâ¢(Iot,Po)))].subscriptğ”¼similar-tosuperscriptsubscriptğ¼ğ‘œğ‘œsubscriptğ‘ğ‘‘ğ‘ğ‘¡ğ‘superscriptsubscriptğ¼ğ‘œğ‘œdelimited-[]log1subscriptğ·ğ‘œğºsuperscriptsubscriptğ¼ğ‘œğ‘¡subscriptğ‘ƒğ‘œ\displaystyle+\mathbb{E}_{I_{o}^{o}\sim p_{data}(I_{o}^{o})}[\mathrm{log}(1-D_% {o}(G(I_{o}^{t},P_{o})))].\+ blackboard_E start_POSTSUBSCRIPT italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_o end_POSTSUPERSCRIPT âˆ¼ italic_p start_POSTSUBSCRIPT italic_d italic_a italic_t italic_a end_POSTSUBSCRIPT ( italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_o end_POSTSUPERSCRIPT ) end_POSTSUBSCRIPT [ roman_log ( 1 - italic_D start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT ( italic_G ( italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT , italic_P start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT ) ) ) ] . |  | (2)  
+  
+Pose Loss: â„’pâ¢oâ¢sâ¢esubscriptâ„’ğ‘ğ‘œğ‘ ğ‘’\mathcal{L}_{pose}caligraphic_L
+start_POSTSUBSCRIPT italic_p italic_o italic_s italic_e end_POSTSUBSCRIPT is
+to align the poses of the synthetic images
+(Iotsuperscriptsubscriptğ¼ğ‘œğ‘¡I_{o}^{t}italic_I start_POSTSUBSCRIPT italic_o
+end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT,
+Ioosuperscriptsubscriptğ¼ğ‘œğ‘œI_{o}^{o}italic_I start_POSTSUBSCRIPT italic_o
+end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_o end_POSTSUPERSCRIPT) with the
+guided poses during the Autoreconstruction. The pose loss is defined as
+
+| â„’pâ¢oâ¢sâ¢eâ¢(Ïˆ,Iot,Pt,Ioo,Po)=â€–Ïˆâ¢(Iot)âˆ’Ptâ€–2+â€–Ïˆâ¢(Ioo)âˆ’Poâ€–2.subscriptâ„’ğ‘ğ‘œğ‘ ğ‘’ğœ“superscriptsubscriptğ¼ğ‘œğ‘¡subscriptğ‘ƒğ‘¡superscriptsubscriptğ¼ğ‘œğ‘œsubscriptğ‘ƒğ‘œsubscriptnormğœ“superscriptsubscriptğ¼ğ‘œğ‘¡subscriptğ‘ƒğ‘¡2subscriptnormğœ“superscriptsubscriptğ¼ğ‘œğ‘œsubscriptğ‘ƒğ‘œ2\displaystyle\small\mathcal{L}_{pose}(\psi,I_{o}^{t},P_{t},I_{o}^{o},P_{o})=\|% \psi(I_{o}^{t})-P_{t}\|_{2}+\|\psi(I_{o}^{o})-P_{o}\|_{2}.caligraphic_L start_POSTSUBSCRIPT italic_p italic_o italic_s italic_e end_POSTSUBSCRIPT ( italic_Ïˆ , italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT , italic_P start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT , italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_o end_POSTSUPERSCRIPT , italic_P start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT ) = âˆ¥ italic_Ïˆ ( italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT ) - italic_P start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT âˆ¥ start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT + âˆ¥ italic_Ïˆ ( italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_o end_POSTSUPERSCRIPT ) - italic_P start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT âˆ¥ start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT . |  | (3)  
+---|---|---|---  
+  
+Identity-preserving Loss: During the image transfer process of the VehicleGAN
+for the target pose, the vehicle identity information should be preserved,
+_i.e_., keeping the identity of the synthetic image consistent with that of
+the original image, _e.g_., Iotsuperscriptsubscriptğ¼ğ‘œğ‘¡I_{o}^{t}italic_I
+start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t
+end_POSTSUPERSCRIPT and Iosubscriptğ¼ğ‘œI_{o}italic_I start_POSTSUBSCRIPT
+italic_o end_POSTSUBSCRIPT. After pose synthesis of vehicles, the semantic
+content, style, texture, and color of the synthetic image should be kept.
+Therefore, we introduce style loss, perceptual loss, content loss to optimize
+the network to preserve the identity.
+
+We introduce Gram matrixÂ [29], which generally represents the style of an
+image, to construct the style loss â„’sâ¢tâ¢yâ¢lâ¢esubscriptâ„’ğ‘
+ğ‘¡ğ‘¦ğ‘™ğ‘’\mathcal{L}_{style}caligraphic_L start_POSTSUBSCRIPT italic_s
+italic_t italic_y italic_l italic_e end_POSTSUBSCRIPT. Let
+Ï•jâ¢(I)subscriptitalic-Ï•ğ‘—ğ¼\phi_{j}(I)italic_Ï• start_POSTSUBSCRIPT
+italic_j end_POSTSUBSCRIPT ( italic_I )
+âˆˆHjÃ—WjÃ—Cjabsentsubscriptğ»ğ‘—subscriptğ‘Šğ‘—subscriptğ¶ğ‘—\in H_{j}\times
+W_{j}\times C_{j}âˆˆ italic_H start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT
+Ã— italic_W start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT Ã— italic_C
+start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT be the feature map at
+jğ‘—jitalic_j-th layer of VGG network for the input image Iğ¼Iitalic_I, then
+the Gram matrix is defined as a CjÃ—Cjsubscriptğ¶ğ‘—subscriptğ¶ğ‘—C_{j}\times
+C_{j}italic_C start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT Ã— italic_C
+start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT matrix whose elements are given
+by
+
+| ğ’¢jâ¢(I)c,câ€²subscriptğ’¢ğ‘—subscriptğ¼ğ‘superscriptğ‘â€²\displaystyle\mathcal{G}_{j}(I)_{c,c^{{}^{\prime}}}caligraphic_G start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT ( italic_I ) start_POSTSUBSCRIPT italic_c , italic_c start_POSTSUPERSCRIPT start_FLOATSUPERSCRIPT â€² end_FLOATSUPERSCRIPT end_POSTSUPERSCRIPT end_POSTSUBSCRIPT | =1Cjâ¢Hjâ¢Wjâ¢âˆ‘h=1Hjâˆ‘w=1Wj(Ï•jâ¢(I)h,w,câ‹…Ï•jâ¢(I)h,w,câ€²).absent1subscriptğ¶ğ‘—subscriptğ»ğ‘—subscriptğ‘Šğ‘—superscriptsubscriptâ„1subscriptğ»ğ‘—superscriptsubscriptğ‘¤1subscriptğ‘Šğ‘—â‹…subscriptitalic-Ï•ğ‘—subscriptğ¼â„ğ‘¤ğ‘subscriptitalic-Ï•ğ‘—subscriptğ¼â„ğ‘¤superscriptğ‘â€²\displaystyle=\frac{1}{C_{j}H_{j}W_{j}}\sum_{h=1}^{H_{j}}\sum_{w=1}^{W_{j}}(% \phi_{j}(I)_{h,w,c}\cdot\phi_{j}(I)_{h,w,c^{{}^{\prime}}}).= divide start_ARG 1 end_ARG start_ARG italic_C start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT italic_H start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT italic_W start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT end_ARG âˆ‘ start_POSTSUBSCRIPT italic_h = 1 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_H start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT end_POSTSUPERSCRIPT âˆ‘ start_POSTSUBSCRIPT italic_w = 1 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_W start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT end_POSTSUPERSCRIPT ( italic_Ï• start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT ( italic_I ) start_POSTSUBSCRIPT italic_h , italic_w , italic_c end_POSTSUBSCRIPT â‹… italic_Ï• start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT ( italic_I ) start_POSTSUBSCRIPT italic_h , italic_w , italic_c start_POSTSUPERSCRIPT start_FLOATSUPERSCRIPT â€² end_FLOATSUPERSCRIPT end_POSTSUPERSCRIPT end_POSTSUBSCRIPT ) . |  | (4)  
+---|---|---|---|---  
+  
+Then, the style loss is formulated as the mean squared error between the Gram
+matrices of Iotsuperscriptsubscriptğ¼ğ‘œğ‘¡I_{o}^{t}italic_I
+start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t
+end_POSTSUPERSCRIPT and Itsubscriptğ¼ğ‘¡I_{t}italic_I start_POSTSUBSCRIPT
+italic_t end_POSTSUBSCRIPT as
+
+| ğ”sâ¢tâ¢yâ¢lâ¢e=âˆ‘jâ€–ğ’¢jâ¢(Iot)âˆ’ğ’¢jâ¢(It)â€–2,subscriptğ”ğ‘ ğ‘¡ğ‘¦ğ‘™ğ‘’subscriptğ‘—subscriptnormsubscriptğ’¢ğ‘—superscriptsubscriptğ¼ğ‘œğ‘¡subscriptğ’¢ğ‘—subscriptğ¼ğ‘¡2\displaystyle\mathfrak{L}_{style}=\sum_{j}\|\mathcal{G}_{j}(I_{o}^{t})-% \mathcal{G}_{j}(I_{t})\|_{2},fraktur_L start_POSTSUBSCRIPT italic_s italic_t italic_y italic_l italic_e end_POSTSUBSCRIPT = âˆ‘ start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT âˆ¥ caligraphic_G start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT ( italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT ) - caligraphic_G start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT ( italic_I start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ) âˆ¥ start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT , |  | (5)  
+---|---|---|---  
+  
+where we use the feature maps of [râ¢eâ¢lâ¢uğ‘Ÿğ‘’ğ‘™ğ‘¢reluitalic_r italic_e
+italic_l italic_u1_1, râ¢eâ¢lâ¢uğ‘Ÿğ‘’ğ‘™ğ‘¢reluitalic_r italic_e italic_l
+italic_u2_1, râ¢eâ¢lâ¢uğ‘Ÿğ‘’ğ‘™ğ‘¢reluitalic_r italic_e italic_l italic_u3_1,
+râ¢eâ¢lâ¢uğ‘Ÿğ‘’ğ‘™ğ‘¢reluitalic_r italic_e italic_l italic_u4_1] layers to
+calculate the style loss.
+
+We define the perceptual loss as
+
+| ğ”pâ¢eâ¢r=â€–Ï•jâ¢(Iot)âˆ’Ï•jâ¢(It)â€–2,subscriptğ”ğ‘ğ‘’ğ‘Ÿsubscriptnormsubscriptitalic-Ï•ğ‘—superscriptsubscriptğ¼ğ‘œğ‘¡subscriptitalic-Ï•ğ‘—subscriptğ¼ğ‘¡2\displaystyle\mathfrak{L}_{per}=\|\phi_{j}(I_{o}^{t})-\phi_{j}(I_{t})\|_{2},fraktur_L start_POSTSUBSCRIPT italic_p italic_e italic_r end_POSTSUBSCRIPT = âˆ¥ italic_Ï• start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT ( italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT ) - italic_Ï• start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT ( italic_I start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ) âˆ¥ start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT , |  | (6)  
+---|---|---|---  
+  
+where we use the feature map from the râ¢eâ¢lâ¢uğ‘Ÿğ‘’ğ‘™ğ‘¢reluitalic_r
+italic_e italic_l italic_u4_1 layer of VGG network to compute the perceptual
+loss. Also, the reconstructed image is expected to keep the same content as
+the source image, then, the content loss is defined as
+
+| â„’c=âˆ‘jâ€–Ï•jâ¢(Ioo)âˆ’Ï•jâ¢(Io)â€–2,subscriptâ„’ğ‘subscriptğ‘—subscriptnormsubscriptitalic-Ï•ğ‘—superscriptsubscriptğ¼ğ‘œğ‘œsubscriptitalic-Ï•ğ‘—subscriptğ¼ğ‘œ2\displaystyle\mathcal{L}_{c}=\sum_{j}\|\phi_{j}(I_{o}^{o})-\phi_{j}(I_{o})\|_{% 2},caligraphic_L start_POSTSUBSCRIPT italic_c end_POSTSUBSCRIPT = âˆ‘ start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT âˆ¥ italic_Ï• start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT ( italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_o end_POSTSUPERSCRIPT ) - italic_Ï• start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT ( italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT ) âˆ¥ start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT , |  | (7)  
+---|---|---|---  
+  
+where we use the feature maps from [râ¢eâ¢lâ¢uğ‘Ÿğ‘’ğ‘™ğ‘¢reluitalic_r
+italic_e italic_l italic_u1_1, râ¢eâ¢lâ¢uğ‘Ÿğ‘’ğ‘™ğ‘¢reluitalic_r italic_e
+italic_l italic_u2_1, râ¢eâ¢lâ¢uğ‘Ÿğ‘’ğ‘™ğ‘¢reluitalic_r italic_e italic_l
+italic_u3_1, râ¢eâ¢lâ¢uğ‘Ÿğ‘’ğ‘™ğ‘¢reluitalic_r italic_e italic_l italic_u4_1]
+layers of VGG network. Therefore, the identity-preserving loss is formulated
+to the weighted sum of the above three losses as
+
+| ğ”iâ¢dâ¢p=Î²1â¢ğ”sâ¢tâ¢yâ¢lâ¢e+Î²2â¢ğ”pâ¢eâ¢r+Î²3â¢â„’c.subscriptğ”ğ‘–ğ‘‘ğ‘subscriptğ›½1subscriptğ”ğ‘ ğ‘¡ğ‘¦ğ‘™ğ‘’subscriptğ›½2subscriptğ”ğ‘ğ‘’ğ‘Ÿsubscriptğ›½3subscriptâ„’ğ‘\displaystyle\mathfrak{L}_{idp}=\beta_{1}\mathfrak{L}_{style}+\beta_{2}% \mathfrak{L}_{per}+\beta_{3}\mathcal{L}_{c}.fraktur_L start_POSTSUBSCRIPT italic_i italic_d italic_p end_POSTSUBSCRIPT = italic_Î² start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT fraktur_L start_POSTSUBSCRIPT italic_s italic_t italic_y italic_l italic_e end_POSTSUBSCRIPT + italic_Î² start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT fraktur_L start_POSTSUBSCRIPT italic_p italic_e italic_r end_POSTSUBSCRIPT + italic_Î² start_POSTSUBSCRIPT 3 end_POSTSUBSCRIPT caligraphic_L start_POSTSUBSCRIPT italic_c end_POSTSUBSCRIPT . |  | (8)  
+---|---|---|---  
+  
+Reconstruction Loss: We employ reconstruction loss to measure the pixel-wise
+error between the generated images and their ground truth, which is defined as
+
+| ğ”râ¢eâ¢c=â€–Iooâˆ’Ioâ€–1+Î´â¢â€–Iotâˆ’Itâ€–1.subscriptğ”ğ‘Ÿğ‘’ğ‘subscriptnormsuperscriptsubscriptğ¼ğ‘œğ‘œsubscriptğ¼ğ‘œ1ğ›¿subscriptnormsuperscriptsubscriptğ¼ğ‘œğ‘¡subscriptğ¼ğ‘¡1\displaystyle\mathfrak{L}_{rec}=\|I_{o}^{o}-I_{o}\|_{1}+\delta\|I_{o}^{t}-I_{t% }\|_{1}.fraktur_L start_POSTSUBSCRIPT italic_r italic_e italic_c end_POSTSUBSCRIPT = âˆ¥ italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_o end_POSTSUPERSCRIPT - italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT âˆ¥ start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT + italic_Î´ âˆ¥ italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT - italic_I start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT âˆ¥ start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT . |  | (9)  
+---|---|---|---  
+  
+On summary, we define the total supervised loss Lâ¢oâ¢sâ¢ssâ¢pğ¿ğ‘œğ‘
+subscriptğ‘ ğ‘ ğ‘{Loss}_{sp}italic_L italic_o italic_s italic_s
+start_POSTSUBSCRIPT italic_s italic_p end_POSTSUBSCRIPT as a weighted sum of
+all the defined losses:
+
+| Lâ¢oâ¢sâ¢ssâ¢p=Î»1â¢â„’aâ¢dâ¢v1+Î»2â¢â„’aâ¢dâ¢v2+Î»3â¢â„’pâ¢oâ¢sâ¢e+Î»4â¢ğ”iâ¢dâ¢p+Î»5â¢ğ”râ¢eâ¢c.ğ¿ğ‘œğ‘ subscriptğ‘ ğ‘ ğ‘subscriptğœ†1subscriptâ„’ğ‘ğ‘‘subscriptğ‘£1subscriptğœ†2subscriptâ„’ğ‘ğ‘‘subscriptğ‘£2subscriptğœ†3subscriptâ„’ğ‘ğ‘œğ‘ ğ‘’subscriptğœ†4subscriptğ”ğ‘–ğ‘‘ğ‘subscriptğœ†5subscriptğ”ğ‘Ÿğ‘’ğ‘\displaystyle\footnotesize{Loss}_{sp}=\lambda_{1}\mathcal{L}_{adv_{1}}+\lambda% _{2}\mathcal{L}_{adv_{2}}+\lambda_{3}\mathcal{L}_{pose}+\lambda_{4}\mathfrak{L% }_{idp}+\lambda_{5}\mathfrak{L}_{rec}.italic_L italic_o italic_s italic_s start_POSTSUBSCRIPT italic_s italic_p end_POSTSUBSCRIPT = italic_Î» start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT caligraphic_L start_POSTSUBSCRIPT italic_a italic_d italic_v start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT end_POSTSUBSCRIPT + italic_Î» start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT caligraphic_L start_POSTSUBSCRIPT italic_a italic_d italic_v start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT end_POSTSUBSCRIPT + italic_Î» start_POSTSUBSCRIPT 3 end_POSTSUBSCRIPT caligraphic_L start_POSTSUBSCRIPT italic_p italic_o italic_s italic_e end_POSTSUBSCRIPT + italic_Î» start_POSTSUBSCRIPT 4 end_POSTSUBSCRIPT fraktur_L start_POSTSUBSCRIPT italic_i italic_d italic_p end_POSTSUBSCRIPT + italic_Î» start_POSTSUBSCRIPT 5 end_POSTSUBSCRIPT fraktur_L start_POSTSUBSCRIPT italic_r italic_e italic_c end_POSTSUBSCRIPT . |  | (10)  
+---|---|---|---  
+  
+####  III-B5 Unsupervised Learning with Unpaired Data
+
+The input original image Iosubscriptğ¼ğ‘œI_{o}italic_I start_POSTSUBSCRIPT
+italic_o end_POSTSUBSCRIPT and the target image Itsubscriptğ¼ğ‘¡I_{t}italic_I
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT might be from different vehicle
+identities. The generated image
+Iotsuperscriptsubscriptğ¼ğ‘œğ‘¡I_{o}^{t}italic_I start_POSTSUBSCRIPT italic_o
+end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT does not
+have ground truth for supervision. In this way, the VehicleGAN can only be
+optimized in an unsupervised way. Since the style loss
+ğ”sâ¢tâ¢yâ¢lâ¢esubscriptğ”ğ‘ ğ‘¡ğ‘¦ğ‘™ğ‘’\mathfrak{L}_{style}fraktur_L
+start_POSTSUBSCRIPT italic_s italic_t italic_y italic_l italic_e
+end_POSTSUBSCRIPT, perceptual loss
+ğ”pâ¢eâ¢rsubscriptğ”ğ‘ğ‘’ğ‘Ÿ\mathfrak{L}_{per}fraktur_L start_POSTSUBSCRIPT
+italic_p italic_e italic_r end_POSTSUBSCRIPT, reconstruction loss
+ğ”râ¢eâ¢csubscriptğ”ğ‘Ÿğ‘’ğ‘\mathfrak{L}_{rec}fraktur_L start_POSTSUBSCRIPT
+italic_r italic_e italic_c end_POSTSUBSCRIPT require the ground truth of
+Iotsuperscriptsubscriptğ¼ğ‘œğ‘¡I_{o}^{t}italic_I start_POSTSUBSCRIPT italic_o
+end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT for
+computation, we need to reformulate the three losses. In addition, because of
+the lack of supervision, we propose a trust-region learning method to reduce
+the degradation effects of the background region of different vehicles in
+image transfer.
+
+Trust-region Learning: We propose a trust-region learning method to only focus
+on the trust regions (_i.e_., the shape of vehicle) in the unsupervised
+setting. We utilize 20 keypoints of a vehicle to represent vehicle pose. We
+use the positions of these keypoints to calculate the convex hull surrounding
+the vehicle as mask. Let
+Mâˆˆâ„1Ã—HÃ—Wğ‘€superscriptâ„1ğ»ğ‘ŠM\in\mathbb{R}^{1\times H\times W}italic_M
+âˆˆ blackboard_R start_POSTSUPERSCRIPT 1 Ã— italic_H Ã— italic_W
+end_POSTSUPERSCRIPT represents a binary mask formed by the pose Pğ‘ƒPitalic_P,
+where Hğ»Hitalic_H and Wğ‘ŠWitalic_W represent the height and width of the
+pose feature maps. The values inside the convex hull/shape of the vehicle are
+all set as 1 (trust regions) while be 0 when outside of the convex hull. Then,
+Mğ‘€Mitalic_M is inferred from the size of feature maps of Pğ‘ƒPitalic_P
+through average pooling to represent the size of the vehicle image.
+
+Losses Reformulation: Due to the lack of paired data of same vehicles, we
+propose a trust-region style loss â„’sâ¢tâ¢yâ¢lâ¢esubscriptâ„’ğ‘
+ğ‘¡ğ‘¦ğ‘™ğ‘’\mathcal{L}_{style}caligraphic_L start_POSTSUBSCRIPT italic_s
+italic_t italic_y italic_l italic_e end_POSTSUBSCRIPT, a trust-region
+perceptual loss â„’pâ¢eâ¢rsubscriptâ„’ğ‘ğ‘’ğ‘Ÿ\mathcal{L}_{per}caligraphic_L
+start_POSTSUBSCRIPT italic_p italic_e italic_r end_POSTSUBSCRIPT, a new
+reconstruction loss
+â„’râ¢eâ¢csubscriptâ„’ğ‘Ÿğ‘’ğ‘\mathcal{L}_{rec}caligraphic_L
+start_POSTSUBSCRIPT italic_r italic_e italic_c end_POSTSUBSCRIPT to replace
+the ğ”sâ¢tâ¢yâ¢lâ¢esubscriptğ”ğ‘ ğ‘¡ğ‘¦ğ‘™ğ‘’\mathfrak{L}_{style}fraktur_L
+start_POSTSUBSCRIPT italic_s italic_t italic_y italic_l italic_e
+end_POSTSUBSCRIPT, ğ”pâ¢eâ¢rsubscriptğ”ğ‘ğ‘’ğ‘Ÿ\mathfrak{L}_{per}fraktur_L
+start_POSTSUBSCRIPT italic_p italic_e italic_r end_POSTSUBSCRIPT,
+ğ”râ¢eâ¢csubscriptğ”ğ‘Ÿğ‘’ğ‘\mathfrak{L}_{rec}fraktur_L start_POSTSUBSCRIPT
+italic_r italic_e italic_c end_POSTSUBSCRIPT to optimize VehicleGAN in an
+unsupervised way.
+
+Given the Gram matrix, we define a trust-region Gram matrix to calculate the
+style loss, which is defined as
+
+| ğ’¢jâ¢(I,M)c,câ€²=1Cjâ¢Hjâ¢Wjâ¢âˆ‘h=1Hjâˆ‘w=1Wj(Ï•jâ¢(I)h,w,câ‹…M)â‹…(Ï•jâ¢(I)h,w,câ€²â‹…M).subscriptğ’¢ğ‘—subscriptğ¼ğ‘€ğ‘superscriptğ‘â€²1subscriptğ¶ğ‘—subscriptğ»ğ‘—subscriptğ‘Šğ‘—superscriptsubscriptâ„1subscriptğ»ğ‘—superscriptsubscriptğ‘¤1subscriptğ‘Šğ‘—â‹…â‹…subscriptitalic-Ï•ğ‘—subscriptğ¼â„ğ‘¤ğ‘ğ‘€â‹…subscriptitalic-Ï•ğ‘—subscriptğ¼â„ğ‘¤superscriptğ‘â€²ğ‘€\small\mathcal{G}_{j}(I,M)_{c,c^{{}^{\prime}}}=\frac{1}{C_{j}H_{j}W_{j}}\sum_{% h=1}^{H_{j}}\sum_{w=1}^{W_{j}}(\phi_{j}(I)_{h,w,c}\cdot M)\cdot(\phi_{j}(I)_{h% ,w,c^{{}^{\prime}}}\cdot M).caligraphic_G start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT ( italic_I , italic_M ) start_POSTSUBSCRIPT italic_c , italic_c start_POSTSUPERSCRIPT start_FLOATSUPERSCRIPT â€² end_FLOATSUPERSCRIPT end_POSTSUPERSCRIPT end_POSTSUBSCRIPT = divide start_ARG 1 end_ARG start_ARG italic_C start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT italic_H start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT italic_W start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT end_ARG âˆ‘ start_POSTSUBSCRIPT italic_h = 1 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_H start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT end_POSTSUPERSCRIPT âˆ‘ start_POSTSUBSCRIPT italic_w = 1 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_W start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT end_POSTSUPERSCRIPT ( italic_Ï• start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT ( italic_I ) start_POSTSUBSCRIPT italic_h , italic_w , italic_c end_POSTSUBSCRIPT â‹… italic_M ) â‹… ( italic_Ï• start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT ( italic_I ) start_POSTSUBSCRIPT italic_h , italic_w , italic_c start_POSTSUPERSCRIPT start_FLOATSUPERSCRIPT â€² end_FLOATSUPERSCRIPT end_POSTSUPERSCRIPT end_POSTSUBSCRIPT â‹… italic_M ) . |  | (11)  
+---|---|---|---  
+  
+The proposed trust-region style loss is formulated to
+
+| â„’sâ¢tâ¢yâ¢lâ¢e=âˆ‘jâ€–ğ’¢jâ¢(Iot,Mt)âˆ’ğ’¢jâ¢(Io,Mo)â€–2,subscriptâ„’ğ‘ ğ‘¡ğ‘¦ğ‘™ğ‘’subscriptğ‘—subscriptnormsubscriptğ’¢ğ‘—superscriptsubscriptğ¼ğ‘œğ‘¡subscriptğ‘€ğ‘¡subscriptğ’¢ğ‘—subscriptğ¼ğ‘œsubscriptğ‘€ğ‘œ2\displaystyle\mathcal{L}_{style}=\sum_{j}\|\mathcal{G}_{j}(I_{o}^{t},M_{t})-% \mathcal{G}_{j}(I_{o},M_{o})\|_{2},caligraphic_L start_POSTSUBSCRIPT italic_s italic_t italic_y italic_l italic_e end_POSTSUBSCRIPT = âˆ‘ start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT âˆ¥ caligraphic_G start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT ( italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT , italic_M start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ) - caligraphic_G start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT ( italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT , italic_M start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT ) âˆ¥ start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT , |  | (12)  
+---|---|---|---  
+  
+where Mtsubscriptğ‘€ğ‘¡M_{t}italic_M start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT and Mosubscriptğ‘€ğ‘œM_{o}italic_M start_POSTSUBSCRIPT
+italic_o end_POSTSUBSCRIPT represents the trust-region masks corresponding to
+the pose of images Iotsuperscriptsubscriptğ¼ğ‘œğ‘¡I_{o}^{t}italic_I
+start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t
+end_POSTSUPERSCRIPT and Iosubscriptğ¼ğ‘œI_{o}italic_I start_POSTSUBSCRIPT
+italic_o end_POSTSUBSCRIPT, respectively.
+
+The trust-region perceptual loss is formulated to
+
+| â„’pâ¢eâ¢r=â€–Ï•jâ¢(Iot)â‹…Mtâˆ’Ï•jâ¢(Io)â‹…Moâ€–2.subscriptâ„’ğ‘ğ‘’ğ‘Ÿsubscriptnormâ‹…subscriptitalic-Ï•ğ‘—superscriptsubscriptğ¼ğ‘œğ‘¡subscriptğ‘€ğ‘¡â‹…subscriptitalic-Ï•ğ‘—subscriptğ¼ğ‘œsubscriptğ‘€ğ‘œ2\displaystyle\mathcal{L}_{per}=\|\phi_{j}(I_{o}^{t})\cdot M_{t}-\phi_{j}(I_{o}% )\cdot M_{o}\|_{2}.caligraphic_L start_POSTSUBSCRIPT italic_p italic_e italic_r end_POSTSUBSCRIPT = âˆ¥ italic_Ï• start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT ( italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT ) â‹… italic_M start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT - italic_Ï• start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT ( italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT ) â‹… italic_M start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT âˆ¥ start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT . |  | (13)  
+---|---|---|---  
+  
+Then, we can replace the supervised loss
+ğ”iâ¢dâ¢psubscriptğ”ğ‘–ğ‘‘ğ‘\mathfrak{L}_{idp}fraktur_L start_POSTSUBSCRIPT
+italic_i italic_d italic_p end_POSTSUBSCRIPT as
+â„’iâ¢dâ¢p=Î²1â¢â„’sâ¢tâ¢yâ¢lâ¢e+Î²2â¢â„’pâ¢eâ¢r+Î²3â¢â„’csubscriptâ„’ğ‘–ğ‘‘ğ‘subscriptğ›½1subscriptâ„’ğ‘
+ğ‘¡ğ‘¦ğ‘™ğ‘’subscriptğ›½2subscriptâ„’ğ‘ğ‘’ğ‘Ÿsubscriptğ›½3subscriptâ„’ğ‘\mathcal{L}_{idp}=\beta_{1}\mathcal{L}_{style}+\beta_{2}\mathcal{L}_{per}+%
+\beta_{3}\mathcal{L}_{c}caligraphic_L start_POSTSUBSCRIPT italic_i italic_d
+italic_p end_POSTSUBSCRIPT = italic_Î² start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT
+caligraphic_L start_POSTSUBSCRIPT italic_s italic_t italic_y italic_l italic_e
+end_POSTSUBSCRIPT + italic_Î² start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT
+caligraphic_L start_POSTSUBSCRIPT italic_p italic_e italic_r end_POSTSUBSCRIPT
++ italic_Î² start_POSTSUBSCRIPT 3 end_POSTSUBSCRIPT caligraphic_L
+start_POSTSUBSCRIPT italic_c end_POSTSUBSCRIPT in an unsupervised manner. The
+unsupervised reconstruction loss is re-defined as self-supervision only via
+
+| â„’râ¢eâ¢c=â€–Iooâˆ’Ioâ€–1.subscriptâ„’ğ‘Ÿğ‘’ğ‘subscriptnormsuperscriptsubscriptğ¼ğ‘œğ‘œsubscriptğ¼ğ‘œ1\displaystyle\mathcal{L}_{rec}=\|I_{o}^{o}-I_{o}\|_{1}.caligraphic_L start_POSTSUBSCRIPT italic_r italic_e italic_c end_POSTSUBSCRIPT = âˆ¥ italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_o end_POSTSUPERSCRIPT - italic_I start_POSTSUBSCRIPT italic_o end_POSTSUBSCRIPT âˆ¥ start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT . |  | (14)  
+---|---|---|---  
+  
+The total unsupervised loss Lâ¢oâ¢sâ¢suâ¢sâ¢pğ¿ğ‘œğ‘ subscriptğ‘ ğ‘¢ğ‘
+ğ‘{Loss}_{usp}italic_L italic_o italic_s italic_s start_POSTSUBSCRIPT italic_u
+italic_s italic_p end_POSTSUBSCRIPT is reformulated to
+
+| Lâ¢oâ¢sâ¢suâ¢sâ¢pğ¿ğ‘œğ‘ subscriptğ‘ ğ‘¢ğ‘ ğ‘\displaystyle\footnotesize{Loss}_{usp}italic_L italic_o italic_s italic_s start_POSTSUBSCRIPT italic_u italic_s italic_p end_POSTSUBSCRIPT | =Î»1â¢â„’aâ¢dâ¢v1+Î»2â¢â„’aâ¢dâ¢v2+Î»3â¢â„’pâ¢oâ¢sâ¢e+Î»4â¢â„’iâ¢dâ¢p+Î»5â¢â„’râ¢eâ¢c.absentsubscriptğœ†1subscriptâ„’ğ‘ğ‘‘subscriptğ‘£1subscriptğœ†2subscriptâ„’ğ‘ğ‘‘subscriptğ‘£2subscriptğœ†3subscriptâ„’ğ‘ğ‘œğ‘ ğ‘’subscriptğœ†4subscriptâ„’ğ‘–ğ‘‘ğ‘subscriptğœ†5subscriptâ„’ğ‘Ÿğ‘’ğ‘\displaystyle=\lambda_{1}\mathcal{L}_{adv_{1}}+\lambda_{2}\mathcal{L}_{adv_{2}% }+\lambda_{3}\mathcal{L}_{pose}+\lambda_{4}\mathcal{L}_{idp}+\lambda_{5}% \mathcal{L}_{rec}.= italic_Î» start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT caligraphic_L start_POSTSUBSCRIPT italic_a italic_d italic_v start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT end_POSTSUBSCRIPT + italic_Î» start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT caligraphic_L start_POSTSUBSCRIPT italic_a italic_d italic_v start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT end_POSTSUBSCRIPT + italic_Î» start_POSTSUBSCRIPT 3 end_POSTSUBSCRIPT caligraphic_L start_POSTSUBSCRIPT italic_p italic_o italic_s italic_e end_POSTSUBSCRIPT + italic_Î» start_POSTSUBSCRIPT 4 end_POSTSUBSCRIPT caligraphic_L start_POSTSUBSCRIPT italic_i italic_d italic_p end_POSTSUBSCRIPT + italic_Î» start_POSTSUBSCRIPT 5 end_POSTSUBSCRIPT caligraphic_L start_POSTSUBSCRIPT italic_r italic_e italic_c end_POSTSUBSCRIPT . |  | (15)  
+---|---|---|---|---  
+  
+###  III-C Joint Metric Learning
+
+Given a pre-trained VehicleGAN obtained in Sec.Â III-B, we first synthesize a
+unified target-pose image for each original vehicle image. Then, the original
+real images are fed into the Re-ID model MRsubscriptMR\mathrm{M_{R}}roman_M
+start_POSTSUBSCRIPT roman_R end_POSTSUBSCRIPT, and the synthetic images with
+unified pose go through the Re-ID model MSsubscriptMS\mathrm{M_{S}}roman_M
+start_POSTSUBSCRIPT roman_S end_POSTSUBSCRIPT.
+MRsubscriptMR\mathrm{M_{R}}roman_M start_POSTSUBSCRIPT roman_R
+end_POSTSUBSCRIPT and MSsubscriptMS\mathrm{M_{S}}roman_M start_POSTSUBSCRIPT
+roman_S end_POSTSUBSCRIPT are optimized by a Joint Metric Learning (JML).
+
+####  III-C1 Unified Target Pose
+
+FollowingÂ [14], we classify vehicles into nine categories, _i.e_., sedan,
+suv, van, hatchback, mpv, pickup, bus, truck, and estate. We manually choose
+one target-pose image for each of the nine categories as the unified target-
+pose image. Then, each original image can be translated into a synthetic image
+with the unified target pose by VehicleGAN, as shown in Fig.Â 2.
+
+####  III-C2 Re-ID Model
+
+We adopt ResNet50 as backbone for MRsubscriptMR\mathrm{M_{R}}roman_M
+start_POSTSUBSCRIPT roman_R end_POSTSUBSCRIPT and
+MSsubscriptMS\mathrm{M_{S}}roman_M start_POSTSUBSCRIPT roman_S
+end_POSTSUBSCRIPT models. Besides, we modify the stride of the last
+convolutional layer of the network to 1 to obtain larger-size feature maps
+with rich information. For the whole pipeline, the input vehicle image goes
+through the model to obtain a 2048-dimensional feature map with size
+16Ã—16161616\times 1616 Ã— 16. Then, the feature map goes through a global
+average pooling layer to output a 2048-dimensional feature vector
+fğ‘“fitalic_f. Thus, the original image and the synthetic image with the
+unified pose are fed into MRsubscriptMR\mathrm{M_{R}}roman_M
+start_POSTSUBSCRIPT roman_R end_POSTSUBSCRIPT and
+MSsubscriptMS\mathrm{M_{S}}roman_M start_POSTSUBSCRIPT roman_S
+end_POSTSUBSCRIPT to obtain feature vectors frsubscriptğ‘“ğ‘Ÿf_{r}italic_f
+start_POSTSUBSCRIPT italic_r end_POSTSUBSCRIPT and fssubscriptğ‘“ğ‘
+f_{s}italic_f start_POSTSUBSCRIPT italic_s end_POSTSUBSCRIPT, respectively.
+Then, the frsubscriptğ‘“ğ‘Ÿf_{r}italic_f start_POSTSUBSCRIPT italic_r
+end_POSTSUBSCRIPT and fssubscriptğ‘“ğ‘ f_{s}italic_f start_POSTSUBSCRIPT
+italic_s end_POSTSUBSCRIPT are concatenated into a 4096-dimensional feature
+vector fcsubscriptğ‘“ğ‘f_{c}italic_f start_POSTSUBSCRIPT italic_c
+end_POSTSUBSCRIPT as the fused feature.
+
+####  III-C3 Loss Functions
+
+We adopt two kinds of loss functions: triplet loss for metric learning and
+cross-entropy loss for classification. The total loss function of JML is the
+sum of the four losses as follow:
+
+| Lâ¢oâ¢sâ¢sJâ¢Mâ¢L=Ltr+Liâ¢dr+Ltc+Liâ¢dc,ğ¿ğ‘œğ‘ subscriptğ‘ ğ½ğ‘€ğ¿subscriptğ¿subscriptğ‘¡ğ‘Ÿsubscriptğ¿ğ‘–subscriptğ‘‘ğ‘Ÿsubscriptğ¿subscriptğ‘¡ğ‘subscriptğ¿ğ‘–subscriptğ‘‘ğ‘\displaystyle{Loss}_{JML}={L}_{t_{r}}+{L}_{id_{r}}+{L}_{t_{c}}+{L}_{id_{c}},italic_L italic_o italic_s italic_s start_POSTSUBSCRIPT italic_J italic_M italic_L end_POSTSUBSCRIPT = italic_L start_POSTSUBSCRIPT italic_t start_POSTSUBSCRIPT italic_r end_POSTSUBSCRIPT end_POSTSUBSCRIPT + italic_L start_POSTSUBSCRIPT italic_i italic_d start_POSTSUBSCRIPT italic_r end_POSTSUBSCRIPT end_POSTSUBSCRIPT + italic_L start_POSTSUBSCRIPT italic_t start_POSTSUBSCRIPT italic_c end_POSTSUBSCRIPT end_POSTSUBSCRIPT + italic_L start_POSTSUBSCRIPT italic_i italic_d start_POSTSUBSCRIPT italic_c end_POSTSUBSCRIPT end_POSTSUBSCRIPT , |  | (16)  
+---|---|---|---  
+  
+where Ltrsubscriptğ¿subscriptğ‘¡ğ‘Ÿ{L}_{t_{r}}italic_L start_POSTSUBSCRIPT
+italic_t start_POSTSUBSCRIPT italic_r end_POSTSUBSCRIPT end_POSTSUBSCRIPT is
+triplet loss for real image features,
+Liâ¢drsubscriptğ¿ğ‘–subscriptğ‘‘ğ‘Ÿ{L}_{id_{r}}italic_L start_POSTSUBSCRIPT
+italic_i italic_d start_POSTSUBSCRIPT italic_r end_POSTSUBSCRIPT
+end_POSTSUBSCRIPT is cross-entropy loss for real image features,
+Ltcsubscriptğ¿subscriptğ‘¡ğ‘{L}_{t_{c}}italic_L start_POSTSUBSCRIPT italic_t
+start_POSTSUBSCRIPT italic_c end_POSTSUBSCRIPT end_POSTSUBSCRIPT is triplet
+loss for combined (real and synthetic) image features,
+Liâ¢dcsubscriptğ¿ğ‘–subscriptğ‘‘ğ‘{L}_{id_{c}}italic_L start_POSTSUBSCRIPT
+italic_i italic_d start_POSTSUBSCRIPT italic_c end_POSTSUBSCRIPT
+end_POSTSUBSCRIPT is cross-entropy loss for combined image features.
+
+##  IV Experiments
+
+###  IV-A Datasets and Evaluations
+
+We perform pose guided vehicle image synthesis and vehicle Re-ID on two public
+benchmark datasets VeRi-776Â [14] and VehicleIDÂ [15] for performance
+evaluation.
+
+####  IV-A1 VehicleGAN Experiments Setting
+
+For the pose guided vehicle image synthesis task, paired images from the same
+vehicle are inputs to the VehicleGAN for supervised learning, i.e., one is as
+the input original image, and the other is as the target pose image, which is
+also the ground truth for the synthesized image. For unsupervised learning,
+unpaired images from the same-type vehicle are fed into the VehicleGAN
+optimized through the unsupervised losses. During the inference stage, paired
+images from the same vehicle are fed into VehicleGAN for view synthesis and
+performance evaluation, _i.e_., the target pose image is the ground truth for
+the synthetic image after view synthesis.
+
+####  IV-A2 Datasets
+
+VeRi-776Â [14] includes more than 50,000 images of 776 vehicles. FollowingÂ
+[22], VeRi-776 is split into a training subset (37,778 images of 576 vehicles)
+and a testing subset. VehicleIDÂ [15] has 211,763 images with 26,267 vehicles.
+There are three test subsets with different sizes, _i.e_., Test800, Test1600,
+and Test2400, for evaluation.
+
+####  IV-A3 Evaluation Metrics
+
+The evaluation metrics of pose guided vehicle image synthesis quality include
+Structural Similarity (SSIM) and Frechet Inception Distance (FID). The
+evaluation metrics of vehicle Re-ID accuracy include mean Average Precision
+(mAP) and Cumulative Matching Characteristic (CMC) at Rank-1 and Rank-5.
+
+###  IV-B Implementation Details
+
+####  IV-B1 VehicleGAN
+
+The resolution of input image in the VehicleGAN is 256Ã—256256256256\times
+256256 Ã— 256. For supervised learning, we set the loss weight parameters
+Î»1subscriptğœ†1\lambda_{1}italic_Î» start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT,
+Î»2subscriptğœ†2\lambda_{2}italic_Î» start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT,
+Î»3subscriptğœ†3\lambda_{3}italic_Î» start_POSTSUBSCRIPT 3 end_POSTSUBSCRIPT,
+Î»4subscriptğœ†4\lambda_{4}italic_Î» start_POSTSUBSCRIPT 4 end_POSTSUBSCRIPT,
+and Î»5subscriptğœ†5\lambda_{5}italic_Î» start_POSTSUBSCRIPT 5
+end_POSTSUBSCRIPT to 1, 0.2, 10,000, 1, 2, respectively.
+Î²1subscriptğ›½1\beta_{1}italic_Î² start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT,
+Î²2subscriptğ›½2\beta_{2}italic_Î² start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT,
+and Î²3subscriptğ›½3\beta_{3}italic_Î² start_POSTSUBSCRIPT 3 end_POSTSUBSCRIPT
+are 1,000, 0.5, 0.05, respectively. Î´ğ›¿\deltaitalic_Î´ is set to 4. For
+unsupervised learning, Î»1subscriptğœ†1\lambda_{1}italic_Î»
+start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT, Î»2subscriptğœ†2\lambda_{2}italic_Î»
+start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT, Î»3subscriptğœ†3\lambda_{3}italic_Î»
+start_POSTSUBSCRIPT 3 end_POSTSUBSCRIPT, Î»4subscriptğœ†4\lambda_{4}italic_Î»
+start_POSTSUBSCRIPT 4 end_POSTSUBSCRIPT, Î»5subscriptğœ†5\lambda_{5}italic_Î»
+start_POSTSUBSCRIPT 5 end_POSTSUBSCRIPT, Î²1subscriptğ›½1\beta_{1}italic_Î²
+start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT, Î²2subscriptğ›½2\beta_{2}italic_Î²
+start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT, and
+Î²3subscriptğ›½3\beta_{3}italic_Î² start_POSTSUBSCRIPT 3 end_POSTSUBSCRIPT are
+5, 1, 20,000, 1, 0.5, 500, 0.01, 0.1, respectively. We adopt Adam as the
+optimizer, and set the batch size to 12. We trained 200K iterations for
+supervised learning, and 300K iterations for unsupervised learning.
+
+####  IV-B2 Re-ID model
+
+We utilize ResNet50 as the backbone network for
+MRsubscriptMR\mathrm{M_{R}}roman_M start_POSTSUBSCRIPT roman_R
+end_POSTSUBSCRIPT and MSsubscriptMS\mathrm{M_{S}}roman_M start_POSTSUBSCRIPT
+roman_S end_POSTSUBSCRIPT, which is per-trained on ImageNet. The input image
+is resized to 224Ã—224224224224\times 224224 Ã— 224 before fed into the model.
+We set the batch size to 64, which includes 16 vehicle IDs, and 4 vehicle
+images for each vehicle ID. We perform data augmentation with random
+horizontal flipping, random cropping, and random erasing during training. We
+trained the MRsubscriptMR\mathrm{M_{R}}roman_M start_POSTSUBSCRIPT roman_R
+end_POSTSUBSCRIPT for 80 epochs when only the original image is fed into
+MRsubscriptMR\mathrm{M_{R}}roman_M start_POSTSUBSCRIPT roman_R
+end_POSTSUBSCRIPT, and 100 epochs when the original image and synthetic image
+are fed into MRsubscriptMR\mathrm{M_{R}}roman_M start_POSTSUBSCRIPT roman_R
+end_POSTSUBSCRIPT and MSsubscriptMS\mathrm{M_{S}}roman_M start_POSTSUBSCRIPT
+roman_S end_POSTSUBSCRIPT, respectively.
+
+###  IV-C Comparison for Pose Guided Vehicle Image Synthesis
+
+For supervised learning, we compare the proposed method with SOTA (state of
+the art) methods CGANÂ [30], PG2Â [31], DSCÂ [32], and PAGMÂ [23]. For
+unsupervised learning, we compare the proposed method with Perspective
+Transformation (PerTransf)Â [33]. We calculate the SSIM and FID metrics
+between the synthetic image and the target pose image, _i.e_., ground truth,
+for performance evaluation. As shown in TableÂ I, our method gain the best
+performance in both supervised and unsupervised setting on SSIM and FID
+metric.
+
+TABLE I: Quantitative results on VeRi-776 and VehicleID. VehicleGAN and
+VehicleGAN* represent training in supervised and unsupervised manners,
+respectively.
+
+Strategies | Methods | VeRi-776Â [14] | VehicleIDÂ [15]  
+---|---|---|---  
+SSIM â†‘â†‘\uparrowâ†‘ | FID â†“â†“\downarrowâ†“ | SSIM â†‘â†‘\uparrowâ†‘ | FID â†“â†“\downarrowâ†“  
+Supervised | CGAN[30] | 0.468 | 339.2 | 0.447 | 325.5  
+PG2[31] | 0.465 | 335.7 | 0.426 | 330.4  
+DSC[32] | 0.456 | 305.7 | 0.425 | 320.7  
+PAGM[23] | 0.492 | 245.3 | 0.444 | 310.5  
+VehicleGAN | 0.554 | 233.0 | 0.551 | 193.6  
+Unsupervised | PerTransfÂ [33] | 0.059 | 598.4 | 0.048 | 521.6  
+VehicleGAN* | 0.437 | 285.0 | 0.430 | 238.9  
+  
+###  IV-D Comparison for Vehicle Re-ID
+
+The MRsubscriptMR\mathrm{M_{R}}roman_M start_POSTSUBSCRIPT roman_R
+end_POSTSUBSCRIPT model, optimized when only the original images are fed into
+the model, is the Baseline-ResNet50 method. When the original images and
+synthetic images are inputs for MRsubscriptMR\mathrm{M_{R}}roman_M
+start_POSTSUBSCRIPT roman_R end_POSTSUBSCRIPT and
+MSsubscriptMS\mathrm{M_{S}}roman_M start_POSTSUBSCRIPT roman_S
+end_POSTSUBSCRIPT, respectively, _i.e_., MRsubscriptMR\mathrm{M_{R}}roman_M
+start_POSTSUBSCRIPT roman_R end_POSTSUBSCRIPT and
+MSsubscriptMS\mathrm{M_{S}}roman_M start_POSTSUBSCRIPT roman_S
+end_POSTSUBSCRIPT models are optimized together by involving pretrained
+VehicleGAN and Joint Metric Learning, the method is denoted as VehicleGAN+JML
+or VehicleGAN*{}^{*}start_FLOATSUPERSCRIPT * end_FLOATSUPERSCRIPT+JML. The
+results of Vehicle Re-ID on VeRi-776 and VehicleID datasets are shown in
+TableÂ II and TableÂ III, respectively. Our method gains better performance
+than the baseline and almost the best performance in all evaluation metrics.
+
+TABLE II: Results of Vehicle Re-ID on VeRi-776Â [14] dataset. Higher mAP, Rank-1, and Rank-5 mean better performance. The best and second best performance are marked in  red and  blue. Methods | mAP | Rank-1 | Rank-5  
+---|---|---|---  
+RAMÂ [34] | 0.615 | 0.886 | 0.940  
+QD-DLFÂ [35] | 0.618 | 0.885 | 0.945  
+VANetÂ [36] | 0.663 | 0.898 | 0.960  
+BIRÂ [37] | 0.704 | 0.905 | 0.971  
+DFLNetÂ [38] | 0.732 | 0.932 | 0.975  
+Baseline-ResNet50 | 0.703 | 0.916 | 0.973  
+VehicleGAN*+JML | 0.736 | 0.936 | 0.973  
+VehicleGAN+JML | 0.742 | 0.936 | 0.973  
+TABLE III: Results of Vehicle Re-ID on VehicleIDÂ [15] dataset. Higher Rank-1,
+and Rank-5 mean better performance. The best and second best performance are
+marked in  red and  blue.
+
+Methods | Test800 | Test1600 | Test2400  
+---|---|---|---  
+Rank-1 | Rank-5 | Rank-1 | Rank-5 | Rank-1 | Rank-5  
+RAMÂ [34] | 0.752 | 0.915 | 0.723 | 0.870 | 0.677 | 0.845  
+QD-DLFÂ [35] | 0.723 | 0.925 | 0.707 | 0.889 | 0.641 | 0.834  
+DF-CVTCÂ [39] | 0.752 | 0.881 | 0.722 | 0.844 | 0.705 | 0.821  
+SAVERÂ [40] | 0.799 | 0.952 | 0.776 | 0.911 | 0.753 | 0.883  
+CFVMNetÂ [41] | 0.814 | 0.941 | 0.773 | 0.904 | 0.747 | 0.887  
+Baseline-ResNet50 | 0.804 | 0.954 | 0.764 | 0.918 | 0.737 | 0.888  
+VehicleGAN*+JML | 0.832 | 0.966 | 0.783 | 0.931 | 0.759 | 0.905  
+VehicleGAN+JML | 0.835 | 0.965 | 0.782 | 0.932 | 0.757 | 0.906  
+  
+##  V Conclusions
+
+This paper proposes a novel VehicleGAN for pose guided vehicle image
+synthesis, followed by a Joint Metric Learning framework to benefit vehicle
+Re-ID. The VehicleGAN utilizes a proposed AutoReconstruction as self-
+supervision for pose guided image synthesis. In this way, the proposed
+VehicleGAN is pair-flexible, working for either supervised (paired) or
+unsupervised (unpaired) setting. VehicleGAN is used to generate pose guided
+synthetic images with a unified target pose, which helps the feature-level
+fusion based Joint Metric Learning framework to learn vehicle perspective-
+invariant features, reducing the Re-ID recognition difficulties introduced by
+diverse poses of the same vehicles. Extensive experiments on two public
+datasets show that: 1) the proposed VehicleGAN can synthesize pose guided
+target image with high quality, 2) the proposed Joint Metric Learning
+framework obtains outstanding Re-ID accuracy with the assistance of
+VehicleGAN.
+
+## References
+
+  * [1] S.Â Teng, X.Â Hu, P.Â Deng, B.Â Li, Y.Â Li, Y.Â Ai, D.Â Yang, L.Â Li, Z.Â Xuanyuan, F.Â Zhu _etÂ al._ , â€œMotion planning for autonomous driving: The state of the art and future perspectives,â€ _IEEE Transactions on Intelligent Vehicles_ , 2023. 
+  * [2] Y.Â Tian, X.Â Zhang, X.Â Wang, J.Â Xu, J.Â Wang, R.Â Ai, W.Â Gu, and W.Â Ding, â€œAcf-net: Asymmetric cascade fusion for 3d detection with lidar point clouds and images,â€ _IEEE Transactions on Intelligent Vehicles_ , pp. 1â€“12, 2023. 
+  * [3] X.Â Liu, Y.Â Zhou, and C.Â Gou, â€œLearning from interaction-enhanced scene graph for pedestrian collision risk assessment,â€ _IEEE Transactions on Intelligent Vehicles_ , vol.Â 8, no.Â 9, pp. 4237â€“4248, 2023. 
+  * [4] X.Â Liang, J.Â Li, R.Â Qin, and F.-Y. Wang, â€œTrustworthy intelligent vehicle systems based on true autonomous organizations and operations: A new perspective,â€ _IEEE Transactions on Intelligent Vehicles_ , pp. 1â€“10, 2024. 
+  * [5] X.Â Han, Z.Â Meng, X.Â Xia, X.Â Liao, Y.Â He, Z.Â Zheng, Y.Â Wang, H.Â Xiang, Z.Â Zhou, L.Â Gao, L.Â Fan, Y.Â Li, and J.Â Ma, â€œFoundation intelligence for smart infrastructure services in transportation 5.0,â€ _IEEE Transactions on Intelligent Vehicles_ , pp. 1â€“11, 2024. 
+  * [6] H.Â Yu, X.Â Liu, Y.Â Tian, Y.Â Wang, C.Â Gou, and F.-Y. Wang, â€œSora-based parallel vision for smart sensing of intelligent vehicles: From foundation models to foundation intelligence,â€ _IEEE Transactions on Intelligent Vehicles_ , pp. 1â€“4, 2024. 
+  * [7] B.Â Li, K.Â Qin, Z.Â Cui, Q.Â Xu, and Z.Â Xu, â€œCross-camera vehicle trajectory estimation towards traffic flow,â€ in _2022 International Conference on Image Processing, Computer Vision and Machine Learning_ , 2022, pp. 103â€“106. 
+  * [8] A.Â Seiffer, L.Â SchÃ¼tz, M.Â Frey, and F.Â Gauterin, â€œConstrained control allocation improving fault tolerance of a four wheel independently driven articulated vehicle,â€ _IEEE Open Journal of Intelligent Transportation Systems_ , vol.Â 4, pp. 187â€“203, 2023. 
+  * [9] K.Â Higashiyama, K.Â Kimura, H.Â Babakarkhail, and K.Â Sato, â€œSafety and efficiency of intersections with mix of connected and non-connected vehicles,â€ _IEEE Open Journal of Intelligent Transportation Systems_ , vol.Â 1, pp. 29â€“34, 2020. 
+  * [10] R.Â Alizadeh, Y.Â Savaria, and C.Â Nerguizian, â€œCharacterization and selection of wifi channel state information features for human activity detection in a smart public transportation system,â€ _IEEE Open Journal of Intelligent Transportation Systems_ , vol.Â 5, pp. 55â€“69, 2024. 
+  * [11] T.Â Tsukiji, N.Â Zhang, Q.Â Jiang, B.Â Y. He, and J.Â Ma, â€œA multifaceted equity metric system for transportation electrification,â€ _IEEE Open Journal of Intelligent Transportation Systems_ , vol.Â 4, pp. 690â€“707, 2023. 
+  * [12] J.Â Hoppe, F.Â Schwinger, H.Â Haeger, J.Â Wernz, and M.Â Jarke, â€œImproving the prediction of passenger numbers in public transit networks by combining short-term forecasts with real-time occupancy data,â€ _IEEE Open Journal of Intelligent Transportation Systems_ , vol.Â 4, pp. 153â€“174, 2023. 
+  * [13] B.Â Jing, Q.Â Shi, C.Â Huang, P.Â Ping, and Y.Â Lin, â€œBandwidth-based traffic signal coordination models for split or mixed phasing schemes in various types of networks,â€ _IEEE Open Journal of Intelligent Transportation Systems_ , vol.Â 4, pp. 755â€“771, 2023. 
+  * [14] X.Â Liu, W.Â Liu, T.Â Mei, and H.Â Ma, â€œA deep learning-based approach to progressive vehicle re-identification for urban surveillance,â€ in _European Conference on Computer Vision_.Â Â Â Springer, 2016, pp. 869â€“884. 
+  * [15] H.Â Liu, Y.Â Tian, Y.Â Yang, L.Â Pang, and T.Â Huang, â€œDeep relative distance learning: Tell the difference between similar vehicles,â€ in _IEEE Conference on Computer Vision and Pattern Recognition_ , 2016, pp. 2167â€“2175. 
+  * [16] Y.Â Lou, Y.Â Bai, J.Â Liu, S.Â Wang, and L.Â Duan, â€œVeri-wild: A large dataset and a new method for vehicle re-identification in the wild,â€ in _IEEE/CVF Conference on Computer Vision and Pattern Recognition_ , 2019, pp. 3235â€“3243. 
+  * [17] Z.Â Li, X.Â Zhang, C.Â Tian, X.Â Gao, Y.Â Gong, J.Â Wu, G.Â Zhang, J.Â Li, and H.Â Liu, â€œTvg-reid: Transformer-based vehicle-graph re-identification,â€ _IEEE Transactions on Intelligent Vehicles_ , vol.Â 8, no.Â 11, pp. 4644â€“4652, 2023. 
+  * [18] S.Â Wang, D.Â Yang, H.Â Sheng, J.Â Shen, Y.Â Zhang, and W.Â Ke, â€œA blockchain-enabled distributed system for trustworthy and collaborative intelligent vehicle re-identification,â€ _IEEE Transactions on Intelligent Vehicles_ , pp. 1â€“13, 2023. 
+  * [19] P.Â K. Sarker, Q.Â Zhao, and M.Â K. Uddin, â€œTransformer-based person re-identification: A comprehensive review,â€ _IEEE Transactions on Intelligent Vehicles_ , pp. 1â€“19, 2024. 
+  * [20] H.Â Zheng, C.Â Chen, S.Â Li, S.Â Zheng, S.Â E. Li, Q.Â Xu, and J.Â Wang, â€œLearning-based safe control for robot and autonomous vehicle using efficient safety certificate,â€ _IEEE Open Journal of Intelligent Transportation Systems_ , vol.Â 4, pp. 419â€“430, 2023. 
+  * [21] H.Â Xie, Y.Â Wang, X.Â Su, S.Â Wang, and L.Â Wang, â€œSafe driving model based on v2v vehicle communication,â€ _IEEE Open Journal of Intelligent Transportation Systems_ , vol.Â 3, pp. 449â€“457, 2022. 
+  * [22] X.Â Liu, W.Â Liu, T.Â Mei, and H.Â Ma, â€œA deep learning-based approach to progressive vehicle re-identification for urban surveillance,â€ in _European Conference on Computer Vision_.Â Â Â Springer, 2016, pp. 869â€“884. 
+  * [23] K.Â Lv, H.Â Sheng, Z.Â Xiong, W.Â Li, and L.Â Zheng, â€œPose-based view synthesis for vehicles: A perspective aware method,â€ _IEEE Transactions on Image Processing_ , vol.Â 29, pp. 5163â€“5174, 2020. 
+  * [24] K.Â Rematas, C.Â H. Nguyen, T.Â Ritschel, M.Â Fritz, and T.Â Tuytelaars, â€œNovel views of objects from a single image,â€ _IEEE Transactions on Pattern Analysis and Machine Intelligence_ , vol.Â 39, no.Â 8, pp. 1576â€“1590, 2016. 
+  * [25] Z.Â Wang, L.Â Tang, X.Â Liu, Z.Â Yao, S.Â Yi, J.Â Shao, J.Â Yan, S.Â Wang, H.Â Li, and X.Â Wang, â€œOrientation invariant feature embedding and spatial temporal regularization for vehicle re-identification,â€ in _IEEE International Conference on Computer Vision_ , 2017, pp. 379â€“387. 
+  * [26] H.Â Chen, B.Â Lagadec, and F.Â Bremond, â€œPartition and reunion: A two-branch neural network for vehicle re-identification.â€ in _IEEE Conference on Computer Vision and Pattern Recognition Workshops_ , 2019, pp. 184â€“192. 
+  * [27] B.Â Xiao, H.Â Wu, and Y.Â Wei, â€œSimple baselines for human pose estimation and tracking,â€ in _European Conference on Computer Vision_ , 2018, pp. 466â€“481. 
+  * [28] X.Â Qian, Y.Â Fu, T.Â Xiang, W.Â Wang, J.Â Qiu, Y.Â Wu, Y.-G. Jiang, and X.Â Xue, â€œPose-normalized image generation for person re-identification,â€ in _European Conference on Computer Vision_ , 2018, pp. 650â€“667. 
+  * [29] L.Â Gatys, A.Â S. Ecker, and M.Â Bethge, â€œTexture synthesis using convolutional neural networks,â€ _Advances in Neural Information Processing Systems_ , vol.Â 28, 2015. 
+  * [30] M.Â Mirza and S.Â Osindero, â€œConditional generative adversarial nets,â€ _arXiv preprint arXiv:1411.1784_ , 2014. 
+  * [31] L.Â Ma, X.Â Jia, Q.Â Sun, B.Â Schiele, T.Â Tuytelaars, and L.Â VanÂ Gool, â€œPose guided person image generation,â€ _Advances in Neural Information Processing Systems_ , vol.Â 30, 2017. 
+  * [32] A.Â Siarohin, E.Â Sangineto, S.Â Lathuiliere, and N.Â Sebe, â€œDeformable gans for pose-based human image generation,â€ in _IEEE Conference on Computer Vision and Pattern Recognition_ , 2018, pp. 3408â€“3416. 
+  * [33] K.Â R. Castleman, _Digital Image Processing_.Â Â Â Prentice Hall Press, 1996. 
+  * [34] X.Â Liu, S.Â Zhang, Q.Â Huang, and W.Â Gao, â€œRam: a region-aware deep model for vehicle re-identification,â€ in _IEEE International Conference on Multimedia and Expo_.Â Â Â IEEE, 2018, pp. 1â€“6. 
+  * [35] J.Â Zhu, H.Â Zeng, J.Â Huang, S.Â Liao, Z.Â Lei, C.Â Cai, and L.Â Zheng, â€œVehicle re-identification using quadruple directional deep learning features,â€ _IEEE Transactions on Intelligent Transportation Systems_ , vol.Â 21, no.Â 1, pp. 410â€“420, 2019. 
+  * [36] R.Â Chu, Y.Â Sun, Y.Â Li, Z.Â Liu, C.Â Zhang, and Y.Â Wei, â€œVehicle re-identification with viewpoint-aware metric learning,â€ in _IEEE/CVF International Conference on Computer Vision_ , 2019, pp. 8282â€“8291. 
+  * [37] M.Â Wu, Y.Â Zhang, T.Â Zhang, and W.Â Zhang, â€œBackground segmentation for vehicle re-identification,â€ in _International Conference on Multimedia Modeling_.Â Â Â Springer, 2020, pp. 88â€“99. 
+  * [38] Y.Â Bai, Y.Â Lou, Y.Â Dai, J.Â Liu, Z.Â Chen, L.-Y. Duan, and I.Â Pillar, â€œDisentangled feature learning network for vehicle re-identification.â€ in _International Joint Conference on Artificial Intelligence_ , 2020, pp. 474â€“480. 
+  * [39] H.Â Li, X.Â Lin, A.Â Zheng, C.Â Li, B.Â Luo, R.Â He, and A.Â Hussain, â€œAttributes guided feature learning for vehicle re-identification,â€ _IEEE Transactions on Emerging Topics in Computational Intelligence_ , 2021. 
+  * [40] P.Â Khorramshahi, N.Â Peri, J.-c. Chen, and R.Â Chellappa, â€œThe devil is in the details: Self-supervised attention for vehicle re-identification,â€ in _European Conference on Computer Vision_.Â Â Â Springer, 2020, pp. 369â€“386. 
+  * [41] Z.Â Sun, X.Â Nie, X.Â Xi, and Y.Â Yin, â€œCfvmnet: A multi-branch network for vehicle re-identification based on common field of view,â€ in _ACM International Conference on Multimedia_ , 2020, pp. 3523â€“3531. 

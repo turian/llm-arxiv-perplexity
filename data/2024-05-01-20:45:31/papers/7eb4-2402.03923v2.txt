@@ -1,0 +1,782 @@
+  1. 1 Introduction
+  2. 2 Preliminary
+  3. 3 Return-Aligned Decision Transformer
+    1. 3.1 Overview
+    2. 3.2 Architecture
+  4. 4 Experiments
+    1. 4.1 Datasets
+    2. 4.2 Baselines and Settings
+    3. 4.3 Main Results
+    4. 4.4 Ability to Maximize Expected Return
+    5. 4.5 Ablation Study
+  5. 5 Related Work
+    1. 5.1 RTG-Conditioned Offline RL
+    2. 5.2 Transformers for RL
+  6. 6 Conclusion
+  7. A Additional Results
+    1. A.1 Further Visualizations of Main Results
+    2. A.2 Scaling Parameters in Cross-Attention
+  8. B Experimental Details
+    1. B.1 Comparison of discrepancies
+    2. B.2 Hyperparameter Settings
+
+marginparsep has been altered.  
+topmargin has been altered.  
+marginparpush has been altered.  
+The page layout violates the ICML style. Please do not change the page layout,
+or include packages like geometry, savetrees, or fullpage, which change it for
+you. Weâ€™re not able to reliably undo arbitrary changes to the style. Please
+remove the offending package(s), or layout-changing commands and try again.
+
+Â
+
+Return-Aligned Decision Transformer
+
+Â
+
+Tsunehiko Tanakaâ€‰1â€‰2â€‰ Kenshi Abeâ€‰2â€‰ Kaito Ariuâ€‰2â€‰ Tetsuro
+Morimuraâ€‰2â€‰ Edgar Simo-Serraâ€‰1â€‰
+
+  
+
+â€ â€ footnotetext:  1Waseda University, Tokyo, Japan 2CyberAgent, Tokyo,
+Japan. Correspondence to: Tsunehiko Tanaka <tsunehiko@fuji.waseda.jp>. Â  
+
+###### Abstract
+
+Traditional approaches in offline reinforcement learning aim to learn the
+optimal policy that maximizes the cumulative reward, also known as return.
+However, as applications broaden, it becomes increasingly crucial to train
+agents that not only maximize the returns, but align the actual return with a
+specified target return, giving control over the agentâ€™s performance.
+Decision Transformer (DT) optimizes a policy that generates actions
+conditioned on the target return through supervised learning and is equipped
+with a mechanism to control the agent using the target return. Despite being
+designed to align the actual return with the target return, we have
+empirically identified a discrepancy between the actual return and the target
+return in DT. In this paper, we propose Return-Aligned Decision Transformer
+(RADT), designed to effectively align the actual return with the target
+return. Our model decouples returns from the conventional input sequence,
+which typically consists of returns, states, and actions, to enhance the
+relationships between returns and states, as well as returns and actions.
+Extensive experiments show that RADT reduces the discrepancies between the
+actual return and the target return of DT-based methods.
+
+##  1 Introduction
+
+Offline reinforcement learning (RL) focuses on learning optimal policies using
+trajectories from offline datasetsÂ Levine etÂ al. (2020); Fujimoto & Gu
+(2021); Jin etÂ al. (2021); Xu etÂ al. (2022). Many methods in offline RL
+traditionally aim to learn the optimal policy that maximizes the cumulative
+reward, also known as return. However, in various scenarios, it is crucial to
+train an agent to align the cumulative reward, which we refer to as the actual
+return, with a given target value, which we call target return. Through
+specifying the actual return, it is possible to adjust the performance of game
+botsÂ Shen etÂ al. (2021) or educational toolsÂ Singla etÂ al. (2021) to match
+user skill levels, or model the trajectories of non-expert agents in traffic
+simulation analysisÂ Nguyen etÂ al. (2021). Despite this importance, existing
+approaches exhibit discrepancies between the actual return and target return,
+which significantly lower the quality of the agents. In this work, we aim to
+align the actual return with the target return, enabling control of the
+agentâ€™s performance based on the target return.
+
+![Refer to caption]()
+
+Figure 1: Comparison between DT and the proposed RADT architecture. RADTÂ
+decouples the returns from states and actions in the input sequence,
+explicitly modeling the relationships between returns and other modalities.
+
+![Refer to caption]()
+
+Figure 2: Absolute errors between the target return and the actual return in
+both the MuJoCo and Atari domains. The discrepancies are normalized by the
+return range between the top 5% and bottom 95% within the dataset. RADTÂ
+significantly reduces the discrepancies in both domains.
+
+Decision Transformer (DT)Â Chen etÂ al. (2021) optimizes a policy that
+generates actions conditioned on the target return through supervised
+learning, and is equipped with a mechanism to control the agent using the
+target return. Specifically, this model takes a sequence comprising future
+desired returns, past states, and actions as inputs, and outputs actions using
+a transformer architectureÂ Vaswani etÂ al. (2017). The self-attention
+mechanism in the transformer extracts significant features of the input
+sequence based on the relative importance of each token to all the other
+tokens. DT integrates returns into the input sequence to condition action
+generation. However, as illustrated in Fig.Â 2, there are discrepancies
+between the actual returns and the target returns. This error could be
+explained by the simultaneous handling of returns with the other modalities
+such as states and actions. This simultaneous processing could lead the model
+to overly focus on state or action tokens, and it may become unable to align
+the actual return with the target return appropriately.
+
+In this paper, we propose a novel architecture, Return-Aligned Decision
+Transformer (RADT), designed to align the actual return with the target
+return, as shown in Fig.Â 2. The core idea is to use an architecture that
+separates returns from the input sequence and explicitly models the
+relationships between the returns and the other modalities. This architecture
+prevents the reduction of the target returnâ€™s influence on the output
+actions due to other modalities such as state and action. To achieve this, we
+employ two techniques. The first is a unique cross-attention mechanism that
+focuses on the relationship between a state-action sequence and a return
+sequence. The second is adaptive layer normalization, which scales the state-
+action features using parameters inferred solely from the return features.
+They are specifically designed for seamless integration into the transformer
+block, thus maintaining the simple supervised learning approach of DT. In our
+experiments, RADTÂ shows a significant reduction in the absolute error between
+the actual return and the target return, decreasing it to 39.7% of DTâ€™s
+error in the MuJoCoÂ Todorov etÂ al. (2012) domain and 29.8% in the AtariÂ
+Bellemare etÂ al. (2013) domain. We evaluate the key techniques of RADTÂ
+through an ablation study, demonstrating that each technique is effective for
+different tasks and can complement each other.
+
+Our contributions are summarized as follows:
+
+  * â€¢
+
+We propose a novel approach for DT designed to align the actual return with a
+given target return.
+
+  * â€¢
+
+To realize this concept, we present Return-Aligned Decision Transformer, which
+decouples the returns from states and actions in the input sequence,
+explicitly modeling the relationships between returns and other modalities.
+
+  * â€¢
+
+We introduce a unique cross-attention mechanism and adaptive layer
+normalization to model the relationships between returns and other modalities.
+
+  * â€¢
+
+Our experiments demonstrate that our method outperforms existing approaches in
+aligning actual returns with target returns.
+
+##  2 Preliminary
+
+We assume a finite horizon Markov Decision Process (MDP) with horizon Tğ‘‡Titalic_T as our environment, which can be described as â„³=âŸ¨ğ’®,ğ’œ,Î¼,P,RâŸ©â„³ğ’®ğ’œğœ‡ğ‘ƒğ‘…\mathcal{M}=\langle\mathcal{S},\mathcal{A},\mu,P,R\ranglecaligraphic_M = âŸ¨ caligraphic_S , caligraphic_A , italic_Î¼ , italic_P , italic_R âŸ©, where ğ’®ğ’®\mathcal{S}caligraphic_S represents the state space; ğ’œğ’œ\mathcal{A}caligraphic_A represents the action space; Î¼âˆˆÎ”â¢(ğ’®)ğœ‡Î”ğ’®\mu\in\Delta(\mathcal{S})italic_Î¼ âˆˆ roman_Î” ( caligraphic_S ) represents the initial state distribution; P:ğ’®Ã—ğ’œâ†’Î”â¢(ğ’®):ğ‘ƒâ†’ğ’®ğ’œÎ”ğ’®P:\mathcal{S}\times\mathcal{A}\to\Delta(\mathcal{S})italic_P : caligraphic_S Ã— caligraphic_A â†’ roman_Î” ( caligraphic_S ) represents the transition probability distribution; and R:ğ’®Ã—ğ’œâ†’â„:ğ‘…â†’ğ’®ğ’œâ„R:\mathcal{S}\times\mathcal{A}\to\mathbb{R}italic_R : caligraphic_S Ã— caligraphic_A â†’ blackboard_R represents the reward function. The environment begins from an initial state s1subscriptğ‘ 1s_{1}italic_s start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT sampled from a fixed distributionÂ Î¼ğœ‡\muitalic_Î¼. At each timestep tâˆˆ[T]ğ‘¡delimited-[]ğ‘‡t\in[T]italic_t âˆˆ [ italic_T ], an agent takes an action atâˆˆğ’œsubscriptğ‘ğ‘¡ğ’œa_{t}\in\mathcal{A}italic_a start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT âˆˆ caligraphic_A in response to the state stâˆˆğ’®subscriptğ‘ ğ‘¡ğ’®s_{t}\in\mathcal{S}italic_s start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT âˆˆ caligraphic_S, transitioning to the next state st+1âˆˆğ’®subscriptğ‘ ğ‘¡1ğ’®s_{t+1}\in\mathcal{S}italic_s start_POSTSUBSCRIPT italic_t + 1 end_POSTSUBSCRIPT âˆˆ caligraphic_S with the probability distribution P(â‹…|st,at)P(\cdot|s_{t},a_{t})italic_P ( â‹… | italic_s start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT , italic_a start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ). Concurrently, the agent receives a reward rt=Râ¢(st,at)subscriptğ‘Ÿğ‘¡ğ‘…subscriptğ‘ ğ‘¡subscriptğ‘ğ‘¡r_{t}=R(s_{t},a_{t})italic_r start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT = italic_R ( italic_s start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT , italic_a start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ).
+
+Decision Transformer (DT) introduces the paradigm of transformers into the
+context of offline reinforcement learning. At each timestep tğ‘¡titalic_t in
+the inference, DT takes a sequence of desired returns, past states, and
+actions as inputs, and outputs an action atsubscriptğ‘ğ‘¡a_{t}italic_a
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT. The input sequence of DT is
+represented as
+
+| Ï„=(R^1,s1,a1,R^2,s2,a2,â€¦,R^t,st),ğœsubscript^ğ‘…1subscriptğ‘ 1subscriptğ‘1subscript^ğ‘…2subscriptğ‘ 2subscriptğ‘2â€¦subscript^ğ‘…ğ‘¡subscriptğ‘ ğ‘¡\displaystyle\tau=(\hat{R}_{1},s_{1},a_{1},\hat{R}_{2},s_{2},a_{2},...,\hat{R}% _{t},s_{t}),italic_Ï„ = ( over^ start_ARG italic_R end_ARG start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT , italic_s start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT , italic_a start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT , over^ start_ARG italic_R end_ARG start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT , italic_s start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT , italic_a start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT , â€¦ , over^ start_ARG italic_R end_ARG start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT , italic_s start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ) , |  | (1)  
+---|---|---|---  
+  
+where R^tsubscript^ğ‘…ğ‘¡\hat{R}_{t}over^ start_ARG italic_R end_ARG
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT represents the returns computed
+over the remaining steps111 Despite Eq.Â (1) taking inputs from 1111 to
+tğ‘¡titalic_t, in practice, only the last Kğ¾Kitalic_K timesteps are
+processed.. It is calculated as
+R^t=Rtargetâˆ’âˆ‘tâ€²=1tâˆ’1rtâ€²subscript^ğ‘…ğ‘¡superscriptğ‘…targetsuperscriptsubscriptsuperscriptğ‘¡â€²1ğ‘¡1subscriptğ‘Ÿsuperscriptğ‘¡â€²\hat{R}_{t}=R^{\mathrm{target}}-\sum_{t^{\prime}=1}^{t-1}r_{t^{\prime}}over^
+start_ARG italic_R end_ARG start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT =
+italic_R start_POSTSUPERSCRIPT roman_target end_POSTSUPERSCRIPT - âˆ‘
+start_POSTSUBSCRIPT italic_t start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT = 1
+end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t - 1 end_POSTSUPERSCRIPT
+italic_r start_POSTSUBSCRIPT italic_t start_POSTSUPERSCRIPT â€²
+end_POSTSUPERSCRIPT end_POSTSUBSCRIPT.
+Rtargetsuperscriptğ‘…targetR^{\mathrm{target}}italic_R start_POSTSUPERSCRIPT
+roman_target end_POSTSUPERSCRIPT is a given
+constant222Rtargetsuperscriptğ‘…targetR^{\mathrm{target}}italic_R
+start_POSTSUPERSCRIPT roman_target end_POSTSUPERSCRIPT is the total return of
+the trajectory in the dataset during training, and it is a given constant
+during inference., which is the total desired return to be obtained in an
+episode of length Tğ‘‡Titalic_T. We refer to
+Rtargetsubscriptğ‘…targetR_{\mathrm{target}}italic_R start_POSTSUBSCRIPT
+roman_target end_POSTSUBSCRIPT as a target return. Raw inputs, referred to as
+tokens, are individually projected into the embedding dimension by separate
+learnable linear layers for return, state, and action respectively, to
+generate token embeddings. The tokens are processed using a Transformer-based
+GPT modelÂ Radford etÂ al. (2018). The model is trained using either cross-
+entropy or mean-squared error loss, calculated between the predicted action
+and the ground truth from the offline datasets.
+
+![Refer to caption]() Figure 3: An overview of our proposed Return-Aligned
+Decision Transformer (RADT). We split input tokens into the return sequence
+and state-action sequence. RADTÂ equips the transformer block with cross-
+attention and adaptive layer normalization to highlight returns tokens.
+![Refer to caption]() Figure 4: The detailed structure of our cross-attention.
+In the cross-attention, the state-action sequence is input as the query, and
+the return sequence serves as both key and value. The query input qğ‘qitalic_q
+and output zğ‘§zitalic_z of the multi-head attention are fed into a linear
+layer to calculate the weight Î±ğ›¼\alphaitalic_Î± for the output
+zğ‘§zitalic_z.
+
+The transformer is an architecture designed for processing sequential data,
+including the attention mechanism, residual connection, and layer
+normalization. The attention mechanism processes three distinct inputs: the
+query, the key, and the value. This process involves weighting the value by
+the normalized dot product of the query and the key. The iğ‘–iitalic_i-th
+output token of the attention mechanism is calculated as follows:
+
+| zi=âˆ‘j=1nsoftmaxâ¢(âŸ¨qi,kâ„“âŸ©â„“=1n)jâ‹…vj,subscriptğ‘§ğ‘–superscriptsubscriptğ‘—1ğ‘›â‹…softmaxsubscriptsubscriptsuperscriptsubscriptğ‘ğ‘–subscriptğ‘˜â„“ğ‘›â„“1ğ‘—subscriptğ‘£ğ‘—\displaystyle z_{i}=\sum_{j=1}^{n}\mathrm{softmax}({\langle q_{i},k_{\ell}% \rangle}^{n}_{\ell=1})_{j}\cdot v_{j},italic_z start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT = âˆ‘ start_POSTSUBSCRIPT italic_j = 1 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_n end_POSTSUPERSCRIPT roman_softmax ( âŸ¨ italic_q start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT , italic_k start_POSTSUBSCRIPT roman_â„“ end_POSTSUBSCRIPT âŸ© start_POSTSUPERSCRIPT italic_n end_POSTSUPERSCRIPT start_POSTSUBSCRIPT roman_â„“ = 1 end_POSTSUBSCRIPT ) start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT â‹… italic_v start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT , |  | (2)  
+---|---|---|---  
+  
+DT uses self-attention, where query, key, and value are obtained by linearly
+different transformations of the input sequence,
+
+| qi=Ï„iâ¢WiQ,ki=Ï„iâ¢WiK,vi=Ï„iâ¢WiV,formulae-sequencesubscriptğ‘ğ‘–subscriptğœğ‘–superscriptsubscriptğ‘Šğ‘–ğ‘„formulae-sequencesubscriptğ‘˜ğ‘–subscriptğœğ‘–superscriptsubscriptğ‘Šğ‘–ğ¾subscriptğ‘£ğ‘–subscriptğœğ‘–superscriptsubscriptğ‘Šğ‘–ğ‘‰\displaystyle q_{i}=\tau_{i}W_{i}^{Q},\ k_{i}=\tau_{i}W_{i}^{K},\ v_{i}=\tau_{% i}W_{i}^{V},italic_q start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT = italic_Ï„ start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT italic_W start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_Q end_POSTSUPERSCRIPT , italic_k start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT = italic_Ï„ start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT italic_W start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_K end_POSTSUPERSCRIPT , italic_v start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT = italic_Ï„ start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT italic_W start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_V end_POSTSUPERSCRIPT , |  | (3)  
+---|---|---|---  
+  
+Moreover, it employs a causal mask to prohibit attention to subsequent tokens,
+rendering tokens in future timesteps ineffective for action prediction.
+
+Layer normalization standardizes the token features to stabilize learning.
+Residual connection avoids gradient vanishing by adding the input and output
+of attention layers or feed-forward layers. For further details on DT, refer
+to the original paperÂ Chen etÂ al. (2021).
+
+Our goal is to minimize the following absolute error between the target return
+and the actual return for any given target return
+Rtargetsuperscriptğ‘…targetR^{\mathrm{target}}italic_R start_POSTSUPERSCRIPT
+roman_target end_POSTSUPERSCRIPT with a single model:
+
+| ğ”¼â¢[|Rtargetâˆ’âˆ‘t=1Trt|].ğ”¼delimited-[]superscriptğ‘…targetsuperscriptsubscriptğ‘¡1ğ‘‡subscriptğ‘Ÿğ‘¡\displaystyle\mathbb{E}\left[\left|R^{\mathrm{target}}-\sum_{t=1}^{T}r_{t}% \right|\right].blackboard_E [ | italic_R start_POSTSUPERSCRIPT roman_target end_POSTSUPERSCRIPT - âˆ‘ start_POSTSUBSCRIPT italic_t = 1 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_T end_POSTSUPERSCRIPT italic_r start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT | ] . |  | (4)  
+---|---|---|---  
+  
+We refer to
+âˆ‘t=1Trtsuperscriptsubscriptğ‘¡1ğ‘‡subscriptğ‘Ÿğ‘¡\sum_{t=1}^{T}r_{t}âˆ‘
+start_POSTSUBSCRIPT italic_t = 1 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT
+italic_T end_POSTSUPERSCRIPT italic_r start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT as an actual return.
+
+##  3 Return-Aligned Decision Transformer
+
+In this section, we present the Return-Aligned Decision Transformer (RADT), a
+model designed to align the actual return with the target return. While DT
+constructs the input sequence using returns, states, and actions, we propose
+to separate returns from the input sequence. RADTÂ incorporates techniques to
+explicitly model the relationships between the returns and the other
+modalities, states and actions. The training process follows a supervised
+learning paradigm of DT. We show the overview of RADTÂ in Fig.Â 3.
+
+###  3.1 Overview
+
+We separately input the return sequence Ï•italic-Ï•\phiitalic_Ï• and the
+state-action sequence Ï„âˆ’superscriptğœ\tau^{-}italic_Ï„
+start_POSTSUPERSCRIPT - end_POSTSUPERSCRIPT into our model.
+
+| Ï•italic-Ï•\displaystyle\phiitalic_Ï• | =(R^1,R^2,â€¦,R^T),absentsubscript^ğ‘…1subscript^ğ‘…2â€¦subscript^ğ‘…ğ‘‡\displaystyle=(\hat{R}_{1},\hat{R}_{2},...,\hat{R}_{T}),= ( over^ start_ARG italic_R end_ARG start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT , over^ start_ARG italic_R end_ARG start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT , â€¦ , over^ start_ARG italic_R end_ARG start_POSTSUBSCRIPT italic_T end_POSTSUBSCRIPT ) , |  | (5)  
+---|---|---|---|---  
+| Ï„âˆ’superscriptğœ\displaystyle\tau^{-}italic_Ï„ start_POSTSUPERSCRIPT - end_POSTSUPERSCRIPT | =(s1,a1,s2,a2,â€¦,sT).absentsubscriptğ‘ 1subscriptğ‘1subscriptğ‘ 2subscriptğ‘2â€¦subscriptğ‘ ğ‘‡\displaystyle=(s_{1},a_{1},s_{2},a_{2},...,s_{T}).= ( italic_s start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT , italic_a start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT , italic_s start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT , italic_a start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT , â€¦ , italic_s start_POSTSUBSCRIPT italic_T end_POSTSUBSCRIPT ) . |  | (6)  
+  
+DT integrates returns, states, and actions into a single input sequence to
+generate actions based on returns. However, this approach could diminish the
+attention allocated to the return tokens, leading to discrepancies between the
+actual return and the target return. This is because the self-attention
+mechanism excessively focuses on modalities other than returns. To address
+this, we split input tokens into the return and state-action sequences and
+apply an architecture that focuses more on the returns. The details of our
+architecture will be explained in the following section.
+
+###  3.2 Architecture
+
+We propose two techniques for RADTÂ to explicitly model the relationships
+between the returns and the other modalities: cross-attention and adaptive
+layer normalization. Both techniques can be seamlessly integrated into
+transformer blocks, and we find that employing them in tandem yields superior
+performance. The architecture utilizing both techniques is illustrated on the
+right side of Fig.Â 3.
+
+Cross-Attention between Returns and States-Actions.  We apply cross-attention
+between the state-action sequence Ï„âˆ’superscriptğœ\tau^{-}italic_Ï„
+start_POSTSUPERSCRIPT - end_POSTSUPERSCRIPT and the return sequence
+Ï•italic-Ï•\phiitalic_Ï•. The detailed structure of our cross-attention is
+shown in Fig.Â 4. In our cross-attention, the state-action sequence
+Ï„âˆ’superscriptğœ\tau^{-}italic_Ï„ start_POSTSUPERSCRIPT -
+end_POSTSUPERSCRIPT acts as the query, while the return sequence
+Ï•italic-Ï•\phiitalic_Ï• acts as both the key and value,
+
+| qi=Ï„iâˆ’â¢WiQ,ki=Ï•iâ¢WiK,vi=Ï•iâ¢WiV.formulae-sequencesubscriptğ‘ğ‘–subscriptsuperscriptğœğ‘–superscriptsubscriptğ‘Šğ‘–ğ‘„formulae-sequencesubscriptğ‘˜ğ‘–subscriptitalic-Ï•ğ‘–superscriptsubscriptğ‘Šğ‘–ğ¾subscriptğ‘£ğ‘–subscriptitalic-Ï•ğ‘–superscriptsubscriptğ‘Šğ‘–ğ‘‰\displaystyle q_{i}=\tau^{-}_{i}W_{i}^{Q},\ k_{i}=\phi_{i}W_{i}^{K},\ v_{i}=% \phi_{i}W_{i}^{V}.italic_q start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT = italic_Ï„ start_POSTSUPERSCRIPT - end_POSTSUPERSCRIPT start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT italic_W start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_Q end_POSTSUPERSCRIPT , italic_k start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT = italic_Ï• start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT italic_W start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_K end_POSTSUPERSCRIPT , italic_v start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT = italic_Ï• start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT italic_W start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_V end_POSTSUPERSCRIPT . |  | (7)  
+---|---|---|---  
+  
+These query, key, and value are input into multi-head attention (Eq.Â 2), and
+we obtain the output zğ‘§zitalic_z. Note that we use a causal mask to ensure
+that tokens in the state-action sequence Ï„âˆ’superscriptğœ\tau^{-}italic_Ï„
+start_POSTSUPERSCRIPT - end_POSTSUPERSCRIPT cannot access future return
+tokens.
+
+Following the powerful cross-attention-based technique for integrating two
+different types of featuresÂ Nguyen etÂ al. (2022), we adaptively adjust the
+scale for the output against the input of the multi-head attention. We
+concatenate the multi-head attention input qğ‘qitalic_q and output
+zğ‘§zitalic_z as a column vector
+[zi;qi]âˆˆâ„2â¢Dsubscriptğ‘§ğ‘–subscriptğ‘ğ‘–superscriptâ„2ğ·[z_{i};q_{i}]\in\mathbb{R}^{2D}[
+italic_z start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ; italic_q
+start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ] âˆˆ blackboard_R
+start_POSTSUPERSCRIPT 2 italic_D end_POSTSUPERSCRIPT and obtain dimension-wise
+scaling parameters Î±ğ›¼\alphaitalic_Î± through a learnable affine projection.
+Using the scale Î±ğ›¼\alphaitalic_Î±, we define residual connection as
+
+| Î±isubscriptğ›¼ğ‘–\displaystyle\alpha_{i}italic_Î± start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT | =Wâ¢[zi;qi]+b,absentğ‘Šsubscriptğ‘§ğ‘–subscriptğ‘ğ‘–ğ‘\displaystyle=W[z_{i};q_{i}]+b,= italic_W [ italic_z start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ; italic_q start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ] + italic_b , |  | (8)  
+---|---|---|---|---  
+| qiupdatedsubscriptsuperscriptğ‘updatedğ‘–\displaystyle q^{\mathrm{updated}}_{i}italic_q start_POSTSUPERSCRIPT roman_updated end_POSTSUPERSCRIPT start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT | =(1+Î±i)âŠ—zi+qi,absenttensor-product1subscriptğ›¼ğ‘–subscriptğ‘§ğ‘–subscriptğ‘ğ‘–\displaystyle=(1+\alpha_{i})\otimes z_{i}+q_{i},= ( 1 + italic_Î± start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ) âŠ— italic_z start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT + italic_q start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT , |  | (9)  
+  
+where Wâˆˆâ„DÃ—2â¢Dğ‘Šsuperscriptâ„ğ·2ğ·W\in\mathbb{R}^{D\times 2D}italic_W
+âˆˆ blackboard_R start_POSTSUPERSCRIPT italic_D Ã— 2 italic_D
+end_POSTSUPERSCRIPT and bâˆˆâ„Dğ‘superscriptâ„ğ·b\in\mathbb{R}^{D}italic_b âˆˆ
+blackboard_R start_POSTSUPERSCRIPT italic_D end_POSTSUPERSCRIPT are learnable
+parameters, and âŠ—tensor-product\otimesâŠ— denotes the Hadamard product. The
+choice of 1+Î±i1subscriptğ›¼ğ‘–1+\alpha_{i}1 + italic_Î± start_POSTSUBSCRIPT
+italic_i end_POSTSUBSCRIPT allows the model to start with a baseline scaling
+of 1 (simple addition) by zero-initialization of Wğ‘ŠWitalic_W and
+bğ‘bitalic_b, resulting in the scale of zisubscriptğ‘§ğ‘–z_{i}italic_z
+start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT and
+qisubscriptğ‘ğ‘–q_{i}italic_q start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT
+being the same. This provides a stable starting point, from which the model
+can learn to adaptively adjust the scaling. As the training progresses,
+Î±isubscriptğ›¼ğ‘–\alpha_{i}italic_Î± start_POSTSUBSCRIPT italic_i
+end_POSTSUBSCRIPT is updated to refine the balance between
+zisubscriptğ‘§ğ‘–z_{i}italic_z start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT
+and qisubscriptğ‘ğ‘–q_{i}italic_q start_POSTSUBSCRIPT italic_i
+end_POSTSUBSCRIPT.
+
+In the self-attention in DT, the input sequence Ï„ğœ\tauitalic_Ï„, which is a
+concatenation of returns, states, and actions, is input as the query, key, and
+value. This setup attempts to express all interrelations solely through
+WQ,WK,WVsuperscriptğ‘Šğ‘„superscriptğ‘Šğ¾superscriptğ‘Šğ‘‰W^{Q},W^{K},W^{V}italic_W
+start_POSTSUPERSCRIPT italic_Q end_POSTSUPERSCRIPT , italic_W
+start_POSTSUPERSCRIPT italic_K end_POSTSUPERSCRIPT , italic_W
+start_POSTSUPERSCRIPT italic_V end_POSTSUPERSCRIPT. However, the model gets
+distracted from such complicated relationships, making it less responsive to
+the returns. We address this by using cross-attention to focus on the
+relationships between returns and the other modalities. Additionally, by
+introducing a scale Î±ğ›¼\alphaitalic_Î± for the output zğ‘§zitalic_z relative
+to the input query qğ‘qitalic_q, we can more flexibly represent the
+relationship between the returns sequence Ï•italic-Ï•\phiitalic_Ï• and the
+state-action sequence Ï„âˆ’superscriptğœ\tau^{-}italic_Ï„
+start_POSTSUPERSCRIPT - end_POSTSUPERSCRIPT.
+
+Adaptive Layer Normalization. We next introduce adaptive layer normalization,
+which adaptively changes depending on the returns. This involves replacing the
+standard layer normalization layers in transformer blocks with adaptive layer
+normalization layers.
+
+| qiâ€²=(1+Î³i)âŠ—LayerNormâ¢(qi)+Î²isubscriptsuperscriptğ‘â€²ğ‘–tensor-product1subscriptğ›¾ğ‘–LayerNormsubscriptğ‘ğ‘–subscriptğ›½ğ‘–\displaystyle q^{\prime}_{i}=(1+\gamma_{i})\otimes\mathrm{LayerNorm}(q_{i})+% \beta_{i}italic_q start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT = ( 1 + italic_Î³ start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ) âŠ— roman_LayerNorm ( italic_q start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ) + italic_Î² start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT |  | (10)  
+---|---|---|---  
+  
+where
+qi,qiâ€²subscriptğ‘ğ‘–subscriptsuperscriptğ‘â€²ğ‘–q_{i},q^{\prime}_{i}italic_q
+start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT , italic_q
+start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT start_POSTSUBSCRIPT italic_i
+end_POSTSUBSCRIPT denote the input and output of adaptive layer normalization,
+respectively. Î³,Î²ğ›¾ğ›½\gamma,\betaitalic_Î³ , italic_Î² are dimension-wise
+scaling parameters regressed by a linear layer from the return sequence
+Ï•italic-Ï•\phiitalic_Ï•. Through this regression, the model can condition the
+state-action sequence Ï„âˆ’superscriptğœ\tau^{-}italic_Ï„
+start_POSTSUPERSCRIPT - end_POSTSUPERSCRIPT with the return. Similar to the
+1+Î±i1subscriptğ›¼ğ‘–1+\alpha_{i}1 + italic_Î± start_POSTSUBSCRIPT italic_i
+end_POSTSUBSCRIPT in Eq.Â (8), by zero-initializing the parameters of the
+linear layer, Eq.Â (10) can be considered the same as the standard layer
+normalization at the beginning of training.
+
+In DT, layer normalization is positioned before either the attention layer or
+the feed-forward layer. This configuration creates pathways that bypass layer
+normalization via a residual connection. We place adaptive layer normalization
+after residual connection to ensure that all pathways undergo adaptive layer
+normalization, as in the vanilla transformerÂ Vaswani etÂ al. (2017).
+
+##  4 Experiments
+
+![Refer to caption]()
+
+Figure 5: Absolute Error Comparison of RADTÂ and baselines in MuJoCo domain.
+Each column represents a task. The x-axis is the target return. Target returns
+are divided into seven equally spaced points based on the cumulative reward of
+trajectories in the dataset, ranging from the bottom 5% to the top 5%. In this
+graph, the bottom 5% is represented as 0, and the top 5% as 100. The y-axis
+represents the absolute error between the actual return and the target return
+obtained from our simulations. We report the mean and standard error over
+three seeds.
+
+![Refer to caption]()
+
+Figure 6: Histogram of the cumulative reward of trajectories included in the
+D4RL dataset. Each column represents a MuJoCo task. The x-axis is normalized
+by the top 5% and bottom 5% of the datasetâ€™s trajectory cumulative reward,
+similar to Fig.Â 6. When viewed alongside Fig.Â 6, we observe that the
+absolute errors of DT and DC are inversely proportional to the amount of data,
+RADTÂ consistently maintains a low absolute error regardless of the amount of
+data. ![Refer to caption]() Figure 7: Absolute Error Comparison of RADTÂ and
+baselines in the Atari domain. The way to read these graphs is the same as in
+Fig.Â 6. We report the mean and standard error over three seeds.
+
+In this section, we conduct extensive experiments to evaluate the performance
+of our RADT. First, we verify that RADTÂ is effective in earning returns
+consistent with various given target returns, compared to other baselines.
+Next, we demonstrate through an ablation study that the two types of
+architectural designs constituting RADTÂ are effective individually, and that
+using both types together further improves performance. Additionally, we show
+that during training, RADTÂ converges to the given target promptly.
+
+###  4.1 Datasets
+
+We evaluate RADTÂ on continuous (MuJoCoÂ Todorov etÂ al. (2012)) and discrete
+(AtariÂ Bellemare etÂ al. (2013)) control tasks in the same way as DT. MuJoCo
+is characterized by a continuous action space with dense rewards. We use four
+gym locomotion tasks from the widely-used D4RLÂ Fu etÂ al. (2020) dataset:
+Ant, Hopper, HalfCheetah, and Walker. In this experiment, we utilize the v2
+medium-replay dataset. The medium-replay comprises a replay buffer of policies
+that achieve approximately 1/3131/31 / 3 of expert performance. Atari involves
+high-dimensional visual observations and requires capturing long-term context
+to handle the delay between actions and the resulting rewards. We use four
+tasks: Breakout, Pong, Qbert, and Seaquest. Similar to DT, we use 1% of all
+samples in the DQN-replay datasets as per Agarwal etÂ al. (2020) for training.
+
+Table 1: Performance comparison in the actual return maximization in the
+MuJoCo domain. We cite the results for DT, DC, and ODT from their reported
+scores. The results for CQL are cited from Kostrikov etÂ al. (2022). We report
+the average across 3 seeds from our simulation results.  
+Method | CQL | DT | DC | ODT | RADT  
+---|---|---|---|---|---  
+halfcheetah-m | 44.0 | 42.6 | 43.0 | 42.2 | 43.1  
+hopper-m | 58.5 | 67.6 | 92.5 | 97.5 | 71.5  
+walker2d-m | 72.5 | 74.0 | 79.2 | 76.8 | 78.3  
+halfcheetah-m-r | 45.5 | 36.6 | 41.3 | 40.4 | 41.6  
+hopper-m-r | 95.0 | 82.7 | 94.2 | 88.9 | 95.1  
+walker2d-m-r | 77.2 | 66.6 | 76.6 | 76.9 | 75.9  
+halfcheetah-m-e | 91.6 | 86.8 | 93.0 | - | 93.4  
+hopper-m-e | 105.4 | 107.6 | 110.4 | - | 111.7  
+walker2d-m-e | 108.8 | 108.1 | 109.6 | - | 108.9  
+  
+###  4.2 Baselines and Settings
+
+To evaluate our proposed model architecture, we use return-conditioned DT
+models with different architectures, specifically DTÂ Chen etÂ al. (2021),
+StARformerÂ Shang etÂ al. (2022), and Decision ConvFormer (DC)Â Kim etÂ al.
+(2024), as baselines. We use the official PyTorch implementations for
+baselines. Although StARformer uses step-by-step rewards instead of returns,
+in our experiments, we employ return-conditioning using returns. This
+modification is stated in the original paperÂ Shang etÂ al. (2022) to have
+minimal impact on performance. The hyperparameters for each method are set
+according to the defaults specified in their respective papers or open-source
+codebases. For visual observations in the Atari domain, RADTÂ and DC use the
+same CNN encoder as DT. StARformer, in addition to the CNN encoder, also
+incorporates more powerful patch-based embeddings like Vision TransformerÂ
+Dosovitskiy etÂ al. (2021).
+
+In MuJoCo, for each method, we train three instances with different seeds, and
+each instance runs 20 episodes for each target return. In Atari, for each
+method, we train three instances with different seeds, and each instance runs
+10 episodes for each target return. Target returns are set by first
+identifying the range of cumulative reward in trajectories in the training
+dataset, specifically from the bottom 5% to the top 5%. This identified range
+is then equally divided into seven intervals, not based on percentiles, but by
+simply dividing the range into seven equal parts. Each of these parts
+represents a target return.
+
+Table 2: Results of the ablation study on the proposed techniques proposed in
+Sec.3.3. Each value indicates the sum of absolute error between the actual
+return and the target return, relative to the target returns in the main
+results. We report the mean and standard error over 3 seeds, and normalize
+such that the average and variance of the results when using both techniques
+(RADT) are 1.0 respectively. CA represents cross-attention, and AdaLN stands
+for adaptive layer normalization.  
+Approach | CA | AdaLN | Ant | HalfCheetah | Hopper | Walker  
+---|---|---|---|---|---|---  
+DT |  |  | 2.69Â±plus-or-minus\pmÂ±2.07 | 2.66Â±plus-or-minus\pmÂ±2.07 | 2.19Â±plus-or-minus\pmÂ±6.49 | 2.39Â±plus-or-minus\pmÂ±2.60  
+RADTÂ w/o AdaLN | âœ“ |  | 1.29Â±plus-or-minus\pmÂ±0.38 | 1.51Â±plus-or-minus\pmÂ±1.19 | 1.20Â±plus-or-minus\pmÂ±1.55 | 1.24Â±plus-or-minus\pmÂ±2.66  
+RADTÂ w/o CA |  | âœ“ | 1.25Â±plus-or-minus\pmÂ±0.33 | 1.17Â±plus-or-minus\pmÂ±1.77 | 1.61Â±plus-or-minus\pmÂ±1.72 | 1.26Â±plus-or-minus\pmÂ±2.48  
+RADTÂ Full | âœ“ | âœ“ | 1.00Â±plus-or-minus\pmÂ±1.00 | 1.00Â±plus-or-minus\pmÂ±1.00 | 1.00Â±plus-or-minus\pmÂ±1.00 | 1.00Â±plus-or-minus\pmÂ±1.00  
+![Refer to caption]() Figure 8: Transitions of the absolute errors between the
+actual and target returns during training in HalfCheetah, comparing the
+absolute errors of DT, StARformer, and DC. The mean and standard error are
+reported across 3 seeds.
+
+###  4.3 Main Results
+
+The main results are presented in Fig.Â 6 for the MuJoCo domain and Fig.Â 7
+for the Atari domain. These figures plot the absolute error between the actual
+return and the target return, where lower is better. Additionally, the target
+returns are represented with the top 5% values as 100 and the bottom 5% values
+asÂ 0.
+
+MuJoCo Domain. In the MuJoCo domain, as shown in Fig.Â 6, RADTÂ outperforms
+the baseline in all tasks. In HalfCheetah, the absolute error of DT becomes
+smaller as the target return gets closer to 0 or 100, while in other tasks,
+the error decreases as the target return gets closer toÂ 0. Additionally, we
+observe that DC exhibits a similar trend in absolute error to DT across all
+four tasks. These trends in absolute error are inversely proportional to the
+cumulative reward of trajectories in the dataset, as shown in Fig.Â 6. We
+believe that DT and DC are susceptible to the distribution of data. In
+contrast, RADTÂ consistently shows smaller absolute errors across various
+target returns compared to DT and DC, indicating its robustness to data
+distribution.
+
+It is noteworthy that in StARformer, the absolute error decreases as it gets
+close to 66.7 in Hopper and 100 in HalfCheetah. This is because, regardless of
+the specified target return, the actual return tends to converge to 66.7
+(Hopper) or 100 (HalfCheetah), as shown in Fig.Â 9 in AppendixÂ A.1. Shang etÂ
+al. (2022) report that it performs equally well with or without using returns
+or step-by-step rewards. We believe that StARformer generates actions
+independently of returns or step-by-step rewards, suggesting that it is
+challenging to control it with various target returns. Conversely, RADTÂ does
+not exhibit the bias seen in StARformer and responds more accurately to the
+target returns.
+
+Atari Domain. The Atari domain is challenging due to the sparsity of rewards,
+making the control of obtained rewards more difficult than in MuJoCo. Despite
+this, RADTÂ outperforms the baselines in most tasks, as shown in Fig.Â 7.
+Moreover, given that observations in the Atari domain are images, enhancements
+to the vision encoder offer considerable advantages. However, when compared to
+StARformer, which utilizes powerful patch-based embeddings such as ViT, RADTÂ
+shows superior performance in most tasks and achieves competitive results in
+others. DC reports excellent results for Pong, demonstrating that convolution
+is superior to self-attention in limited tasks. Meanwhile, our proposed method
+performs best in the other tasks, suggesting that RADTÂ would be better suited
+for a wide range of scenarios.
+
+###  4.4 Ability to Maximize Expected Return
+
+We conduct experiments on the MuJoCo domain to examine the ability to maximize
+the expected return, a standard task in offline RL. We consider four
+baselines: CQLÂ Kumar etÂ al. (2020), DTÂ Chen etÂ al. (2021), DCÂ Kim etÂ al.
+(2024), and ODTÂ Zheng etÂ al. (2022). The results are shown in Tab.Â 1. All
+scores are normalized so that 100 represents the score of an expert policy, as
+per Â Fu etÂ al. (2020). We can observe that RADT achieves competitive or
+superior results compared to the baselines. These results mean that the
+architectural design of RADT can not only align the actual return with the
+target return, but also excel in return maximization.
+
+###  4.5 Ablation Study
+
+Architecture Techniques. We conduct an ablation study for the core techniques
+of RADT, as proposed in Sec.Â 3.2, on the MuJoCo domain. The results are
+summarized in Tab.Â 2. CA represents cross-attention, and AdaLN stands for
+adaptive layer normalization. Each value is the sum of the absolute errors
+between the actual return and the target return across the multiple target
+returns. These values are then normalized so that the average and standard
+error of the results when using both techniques (RADT) are 1.0 respectively.
+TableÂ 2 reports that introducing either cross-attention or adaptive layer
+normalization individually proves to be effective. The cross-attention
+performs better in Hopper and Walker, while adaptive layer normalization
+excels in Ant and HalfCheetah. This suggests that each technique has its
+unique areas of expertise. The combination of both techniques results in the
+smallest error across all tasks, implying that cross-attention and adaptive
+layer normalization effectively complement each other.
+
+Training Convergence. We present in Fig.Â 8 the curves of the absolute errors
+between the actual return and the target return as training proceeds, along
+with the absolute errors of DT, StARformer, and DC as baselines. For all
+target returns, we observe that RADTÂ converges up to 20k iterations. This
+suggests that RADTÂ has an advantage in terms of the speed and stability of
+training compared to other baselines.
+
+##  5 Related Work
+
+###  5.1 RTG-Conditioned Offline RL
+
+Recent studies have focused on formulating offline reinforcement learning (RL)
+as a problem of predicting action sequences that are conditioned by goals and
+rewardsÂ Chen etÂ al. (2021); Emmons etÂ al. (2022); David etÂ al. (2023);
+Schmidhuber (2019); Srivastava etÂ al. (2019). This approach differs from the
+popular value-based methodsÂ Kumar etÂ al. (2020); Kostrikov etÂ al. (2022) by
+modeling the relationship between rewards and actions through supervised
+learning. Decision Transformer (DT)Â Chen etÂ al. (2021) introduces the
+concept of desired future returns and improves performance by training the
+transformerÂ Vaswani etÂ al. (2017) as a return-conditioned policy. There have
+been various advancements in offline RL based on the DT framework, which will
+be elaborated in the following section.
+
+###  5.2 Transformers for RL
+
+Some efforts focus on refining the transformer architecture for offline RL.
+StARformerÂ Shang etÂ al. (2022) introduces two transformer architectures, one
+aggregates information at each step, and the other aggregates information
+across the entire sequence. The image encoding process is improved by dividing
+the observation images into patches and feeding them into the transformer to
+enhance step information, similar to Vision TransformerÂ Dosovitskiy etÂ al.
+(2021). Decision ConvFormerÂ Kim etÂ al. (2024) replaces attention with
+convolution to capture the inherent local dependence pattern of MDP. While
+these architectures preserve the input sequence structure of the transformer,
+comprising returns, states, and actions, they do not directly tackle the
+challenge of diminishing the influence of returns on the decision-making
+process. In contrast, our research specifically aims to align the actual
+return with the target return.
+
+There is growing interest in methods of manipulating data to train DT to solve
+the trajectory stitching problem in offline RL. Stitching refers to the
+ability to combine sub-optimal trajectories to create an optimal one. For
+example, Q-learning Decision Transformer (QDT)Â Yamagata etÂ al. (2023) and
+Advantage Conditioned Transformer (ACT)Â Gao etÂ al. (2023) re-label the data
+trajectories using return-to-go or advantage obtained by dynamic programming.
+Elastic Decision Transformer (EDT)Â Wu etÂ al. (2023) adjusts the length of
+trajectories maintained in DT to facilitate the stitching of trajectories
+during testing. Liu & Abbeel (2023) prepare multiple trajectories sorted in
+ascending order by total rewards and re-labels them with the highest total
+reward in the trajectories before training DT. These efforts enhance the
+stitching capability, demonstrating that agents trained in offline RL can
+achieve better performance. While our focus is on model improvement and thus
+our scope differs from these efforts, we anticipate that combining these
+efforts and our model could improve the performance of both.
+
+Several training methods have been proposed that emphasize the performance of
+DT agents when transitioning from offline training to online activity. Online
+Decision TransformerÂ Zheng etÂ al. (2022) fine-tunes policies pre-trained on
+offline datasets through online interactions with the environment. Janner etÂ
+al. (2021) add beam search to enable the agent to explore better actions. Wang
+etÂ al. (2023) introduce a trained value function into DT, bridging the gap
+between the deterministic nature of return-conditioned supervised learning and
+the probabilistic characteristics of value-based methods. While these online
+enhancements diverge from the primary focus of this study, we believe that a
+combination of this study with these enhancements can potentially open up
+further possibilities.
+
+##  6 Conclusion
+
+We have explored the development of advanced, controllable agents in offline
+RL based on DT. Our proposed Return-Aligned Decision Transformer (RADT)
+separates the return sequence from the state-action sequence and can
+significantly improve the alignment of actual returns with the target return.
+The architectural innovations of RADTÂ are a distinctive cross-attention
+mechanism and adaptive layer normalization for returns, designed to be easily
+integrated into the transformer block. In both MuJoCo and Atari domains, RADTÂ
+demonstrated superior capability in aligning the actual return with the target
+return compared to existing DT-based methods. We believe that this capability
+allows us to obtain agents at various skill levels, and it broadens the range
+of applications for DT, such as in traffic analysis and as tools for games and
+education.
+
+## References
+
+  * Agarwal etÂ al. (2020) Agarwal, R., Schuurmans, D., and Norouzi, M.  An optimistic perspective on offline reinforcement learning.  In _Proc. of ICML_ , 2020. 
+  * Bellemare etÂ al. (2013) Bellemare, M.Â G., Naddaf, Y., Veness, J., and Bowling, M.  The arcade learning environment: An evaluation platform for general agents.  _Journal of Artificial Intelligence Research_ , 47(1):253â€“279, 2013. 
+  * Chen etÂ al. (2021) Chen, L., Lu, K., Rajeswaran, A., Lee, K., Grover, A., Laskin, M., Abbeel, P., Srinivas, A., and Mordatch, I.  Decision transformer: Reinforcement learning via sequence modeling.  In _Proc. of NeurIPS_ , 2021. 
+  * David etÂ al. (2023) David, S.Â B., Zimerman, I., Nachmani, E., and Wolf, L.  Decision S4: Efficient sequence-based RL via state spaces layers.  In _Proc. of ICLR_ , 2023. 
+  * Dosovitskiy etÂ al. (2021) Dosovitskiy, A., Beyer, L., Kolesnikov, A., Weissenborn, D., Zhai, X., Unterthiner, T., Dehghani, M., Minderer, M., Heigold, G., Gelly, S., Uszkoreit, J., and Houlsby, N.  An image is worth 16x16 words: Transformers for image recognition at scale.  In _Proc. of ICLR_ , 2021. 
+  * Emmons etÂ al. (2022) Emmons, S., Eysenbach, B., Kostrikov, I., and Levine, S.  Rvs: What is essential for offline RL via supervised learning?  In _Proc. of ICLR_ , 2022. 
+  * Fu etÂ al. (2020) Fu, J., Kumar, A., Nachum, O., Tucker, G., and Levine, S.  D4rl: Datasets for deep data-driven reinforcement learning.  _arXiv preprint arXiv:2004.07219_ , 2020. 
+  * Fujimoto & Gu (2021) Fujimoto, S. and Gu, S.  A minimalist approach to offline reinforcement learning.  In _Proc. of NeurIPS_ , 2021. 
+  * Gao etÂ al. (2023) Gao, C., Wu, C., Cao, M., Kong, R., Zhang, Z., and Yu, Y.  Act: Empowering decision transformer with dynamic programming via advantage conditioning.  _arXiv preprint arXiv:2309.05915_ , 2023. 
+  * Janner etÂ al. (2021) Janner, M., Li, Q., and Levine, S.  Offline reinforcement learning as one big sequence modeling problem.  In _Proc. of NeurIPS_ , 2021. 
+  * Jin etÂ al. (2021) Jin, Y., Yang, Z., and Wang, Z.  Is pessimism provably efficient for offline RL?  In _Proc. of ICML_ , 2021. 
+  * Kim etÂ al. (2024) Kim, J., Lee, S., Kim, W., and Sung, Y.  Decision ConvFormer: Local filtering in MetaFormer is sufficient for decision making.  In _Proc. of ICLR_ , 2024. 
+  * Kostrikov etÂ al. (2022) Kostrikov, I., Nair, A., and Levine, S.  Offline reinforcement learning with implicit Q-learning.  In _Proc. of ICLR_ , 2022. 
+  * Kumar etÂ al. (2020) Kumar, A., Zhou, A., Tucker, G., and Levine, S.  Conservative Q-learning for offline reinforcement learning.  In _Proc. of NeurIPS_ , 2020. 
+  * Levine etÂ al. (2020) Levine, S., Kumar, A., Tucker, G., and Fu, J.  Offline reinforcement learning: Tutorial, review, and perspectives on open problems.  _arXiv preprint arXiv:2005.01643_ , 2020. 
+  * Liu & Abbeel (2023) Liu, H. and Abbeel, P.  Emergent agentic transformer from chain of hindsight experience.  In _Proc. of ICML_ , 2023. 
+  * Nguyen etÂ al. (2021) Nguyen, J., Powers, S.Â T., Urquhart, N., Farrenkopf, T., and Guckert, M.  An overview of agent-based traffic simulators.  _Transportation Research Interdisciplinary Perspectives_ , 12:100486, 2021. 
+  * Nguyen etÂ al. (2022) Nguyen, V.-Q., Suganuma, M., and Okatani, T.  Grit: Faster and better image captioning transformer using dual visual features.  In _Proc. of ECCV_ , 2022. 
+  * Radford etÂ al. (2018) Radford, A., Narasimhan, K., Salimans, T., Sutskever, I., etÂ al.  Improving language understanding by generative pre-training.  2018\. 
+  * Schmidhuber (2019) Schmidhuber, J.  Reinforcement learning upside down: Donâ€™t predict rewardsâ€“just map them to actions.  _arXiv preprint arXiv:1912.02875_ , 2019. 
+  * Shang etÂ al. (2022) Shang, J., Kahatapitiya, K., Li, X., and Ryoo, M.Â S.  StARformer: Transformer with state-action-reward representations for visual reinforcement learning.  In _Proc. of ECCV_ , 2022. 
+  * Shen etÂ al. (2021) Shen, R., Zheng, Y., Hao, J., Meng, Z., Chen, Y., Fan, C., and Liu, Y.  Generating behavior-diverse game ais with evolutionary multi-objective deep reinforcement learning.  In _Proc. of IJCAI_ , 2021. 
+  * Singla etÂ al. (2021) Singla, A., Rafferty, A.Â N., Radanovic, G., and Heffernan, N.Â T.  Reinforcement learning for education: Opportunities and challenges.  _arXiv preprint arXiv:2107.08828_ , 2021. 
+  * Srivastava etÂ al. (2019) Srivastava, R.Â K., Shyam, P., Mutz, F., JaÅ›kowski, W., and Schmidhuber, J.  Training agents using upside-down reinforcement learning.  _arXiv preprint arXiv:1912.02877_ , 2019. 
+  * Todorov etÂ al. (2012) Todorov, E., Erez, T., and Tassa, Y.  MuJoCo: A physics engine for model-based control.  In _Proc. of IROS_ , 2012. 
+  * Vaswani etÂ al. (2017) Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A.Â N., Kaiser, Å., and Polosukhin, I.  Attention is all you need.  In _Proc. of NeurIPS_ , 2017. 
+  * Wang etÂ al. (2023) Wang, Y., Yang, C., Wen, Y., Liu, Y., and Qiao, Y.  Critic-guided decision transformer for offline reinforcement learning.  _arXiv preprint arXiv:2312.13716_ , 2023. 
+  * Wu etÂ al. (2023) Wu, Y.-H., Wang, X., and Hamaya, M.  Elastic decision transformer.  In _Proc. of NeurIPS_ , 2023. 
+  * Xu etÂ al. (2022) Xu, H., Jiang, L., Li, J., and Zhan, X.  A policy-guided imitation approach for offline reinforcement learning.  In _Proc. of NeurIPS_ , 2022. 
+  * Yamagata etÂ al. (2023) Yamagata, T., Khalil, A., and Santos-Rodriguez, R.  Q-learning decision transformer: Leveraging dynamic programming for conditional sequence modelling in offline RL.  In _Proc. of ICML_ , 2023. 
+  * Zheng etÂ al. (2022) Zheng, Q., Zhang, A., and Grover, A.  Online decision transformer.  In _Proc. of ICML_ , 2022. 
+
+##  Appendix A Additional Results
+
+###  A.1 Further Visualizations of Main Results
+
+Concerning the results of Fig.Â 6 and Fig.Â 7 presented in Sec.Â 4.3, we
+illustrate the comparison of performance for each target return in Fig.Â 9.
+The black dotted line represents y=xğ‘¦ğ‘¥y=xitalic_y = italic_x, indicating
+that the actual return matches the target return perfectly. The closer to the
+black dotted line, the better the result. In the MuJoCo domain, it is shown
+that there is a correlation between the target return and the actual return
+for all methods. In contrast, in the Atari domain, especially in the Qbert
+task, the baseline shows a lack of correlation with the target return.
+Furthermore, there tends to be a performance that exceeds the black dotted
+line, suggesting that aligning with the target return is more difficult
+compared to the MuJoCo domain.
+
+![Refer to caption]() (a) MuJoCo.
+
+![Refer to caption]() (b) Atari.
+
+Figure 9: Comparisons of actual returns per target return in the experiments
+of Fig.Â 6 and Fig.Â 7. Each column represents a task. The x-axis represents
+the target return, and the y-axis represents the actual return. Target returns
+are set in the same way as Fig.Â 6 and Fig.Â 7. The black dotted line
+represents y=xğ‘¦ğ‘¥y=xitalic_y = italic_x, indicating that the actual return
+matches the target return perfectly. We report the mean and standard error
+over three seeds.
+
+###  A.2 Scaling Parameters in Cross-Attention
+
+We conduct experiments to evaluate the scaling parameter Î±ğ›¼\alphaitalic_Î±,
+included in the cross-attention introduced in Sec.Â 3.2. The results are shown
+in Tab.Â 3. In these experiments, we did not employ adaptive layer
+normalization in either scenario, whether with or without Î±ğ›¼\alphaitalic_Î±
+We observed that the introduction of cross-attention without scaling improves
+the results for some tasks compared to DT. Furthermore, the inclusion of the
+scaling parameter Î±ğ›¼\alphaitalic_Î± significantly enhance performance,
+surpassing DT in all tasks.
+
+Table 3: Experimental results evaluating the scaling parameters
+Î±ğ›¼\alphaitalic_Î± in the MuJoCo domain. CA represents DT with our cross-
+attention, and we prepare versions with and without the scaling parameters.
+The results of DT are also included.  
+Method | Scaling | Ant | HalfCheetah | Hopper | Walker  
+---|---|---|---|---|---  
+DT |  | 2.69Â±plus-or-minus\pmÂ±2.07 | 2.66Â±plus-or-minus\pmÂ±2.07 | 2.19Â±plus-or-minus\pmÂ±6.49 | 2.39Â±plus-or-minus\pmÂ±2.60  
+CA |  | 1.97Â±plus-or-minus\pmÂ±0.13 | 2.74Â±plus-or-minus\pmÂ±0.35 | 2.15Â±plus-or-minus\pmÂ±0.10 | 2.90Â±plus-or-minus\pmÂ±0.21  
+CA | âœ“ | 1.29Â±plus-or-minus\pmÂ±0.38 | 1.51Â±plus-or-minus\pmÂ±1.19 | 1.20Â±plus-or-minus\pmÂ±1.55 | 1.24Â±plus-or-minus\pmÂ±2.66  
+  
+##  Appendix B Experimental Details
+
+###  B.1 Comparison of discrepancies
+
+The discrepancies in Fig.Â 2 are calculated as the sum of the absolute errors
+between the actual return and target return across multiple tasks. The
+absolute error is normalized by the difference between the top 5% and bottom
+95% of returns within the dataset.
+
+###  B.2 Hyperparameter Settings
+
+The full list of hyperparameters for RADTÂ can be found in Tab.Â 4 and Tab.Â
+5. We use the model code for DT, StARformer, and DC from the following
+sources. DT: https://github.com/kzl/decision-transformer. StARformer:
+https://github.com/elicassion/StARformer. DC:
+https://openreview.net/forum?id=af2c8EaKl8.
+
+Table 4: Hyperparameters settings of RADT in the MuJoCo domain.  
+Hyperparameter | Value  
+---|---  
+Number of layers | 3333  
+Number of attention heads | 1111  
+Embedding dimension | 128128128128  
+Nonlinearity function | GELU, transformer  
+| SiLU, adaptive layer normalization  
+Context length K | 20202020  
+Dropout | 0.10.10.10.1  
+Learning rate | 10âˆ’4superscript10410^{-4}10 start_POSTSUPERSCRIPT - 4 end_POSTSUPERSCRIPT  
+Grad norm clip | 0.250.250.250.25  
+Weight decay | 10âˆ’4superscript10410^{-4}10 start_POSTSUPERSCRIPT - 4 end_POSTSUPERSCRIPT  
+Learning rate decay | Linear warmup for first 105superscript10510^{5}10 start_POSTSUPERSCRIPT 5 end_POSTSUPERSCRIPT training steps  
+Position Encoding | Sinusoidal Position Encoding  
+Table 5: Hyperparameters settings of RADT in the MuJoCo domain.  
+Hyperparameter | Value  
+---|---  
+Number of layers | 6666  
+Number of attention heads | 8888  
+Embedding dimension | 128128128128  
+Batch size |  512512512512 Pong  
+|  128128128128 Breakout, Qbert, Seaquest  
+Nonlinearity | ReLU encoder  
+| GELU transformer  
+| SiLU adaptive layer normalization  
+Encoder channels | 32,64,6432646432,64,6432 , 64 , 64  
+Encoder filter size | 8Ã—8,4Ã—4,3Ã—38844338\times 8,4\times 4,3\times 38 Ã— 8 , 4 Ã— 4 , 3 Ã— 3  
+Encoder strides | 4,2,14214,2,14 , 2 , 1  
+Max epochs | 5555  
+Dropout | 0.10.10.10.1  
+Learning rate | 6Ã—10âˆ’46superscript1046\times 10^{-4}6 Ã— 10 start_POSTSUPERSCRIPT - 4 end_POSTSUPERSCRIPT  
+Adam betas | (0.9,0.95)0.90.95(0.9,0.95)( 0.9 , 0.95 )  
+Grad norm clip | 0.10.10.10.1  
+Weight decay | 0.10.10.10.1  
+Learning rate decay | Linear warmup and cosine decay  
+Warmup tokens | 512âˆ—2051220512*20512 âˆ— 20  
+Final tokens | 2âˆ—500000âˆ—K2500000ğ¾2*500000*K2 âˆ— 500000 âˆ— italic_K  
+Position Encoding | Sinusoidal Position Encoding  
+  

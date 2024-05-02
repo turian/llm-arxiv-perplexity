@@ -1,0 +1,1380 @@
+  1. 1 Introduction
+  2. 2 Related Work
+    1. 2.1 Automatically Distinguishing Types of Instances
+    2. 2.2 Visualization for Outlier and Rare Category Detection
+    3. 2.3 Data-centric Machine Learning
+  3. 3 Analytical Tasks and Design Goals
+    1. 3.1 Analytical Tasks for Undersampling and Oversampling
+    2. 3.2 Design Goals for HardVis
+  4. 4 HardVis: System Overview and First Application
+    1. 4.1 Data Types
+    2. 4.2 Undersampling
+    3. 4.3 Oversampling
+    4. 4.4 Sampling Execution Tracker and Test Set Confusion
+    5. 4.5 First Application
+  5. 5 Use Cases
+    1. 5.1 Usage Scenario: Local Assessment of Undersampling
+    2. 5.2 Use Case: Explorative Sampling for Better Classification
+  6. 6 Evaluation
+  7. 7 Discussion
+    1. 7.1 Visual Design
+    2. 7.2 Limitations
+  8. 8 Conclusion
+
+\JournalPaper\BibtexOrBiblatex\electronicVersion\PrintedOrElectronic\AddEverypageHook{textblock*}
+
+140mm(37mm,270mm) _© 2023 The Eurographics Association and John Wiley & Sons
+Ltd. This is the author’s version of the article that has been published in
+Computer Graphics Forum. The final version of this record is available at:
+10.1111/cgf.14726_ \newfboxstyletight2padding=2pt,margin=0pt,baseline-
+skip=false
+
+{textblock*}
+
+140mm(37mm,270mm) _© 2023 The Eurographics Association and John Wiley & Sons
+Ltd. This is the author’s version of the article that has been published in
+Computer Graphics Forum. The final version of this record is available at:
+10.1111/cgf.14726_
+
+# HardVis: Visual Analytics to Handle Instance Hardness Using Undersampling
+and Oversampling Techniques
+
+A. Chatzimparmpas1\orcid0000-0002-9079-2376, F. V.
+Paulovich2\orcid0000-0002-2316-760X, and A. Kerren1,3\orcid0000-0002-0519-2537  
+1Department of Computer Science and Media Technology, Linnaeus University,
+Sweden 2Department of Mathematics and Computer Science, Eindhoven University
+of Technology, The Netherlands 3Department of Science and Technology,
+Linköping University, Sweden
+
+###### Abstract
+
+Despite the tremendous advances in machine learning (ML), training with
+imbalanced data still poses challenges in many real-world applications. Among
+a series of diverse techniques to solve this problem, sampling algorithms are
+regarded as an efficient solution. However, the problem is more fundamental,
+with many works emphasizing the importance of instance hardness. This issue
+refers to the significance of managing unsafe or potentially noisy instances
+that are more likely to be misclassified and serve as the root cause of poor
+classification performance. This paper introduces HardVis, a visual analytics
+system designed to handle instance hardness mainly in imbalanced
+classification scenarios. Our proposed system assists users in visually
+comparing different distributions of data types, selecting types of instances
+based on local characteristics that will later be affected by the active
+sampling method, and validating which suggestions from undersampling or
+oversampling techniques are beneficial for the ML model. Additionally, rather
+than uniformly undersampling/oversampling a specific class, we allow users to
+find and sample easy and difficult to classify training instances from all
+classes. Users can explore subsets of data from different perspectives to
+decide all those parameters, while HardVis keeps track of their steps and
+evaluates the model’s predictive performance in a test set separately. The end
+result is a well-balanced data set that boosts the predictive power of the ML
+model. The efficacy and effectiveness of HardVis are demonstrated with a
+hypothetical usage scenario and a use case. Finally, we also look at how
+useful our system is based on feedback we received from ML experts.
+
+CCS Concepts  
+∙∙\bullet∙ Human-centered computing →→\rightarrow→ Visualization; Visual
+analytics; ∙∙\bullet∙ Machine learning →→\rightarrow→ Supervised learning;
+
+##  1 Introduction
+
+In machine learning (ML), _easy to classify instances_ are those for which ML
+models have a high probability of predicting the correct class label, whereas
+the opposite is true for the _difficult to classify instances_ [YLW∗21]. The
+assessment of instance hardness can reveal useful information about the
+boundaries of ML capabilities [PHOMU15]. Instance hardness is a common problem
+that even inspired the creation of well-known boosting algorithms [YLF∗21],
+such as AdaBoost [FSA99]. It can also highlight when and where human
+intervention is required to resolve data-related issues. The ultimate goal of
+such a procedure is to identify misclassified instances and interpret why this
+has happened [CdMP14], as well as improve predictive performance [SMGC14].
+This scenario is where visual analytics (VA) approaches are considered as a
+possible solid solution [WDC∗22] with many recent works focusing on
+problematic subsets of data for the interpretation and performance boost of ML
+models [CVW22, ZOS∗22]. However, the classification problem becomes
+significantly more complex when the data set contains both _class overlap_ and
+_class imbalance_. There are many problems [RKN06, WLC∗13, HKB18, CCS06,
+KHM98] in which the minority class—composed of mostly unsafe instances such as
+borderline examples, rare cases, and outliers—is of great interest [NS16]. A
+medical diagnosis task of detecting ill patients within a healthy majority is
+an example that illustrates the great importance of imbalanced data problems.
+Learning from such unbalanced data sets can be difficult because most models
+will theoretically attain high accuracy by merely predicting the majority
+class [Ste16].
+
+There are two fundamental methodologies to deal with these kinds of imbalance
+problems: _data-level_ and _algorithm-level approaches_ [Kra16]. The first
+method utilizes preprocessing strategies in order to balance the training set.
+The second method aims at determining what causes a certain ML model to fail
+in imbalanced circumstances and addressing those flaws to create new robust ML
+models [CZV13, CT17]. _Ensemble approaches_ have also grown in popularity, as
+they allow for a fusion of model combinations and the usage of one of the
+methodologies discussed above [KGW17, WGC14]. In this paper, we solely focus
+on the data-level approaches because they are not entangled to a specific ML
+algorithm; and they remain as an underrepresented category without the support
+of VA solutions [CMJK20, CMJ∗20, YCY∗21]. These approaches perform data
+sampling that refers to either undersampling or oversampling techniques. The
+former removes instances from the training set, while the latter generates
+synthetic/artificial instances from the already existing data to balance the
+class distribution.
+
+With regard to _undersampling_ , two advanced techniques for concurrently
+eliminating and maintaining instances are: one-sided selection (OSS) [KM97]
+and neighborhood cleaning rule (NCR) [Lau01]. The goal here is to remove
+ambiguous points on the class boundary and, at the same time, keep any
+nonredundant examples far from the decision boundary. On the other hand, a
+frequently used _oversampling_ algorithm is the synthetic minority
+oversampling technique (SMOTE) [CBHK02] that comes with several drawbacks. One
+of those is the uniform approach to oversampling which considers all minority
+instances equally important. To deal with this flaw, adaptive synthetic
+(ADASYN) [HBGL08] was invented that dynamically determines which cases may
+represent a greater challenge for an ML model, thus oversampling instances
+around class borders. A non-trivial issue with these algorithms is that they
+require the exploration of specific parameters from the user side. The common
+ground in all these techniques is the k-value that should be set for the
+k-nearest neighbors (KNN) algorithm [Alt92, FH89]. Depending on this critical
+value, more or fewer instances will be removed or used for artificial
+addition, which might cause harm to the predictive performance of the ML model
+under training. For example, in an imbalanced healthcare data scenario, a data
+analyst who blindly trusts one of the previous heuristic-based approaches for
+undersampling and chooses a high k-value will eventually remove so many
+healthy patients (belonging to the majority class), leading to a balanced
+training set but with a significant loss of critical data for generalizing
+when the system will be put into production. Tuning those parameters is not
+straightforward to be automated since there are multiple ways on how to
+combine undersampling and oversampling; thus, making room for human-centric
+solutions such as interactive visualizations that facilitate human exploration
+and domain knowledge injection into this complex problem. Furthermore, the
+local characteristics of each instance are at least equally important as the
+global extracted patterns, which are usually investigated with automated
+methods [RVV∗15]. Consequently, a remaining open question is: (RQ1) for a
+given data set, how can visualization assist users in deciding the optimal
+parameters for the undersampling and oversampling techniques?
+
+Another challenge related to the previous one is to identify common _local
+characteristics_ of the instances in order to classify them into data types,
+as in the work of Napierala and Stefanowski [NS16] that acknowledges four
+types of data: _safe, borderline, rare,_ and _outliers_ (SBRO in short). As
+described before, depending on the selected k-value, the distribution of
+instances in those types is subject to change [SK17]. Outliers can account for
+a sizable fraction of a class, especially in minority groups; as a result, in
+some data sets, they may even predominate [NS16]. It is dangerous to treat
+outliers as noise and utilize noise-handling approaches such as relabeling or
+eliminating them from the learning set without extensively analyzing them
+[XYX∗19, BNR20]. Separating noise from outliers is a necessary but non-trivial
+task [SAPV16]. If we consider the previously established example, a data
+analyst will receive various distributions of SBRO instances (i.e.,
+separations of patients) depending on the k-value selected for splitting the
+data with KNN into these four data types, where some combinations will lead to
+more outliers that could be potentially treated as noisy data compared to
+others. Moreover, rare cases exist in several data sets [Rav11]. This
+indicates that class difference is not the only source of difficulties when
+dealing with unbalanced data, but local characteristics of each class are also
+essential [NS16]. This problem is partially addressed with upgraded versions
+of SMOTE and hybrid algorithms. For example, Borderline-SMOTE [HWM05] focuses
+on oversampling cases that are near to class boundaries. Safe-Level-SMOTE
+[BSL09] allocates weights to instances based on how “safe” they are from the
+majority class influence, and it uses these weights to guide the introduction
+of artificial examples. Additionally, selective preprocessing of imbalanced
+data (SPIDER) [NSW10] focuses on highlighting problematic cases, particularly
+those that overlap with the majority class. Nevertheless, it would be better
+to dynamically adjust this ratio based on the exploration of local data
+features and the varying density of examples. In such dynamic approaches,
+evaluating several types of data could be useful [NS16]. Thus, a question that
+arises is: (RQ2) which algorithmic suggestions should users accept based on
+the visual analysis of particular SBRO areas or even whole regions?
+
+In this paper, we present a VA system, called HardVis, that incorporates
+undersampling and oversampling techniques for the management of both instance
+hardness and class imbalance independent of the ML algorithm in use. It adopts
+validation metrics suitable for imbalanced multi-class classification problems
+and includes several iterative phases that enable users to apply undersampling
+and oversampling in various strategic schemes. Our contributions are
+summarized as follows:
+
+  * •
+
+a coherent visual analytic workflow that takes into account instance hardness,
+while leveraging undersampling and oversampling techniques;
+
+  * •
+
+a working prototype of the suggested workflow in the form of our VA system,
+HardVis, which comprises a novel combination of multiple coordinated views to
+support the entire process of selectively undersampling and oversampling parts
+of the data set;
+
+  * •
+
+a proof-of-concept showcasing the proposed system’s applicability with a
+hypothetical usage scenario, and a use case that illustrates the utility of
+our decision to deploy sampling approaches and involves humans in-between
+automated methods; and
+
+  * •
+
+the discussion of the methodology and findings of interview sessions with five
+ML experts, presenting positive results.
+
+The remainder of this paper is organized as follows. In Section 2, we review
+automated methods for the detection of different data types, visually-assisted
+identification of outliers and rare examples, and visualization approaches for
+data-centric ML error analysis. Afterwards, in Section 3, we outline the
+analytical tasks and design goals for using VA to manage instance hardness in
+imbalanced data sets, and we emphasize the need for both automatic approaches
+and human intuition. Section 4 presents the system’s functionalities and
+simultaneously describes a first simple use case with multiple cycles of
+undersampling and oversampling applied to specific instances in order to
+enhance predictive performance. Following that, in Section 5, we illustrate
+the applicability and utility of HardVis with two real-world data sets
+concentrating on detecting breast cancer and recognizing vehicles from their
+silhouettes. Thereafter in Section 6, we examine the input received from the
+expert interviews, including limitations identified by the experts.
+Subsequently, in Section 7, we reflect further on the visual design and the
+limitations of our work that lead to future plans for HardVis. Finally,
+Section 8 concludes our paper.
+
+##  2 Related Work
+
+This section summarizes previous research on automatic approaches for the
+identification of different types of instances, visualization methods for
+outlier/anomaly and rare category detection, and data-centric ML solutions
+from the visualization community. To underscore the uniqueness of our
+approach, we explain the difference between such solutions contrasted to
+HardVis. To the best of our knowledge, there is no literature explaining the
+use of VA for the complete undersampling and oversampling procedure, along
+with the partial application in specific types based on the visual exploration
+of data and distributions.
+
+###  2.1 Automatically Distinguishing Types of Instances
+
+In the ML community, several methods for automatically categorizing data
+instances into different types exist, with a particular focus on the
+outlier/anomaly detection research in the past decades [CBK09, HA04].
+Nevertheless, most algorithms cannot identify rare cases that are typically
+isolated groups, including a set of comparable data examples that deviate from
+the majority—rather than single isolated instances which are outliers. The
+majority of anomaly detection techniques can be divided into five categories:
+(1) classification-based [HHWB02, WMCW03, MC03], (2) density-based [BS03,
+BKNS00], (3) clustering-based [MLC07, VW09, SPBW12], (4) statistical-based
+[YTWM04, KK17], and (5) ensemble approaches [VK09, SLSH15, VC17, ZDH∗17]. The
+last category is a hybrid one, which aims to combine the benefits of the
+various techniques from the other categories. The problem with all the
+approaches, except for the density-based approaches, is the misalignment with
+sophisticated undersampling (e.g., NCR) and oversampling algorithms (e.g.,
+ADASYN) that are using KNN to propose instances for removal or addition,
+respectively. Two empirical studies [SK17, NS16] that were conducted with
+density-based sampling algorithms deploy KNN to distinguish the type of each
+instance along with multidimensional scaling (MDS) [Kru64], which is a global
+linear dimensionality reduction algorithm. We follow the same methodology to
+characterize instances based on local characteristics, but HardVis uses an
+interactive UMAP projection [MHM18] since it preserves mostly the local
+structure [EMK∗21]. Although those studies suggest that applying sampling
+techniques in specific types of instances (e.g., by using only outliers) can
+boost predictive performance, controlling which subsets of particular instance
+types are considered when undersampling and oversampling is an undiscovered
+step. This research opportunity inspired us to design HardVis.
+
+Density-based algorithms [HHHM11, HLL08] also work well with the detection of
+rare categories by discovering substantial changes in data densities using a
+KNN search in the high-dimensional space. But how to choose the best k-value
+for a given data set? While it is possible to estimate the best k-value
+automatically by using the local outlier factor [BKNS00], the balance of the
+distribution of safe and unsafe instances could be off when focusing merely on
+rare cases and outliers. Huang et al. [HCG∗14] proposed a method for
+automatically selecting k-values. However, their algorithm starts with a seed
+depending on the target category, which is often difficult to set. iFRED and
+vFRED [LCH∗14] are two approaches for identifying rare categories based on
+wavelet transformation without the necessity of any predefined seed.
+Nevertheless, these methods are robust in low-dimensional data only but fail
+to discover the remaining types of data introduced in Section 1, which are
+important for HardVis. Regarding decision boundaries and borderline examples,
+Melnik [Mel02] analyzes their structure using connectivity graphs [MS94]. And
+finally, Ramamurthy et al. [RVM19] utilize persistent homology inference to
+describe the ambiguity (or even lack) of decision boundaries. All described
+methods, while being valuable, do not focus on the problem of undersampling or
+oversampling at all, as it happens with our system.
+
+###  2.2 Visualization for Outlier and Rare Category Detection
+
+Numerous VA approaches are combined with detection algorithms as described in
+Section 2.1. Usually, they are designed for supporting outlier and rare
+categories identification and classification, which could be considered
+relevant to our work. Oui [ZCW∗19] is a tool that assists users in
+comprehending, interpreting, and selecting outliers identified by multiple
+algorithms. #FluxFlow [ZCW∗14] is another VA system that utilizes complex
+analytical methods to find, summarize, and understand aberrant information
+spreading patterns. TargetVue [CSL∗16] detects users with abnormal behaviors
+using the local outlier factor and intuitive behavior glyph designs. An
+extension of such glyphs, named as Z-Glyph [CLGD18], was developed to aid
+human judgment in multivariate data outlier analysis. RCLens [LGG∗18] is an
+active learning system that uses visualization approaches to support the
+discovery of rare instances. EnsembleLens [XXM∗19] is a hybrid visual system
+that utilizes a modified Gaussian mixture model [AY19] to identify problematic
+patterns in human behaviors. RISSAD [DB21] is an interactive approach that not
+only assists users in detecting abnormalities but also automatically defines
+them using descriptive rules. Even border detection has recently gotten some
+attention thanks to a VA method [MM21] which uses the power of explainability
+from linear projections to help analysts study nonlinear separation
+structures. However, the final goal of HardVis differs since we try to merge
+the gap between instance hardness and sampling techniques for evaluating their
+suggestions. None of the above VA systems incorporate sampling mechanisms, as
+defined in Section 1.
+
+VERONICA [RAS∗21] is a domain-specific VA system that uses undersampling and
+SMOTE for specific classes of data and groups of features. Nonetheless,
+HardVis is inherently designed to be generalizable to any numerical data set
+stored in a tabular form. It also accounts for instance hardness while
+enabling the micromanagement of the sampling techniques. To improve the
+efficiency of model construction, Li et al. [LFM∗18] presented a VA approach
+that allows infusing dynamic user feedback in various forms, with interactive
+addition of new samples being one of them. Despite that, the goal is very
+different from ours since the focus is on learning with a limited amount of
+data or incrementally learning as in [PSPM15]. During the main use case of
+RuleMatrix [MQB19], Ming et al. manually selected a problematic subset of
+instances and applied oversampling, which resulted in improved model accuracy.
+In contrast, HardVis enables knowledgeable users to systematically explore the
+distribution of data in different types and the suggestions of the
+undersampling and oversampling to enhance predictive performance.
+
+###  2.3 Data-centric Machine Learning
+
+Most of the model-centric ML work so far has focused on how model developers
+incrementally improve an existing or newly invented ML algorithm’s predictive
+performance while making no changes to the collected data [Ham22]. On the
+other hand, practitioners of data-centric ML maintain the ML model stable
+while iteratively upgrading the quality of the data at hand [Ham22]. Advocates
+for data-centric ML have recently increased in volume. A few reasons for this
+shift are the benefits of involving domain experts in the data analysis
+process and the necessity for very configurable solutions that focus on
+subsets (or _slices_) of data [Ham22]. Closely related to this paradigm,
+ModelTracker [ACD∗15] and Squares [RAL∗17] are two interactive visualization
+approaches that improve a more standard confusion matrix to detect issues with
+particular instances and enable users to tune the input by monitoring the
+output of the model. The former proposes a visualization that incorporates
+information from a variety of typical descriptive statistics while providing
+instance-level performance and allowing for direct error analysis and
+troubleshooting. The latter computes performance measurements and assists
+users in concentrating their efforts on instance-level issues. Therefore, both
+works follow the general framework of visual parameter space analysis (vPSA)
+[SHB∗14]. Although HardVis is also an applied example of the vPSA framework,
+it is explicitly designed for the first stages of an ML model-building
+pipeline, addressing a clear need for applying sampling techniques in specific
+types of instances only.
+
+Active learning is also part of data-centric ML solutions. It can be defined
+as the active usage of a learning algorithm to iteratively suggest to a user
+to classify unknown instances in order to increase the ML model’s performance
+quickly [Set12]. In the visualization community, many VA techniques have been
+developed explicitly for active learning [BZL∗18, BHS∗21, BHZ∗18, GBSW21].
+More specifically, these works have focused on how VA can help users during
+the labeling process for semi-supervised learning problems. The challenges are
+somewhat similar to ours since understanding how hard (or important) it is for
+an instance to be labeled before the rest is a relatable problem. However, our
+end goal is to prioritize which instances should be undersampled and
+oversampled first (and how exactly) in supervised learning classification
+problems containing labels for all data instances.
+
+##  3 Analytical Tasks and Design Goals
+
+This section outlines the basic analytical tasks (T1–T5) that a user should be
+able to complete when undersampling or oversampling while using a VA system
+for support and direction. Following that, we present the design goals (G1–G5)
+that guided the development of HardVis.
+
+![Refer to caption]() Figure 1: Undersampling and oversampling certain data
+types with HardVis: (a) the panel with many tunable parameters for UMAP,
+undersampling, and oversampling; (b) box plots for comparing the values of all
+points against the algorithm’s suggestion in each feature; (c) a stacked bar
+chart showing the base vs. the new distribution if the suggestion is approved;
+(d) a table heatmap view for comparing the instances’ values across all
+features; (e) a UMAP projection emphasizing the additions/deletions of points,
+along with the data type for every instance; (f) an inverse polar chart with
+chords that depicts the predicted probabilities, as well as the training
+confusion; (g) a Sankey diagram for tracking any undersampling or oversampling
+confirmed actions; and (h) a visual embedding based on (e) to highlight the
+confusing test instances, and a horizontal bar chart to illustrate the
+performance difference for each step.
+
+###  3.1 Analytical Tasks for Undersampling and Oversampling
+
+From the in-depth examination of the related work highlighted in Section 2 and
+our own recent experiences implementing VA tools for ML [CMK20, CMKK21a,
+CMKK21b, CMKK22, CMK22], we came up with five analytical tasks.
+
+T1: Identify the various types of instances. As the decrease in predictive
+performance is connected to data distribution-related factors, such as the
+presence of many rare subgroups obscuring the classification [WH00, Jap01],
+the consequences from the overlap between the classes [PBM04, GSM07], or the
+existence of several misclassified examples [NSW10], a primary goal is to spot
+such groups of points—as precisely as possible—with the use of VA systems.
+
+T2: Support the exploration of undersampling vs. oversampling alternatives
+applied globally and locally. When applying such techniques, the data
+instances used as input for undersampling and oversampling algorithms could
+differ depending on the stable anchors a user sets. An example of a stable
+anchor is how the partitioning of data into four types occurs, leading up to
+16 different SBRO combinations used as input for the sampling algorithms.
+Also, the distribution of SBRO (as defined in T1) is another factor to be
+considered as a stable anchor under investigation. On the one hand, global
+undersampling or oversampling will allow all instances to be candidates for
+removal or under consideration when creating synthetic data, respectively. On
+the other hand, locally applied algorithms will dynamically enable users to
+consider local characteristics of data points and exclude a few suggestions
+from the pool of recommendations. Modifying this ratio dynamically could be
+beneficial for the ML model, thus the user’s interaction guided by visual
+feedback is necessary.
+
+T3: Explore automated methods’ suggestions. The identification of conditions
+for the efficient use of a particular method is an open research problem
+[NS16]. A user should be competent in judging the influence of a suggestion on
+the whole data set. For example, what if, by removing too many rare cases, the
+model overfits the training data but generalizes poorly in a test set? A user
+should be empowered by VA systems that facilitate exploratory analysis of
+unsafe instances.
+
+T4: Confirm suggestions by making justifiable decisions. A user should have
+the ability to partially confirm the proposal of the automated methods based
+on the analysis he/she has performed earlier in the preceding task. How will
+the data distribution change due to the acceptance of such a suggestion? VA
+systems should envision these future steps and enhance users’ decision-making.
+
+T5: Monitor and evaluate the results of the sampling process. At any stage of
+the sampling process (T2–T4), a user should be able to observe performance
+fluctuations with the use of appropriate validation metrics for imbalanced
+data sets (e.g., _balanced accuracy_ and _f1-score_). A user might also wish
+to look back at the history of activities to see if any crucial actions
+corresponded to better results. Thus, VA systems must be capable of providing
+ways to monitor performance.
+
+###  3.2 Design Goals for HardVis
+
+We identified five design goals for our system to meet in order to fulfill the
+more general aforementioned analytical tasks for undersampling and
+oversampling. We implemented them in Section 4.
+
+G1: Visual examination of several data types’ distributions and projections to
+choose a generic ‘number of neighbors’ parameter. Our goal is to assist in the
+search for distinctive distributions of data types that might consider
+different populations of SBRO instances (T1). By systematically modifying the
+_number of neighbors_ parameter of UMAP, we aim to assure that users will pick
+a better value based on the visual exploration of data types in the generated
+projection. Furthermore, this value propagates in the undersampling and
+oversampling techniques that require a _k-value_ , which works similarly to
+the above parameter.
+
+G2: Application of undersampling and oversampling in specific data types only,
+with different parameter settings. There are several different undersampling
+and oversampling techniques, but they are usually only applied the entire
+training set (i.e., global sampling). However, with our proposed system, we
+enable users to choose a technique, tune the parameters depending on the
+visual exploration, and even deploy them in particular subsets of the training
+data (i.e., local sampling as established in T2).
+
+G3: Exploratory data analysis of unsafe suggestions. Next, the system should
+provide sufficient visual guidance to users to focus on the exploration of the
+values in each feature for unsafe suggestions (T3). The analysis of
+borderline, rare, and outlier data types should be feasible in a generic and
+detailed manner.
+
+G4: Comparison of trade-offs while removing or adding training instances
+throughout the decision-making process. After the extraction of evidence as
+defined in G3, users should see how the distribution of instances will change
+due to the undersampling and/or oversampling phases. Next, the system should
+give a prediction for a data point and juxtapose it to all other points. With
+this, users should be able to estimate the impact of algorithmic
+recommendations during exclusion or inclusion of instances (T4).
+
+G5: Keep track of critical steps and evaluate predictive performance in
+general and for specific test instances. Users’ interactions should be tracked
+in order to preserve a history of modifications in the training set, and the
+performance should be monitored with validation metrics (T5). Finally, using
+an unseen test set, the system should continuously stress the difference in
+the model’s predictive performance.
+
+##  4 HardVis: System Overview and First Application
+
+![Refer to caption]() Figure 2: The HardVis workflow starts by classifying the
+training data into four types according to the user’s visual inspection of 9
+alternative projections. The data is sent for either undersampling or
+oversampling, which can make suggestions continuously. The user’s confirmation
+is requested after the exploratory data analysis through the visualizations.
+
+Following the analytical tasks and the resulting design goals, we have
+developed HardVis, an interactive web-based VA system that allows users to
+identify areas where instance hardness occurs and to micromanage sampling
+algorithms. Section 7.2 contains further implementation details.
+
+The system consists of 8 interactive visualization panels (Figure 1): (a) data
+types projections (→→\rightarrow→ G1) incl. data sets and sampling techniques
+(→→\rightarrow→ G2), (b) data overview, (c) data types distribution, (d) data
+details, (e) data space, (f) predicted probabilities (→→\rightarrow→ G3 and
+G4), (g) sampling execution tracker, and (h) test set confusion
+(→→\rightarrow→ G5). We propose the following workflow for the integrated use
+of these panels (cf. Figure 2): (i) explore various projections with
+alternative distributions of data types, leading to the division of training
+data into SBRO (cf. Figure 3(b)); (ii) in the undersampling or oversampling
+phase, tune the active algorithm’s parameters to affect specific types of data
+(Figure 1(a)); (iii) during the confirmation phase, identify which suggestions
+will impact negatively or positively the predictive performance and approve or
+reject any suggestion (cf. Figure 1(b)–(f)); and (iv) store every manually-
+operated sampling execution, identify confused test instances, and compare the
+predictive performance in each step of the process according to two validation
+metrics designed explicitly for imbalanced classification problems (Figure
+1(g) and (h)). These steps are iterative, and they might occur in any
+sequence. The created knowledge obtained from the undersampled/oversampled
+data set is the end result. This knowledge can be useful to users that have to
+explain and are accountable for their actions, e.g., people working in
+critical domains such as medicine.
+
+![Refer to caption]() Figure 3: At first, a comparison of different data types
+projections and then two consecutive undersampling phases with the NCR
+algorithm are shown in this arrangement of screenshots. The _default_ value
+for the number of neighbors is 5 (see (a)), which is used as input for
+computing the type of each instance with KNN. The projections are generated by
+systematically tweaking the above parameter, as illustrated in (b); the best
+choice is theoretically the highest value for the Shepard diagram correlation
+(SDC) metric. In (c), we have activated the algorithm, and we check the impact
+of this automated technique on the projection in (d). (e) presents the
+difference in distributions of all data types per class label from when the
+algorithm was inactive as opposed to its activation. In (f), we explore a
+specific rare case under removal consideration. This instance is contrasted
+against the remaining points of this same class (i.e., virginica in orange
+color); the selection was made using a lasso interaction, as demonstrated in
+(d). While the values for all features are lower for this sample than the
+rest, _sepal_l_ appears the furthest away. Additional details can be found in
+(g) that highlights these differences in values of particular features and
+confirms our findings from the data overview. Consequently, we choose to
+delete this instance because it might cause further confusion to the model, as
+depicted in (d). The second time we deploy NCR (cf. (h)), two safe instances
+are in our focus since they are easily classified due to the high predicted
+probability visible from the inverse polar chart in (i). Therefore, we decide
+to remove these two points.
+
+HardVis employs a cutting-edge ensemble learning approach named as XGBoost
+[CG16], and its workflow is model-agnostic. To make our approach even more
+future-proof, we train this ML algorithm with the _Bayesian Optimization_
+package [Nog14]. HardVis utilizes OSS, NCR, SMOTE, and ADASYN, which are
+state-of-the-art sampling algorithms that are tweaked to receive specific SBRO
+instances as an input. Despite that, these algorithms are easily replaceable.
+The reader is referred to [HG09, HM13] for a more detailed analysis of
+different strategies that cope with class imbalance. For this section and the
+use cases in Section 5, we split the data sets into 75% training and 25%
+testing sets with the stratified strategy (i.e., keeping the same balance in
+all classes for both sets) and validate our results with 5-fold cross-
+validation. Also, we scan the hyperparameter space for 25 iterations, choosing
+the model with the best accuracy. The hyperparameters we used are the same as
+in another VA system developed by us [CMKK22].
+
+In the following subsections, we explain the system by using a running example
+with the _iris flower_ data set [FIS36] obtained from the UCI ML repository
+[DG17a]. The data set represents a balanced multi-class classification problem
+and consists of four numerical features and 150 instances. The three classes
+are: _setosa_ , _versicolor_ , and _virginica_.
+
+###  4.1 Data Types
+
+HardVis follows the Napierala and Stefanowski [NS16] methodology in order to
+label all training instances in one of the following types: safe (S) examples,
+borderline (B) samples, rare (R) cases, and outliers (O). To calculate the
+difference between instances in the high-dimensional space, we use KNN [Alt92,
+FH89] with the _default_ value of k being 5 and the _euclidean_ distance
+metric. For determining the type of a sample with k=5k5\mbox{k}=5k = 5, we
+would have, e.g., 5 or 4 nearest instances being from the same class, then the
+sample gets labeled as S; 3 or 2 instances from the same class, then it
+belongs to B; only 1 instance from the same class, it is R; and 0 (i.e., the 5
+nearest instances are from the other class), it becomes O. However, the
+analogies will change with k>5k5\mbox{k}>5k > 5.
+
+As shown in Figure 3(a), stacked bar chart, the distributions of instances
+change accordingly as the _number of neighbors_ in the UMAP [MHM18] shifts
+since we utilize the same value for the KNN algorithm. Thus, the goal of the
+two-dimensional projection is to reflect visually the same separation of
+training instances into the SBRO types. The _minimum distance_ is another
+parameter of UMAP that (in our case) is being automatically computed from the
+maximum achievable Shepard diagram correlation (SDC) [CMK20] score (see Figure
+3(a), line chart). This metric serves as a first indicator of optimal distance
+preservation between the low- and the high-dimensional space. Nevertheless, it
+cannot be trusted blindly, and human exploration is necessary to conclude
+which parameters are optimal for the given data set.
+
+The main challenge of KNN is the user-selected k-value, thus it is a highly
+parametric-dependent approach. To resolve this problem, we enable the user to
+explore different data types’ projections generated by the systematic change
+of k-value from 5 to 13 (cf. Figure 3(b)). This range is chosen intentionally
+because, in low k-values, a slight modification is more impactful to the
+projection [NS16]. However, these values are adjustable within the code.
+
+###  4.2 Undersampling
+
+Figure 3(c) presents the tab for Undersampling (US), which along with the
+standard method’s parameters comprises a Types menu with options to exclude
+any SBRO group. The k-value is automatically tuned due to the selection of the
+number of neighbors parameter, as explained in Section 4.1. OSS [KM97] uses
+Tomek links [Tom76] which are ambiguous points on the class boundary that are
+typically identified and removed. Moreover, it employs the condensed nearest
+neighbor rule [Har68] to remove redundant examples far from the decision
+boundary. In contrast, NCR [Lau01] is an undersampling technique that combines
+the condensed nearest neighbor rule to exclude redundant examples and the
+edited nearest neighbors rule [Wil72] to remove noisy or ambiguous points. Its
+main difference from OSS is that fewer redundant examples are deleted, and
+more attention is placed on “cleaning” those retained instances. Each
+algorithm expects input for a unique parameter. In particular, NCR has
+_Threshold_ which is used for deciding whether to consider a class or not
+during the cleaning after applying edited nearest neighbors. _Seeds_ is the
+number of samples to extract in order to build a set S for OSS. All these
+techniques can be employed in the Majority, ≠\neq≠ Minority, ≠\neq≠ Majority,
+or All classes according to the user’s choice. In multi-class classification
+problems, the Majority will be merely the class that contains the most
+instances, ≠\neq≠ Minority will be all classes except the one with the least
+instances, and so on. In balanced data sets, only the All option is relevant.
+
+The UMAP projection in Figure 3(d) allows users to observe the type of each
+instance concurrently and if it was suggested for removal with an “×\times×”
+symbol or addition with a “+++” mark by the active undersampling or
+oversampling algorithm, respectively. The parameters for the UMAP are set as
+discussed in the preceding subsection. Hovering over a point will present
+details on demand such as the ID of the point, the predicted probability, and
+the values for each feature.
+
+The distribution of data types is known due to a stacked and grouped bar chart
+with the instances distributed in SBRO and per class, simultaneously (cf.
+Figure 3(e)). The base distribution is also comparable with the suggestion
+from the sampling algorithm that will modify the initial distribution.
+
+Figure 3(f) is a box plot that facilitates the comparison of all points per
+feature versus the selected points via lasso functionality in the projection.
+When a sampling algorithm is active, the same group of instances with merely
+the sampling suggestions is also visualized. In case of no selection, a
+simpler version of all points against all points in either undersampling or
+oversampling suggestion exists (see Figure 1(b)). Users’ actions determine the
+mode automatically. The features are sorted from left to right, from the least
+important to the most important at each execution step of
+undersampling/oversampling (due to XGBoost retraining process). The proposals
+for removal are denoted in light red color, and light green is used for the
+suggested additions.
+
+The table heatmap view in Figure 3(g) is a more detailed view of the
+aggregated results present in the box plots. It normalizes the values from 0
+to 1, evident in dark brown to dark teal colors, and it shows for each feature
+the current value in each instance. The features are sorted as in the box
+plots. Moreover, the _# Type #_ is perceivable through this visual
+representation, with outliers, then rare cases, next borderline examples, and
+finally safe instances being at the top of the list. The selection of a
+specific feature in this view applies the diverging colormap to the projection
+for comparing all instances for this particular feature (see Figure 6(d),
+Zoomed in View). More detailed discussions on the visual design behind some of
+the views can be found in Section 7.1.
+
+The inverse polar chart in Figure 3(i), is deliberately designed to provide
+more space to instances that are in the borders between two classes or
+completely misclassified cases. The predicted probability with the ground
+truth class is used for the 100 to 0 axis, and the angle/orientation is
+computed as the difference in predicted probability of belonging to the
+remaining two classes. The greater this difference is, the farther a point
+deviates from the center of its circular segment corresponding to the correct
+class label. In our example, the versicolor has a few instances mainly
+confused with the virginica and vice versa. This is why all setosa instances
+are near 100% predicted probability in the purple circular segment. The size
+of each piece is calculated from the number of training instances that belong
+to a particular class, with extra space being provided to larger classes
+(i.e., consisting of more points). The same symbols as in the projection are
+also retained here. This approach can easily work for two or three classes but
+becomes challenging to interpret with more classes; such limitations are
+discussed in Sections 6 and 7.2. The centerpiece of this visualization is a
+chord diagram that summarizes the confusion matrix for the training data, as
+in [AHH∗14]. Thus, in Figure 3(i), the confusion between versicolor and
+virginica is immediately distinguishable by the chords linking the different
+circular segments. The number of confused instances from one to the other
+classes is encoded as chord width.
+
+###  4.3 Oversampling
+
+Two mainstream oversampling techniques are implemented in HardVis. SMOTE
+[CBHK02] finds the KNN in the minority class for each of the samples in the
+class. Next, it draws a line between the neighbors and generates random points
+on the lines. ADASYN [HBGL08] is the same as SMOTE, just with a minor
+improvement. After creating those samples, it adds a small random deviation to
+the points, thus making it more realistic with the additional variance.
+Similar to the undersampling techniques before, SMOTE and ADASYN have all
+options except for the division of types provided via a separate menu of our
+system. The All option is equivalent to ≠\neq≠ Majority, but we implemented
+them differently when a type of instance is deactivated. The former considers
+removing all points of the specific deactivated type/s irrelevant to the class
+that will be oversampled, leading to more excluded points for the active
+algorithm. The latter excludes from the pool of points only those from the
+deactivated type/s but from the class that will be oversampled. The Minority
+and ≠\neq≠ Minority are implemented based on the second schema described here.
+The same exploration and analysis options mentioned in the previous subsection
+also apply for oversampling.
+
+![Refer to caption]() Figure 4: An oversampling phase that aims to balance the
+data set again. According to (a), we use ADASYN for the minority class
+(versicolor in blue) that contains fewer instances. Also, we exclude from the
+input of the algorithm two rare cases near the borders of two classes, as
+illustrated in (b). The system proposes two artificially-created points for
+addition that we approve, see (c). The Sankey diagram in (d) summarizes the
+core execution phases with undersampling and oversampling steps. Only one test
+instance is confused according to (e), while the manual decisions (step 2,
+step 4, and step 7/8) improved the balanced accuracy and f1-score scores
+compared to the automated methods (steps 1, 3, and 5).
+
+###  4.4 Sampling Execution Tracker and Test Set Confusion
+
+Each manual undersampling or oversampling confirmation is registered in the
+Sankey diagram (see Figure 4(d)). The initial setting is to record the
+distribution of all training data to the SBRO types. Then, as an undersample
+or oversample execution takes place, the instances move from their type to the
+US (in dark red) or OS (in dark green) bin of the Sankey diagram.
+
+The test set is also plotted using the visual embedding of training data in
+each step (cf. Figure 4(e), left). All test instances are transparent when
+predicted correctly by the ML model and opaque in cases of confusion. For
+example, in Figure 4(e), left, the star with blue color is from the versicolor
+class, but it was predicted as virginica due to the orange outline.
+Furthermore, the initial and current balanced accuracy (bright turquoise) and
+f1-scores (deep magenta) are visible in the text at each side of the heading
+of the Test Set Confusion panel. The difference in performance based on those
+metrics is tracked for every step of the process with a horizontal bar chart
+(Figure 4(e), right).
+
+###  4.5 First Application
+
+In our first application, we observe that the maximum SDC value is 94.80%
+(high correlation, Figure 3(b)), resulting in a most probably trustworthy
+projection. Another reassurance stems from the visual inspection of points in
+the middle of two classes that appear clearly confused, with most rare and
+borderline instances being located there.
+
+The undersampling phase is perhaps most crucial since removing unsafe
+instances without justifying one’s action could cause a severe issue to the ML
+model. We choose to activate the de-facto NCR algorithm without any tweaks to
+check the suggestions (Figure 3(c) and (d)). The distribution of instances
+changes according to this global suggestion for removal of orange and blue
+points, as seen in Figure 3(e). Despite that, we want to explore further a
+suggestion for removal that is a distant point from the core virginica
+cluster. We use the lasso to select those points and proceed with the
+investigation. The box plot in Figure 3(f) enables us to conclude that this is
+an extreme case relatively different from the remaining selected points of its
+own class since the values for all features are very low. The table heatmap
+view in Figure 3(g) reaffirms our hypothesis, because the instance with ID 28
+has the lowest _sepal_l_ value (<<< 0.1 due to dark brown color). We exclude
+this instance, but we keep the rare cases around the borders of the two
+classes that can easily flip class labels. Another phase of undersampling is
+also capable with HardVis since the new data become the ground zero for the
+next application of the automatic algorithm; NCR is again our choice. This
+time, five instances are proposed for deletion (cf. Figure 3(h)). However, by
+checking the inverse polar chart in Figure 3(i), we see that two of them are
+easily predictable and potentially redundant for the ML model. Therefore, we
+decide to exclude those two safe samples solely.
+
+Using the Oversampling (OS) tab, we try to balance the classes that contain
+fewer training samples. In Figure 4(a), we activate ADASYN for the minority
+class, which requires two more examples to restore balance in the training
+set. This setting, in combination with the observation of two rare cases that
+are in the borders of the versicolor class (Figure 4(b)), leads to the
+deselection of the Rare type. Consequently, these two rare cases are excluded
+from the pool of available for oversampling training instances. Without the
+appropriate choice of k-value, resulting in an expressive and effective
+distribution of data types, it would have been challenging to detect and
+handle such cases (especially if no class labels were provided). The
+oversampling generated two instances that we accept in step 8, as depicted in
+Figure 4(c).
+
+![Refer to caption]() Figure 5: The investigation of diverse structures of
+data types and alternative suggestions in an undersampling scenario. View (a)
+shows the selection of the number of neighbors value of 13, which has 75.21%
+Shepard diagram correlation (SDC) score, as illustrated in (b). The UMAP
+visible in (c) has one rare sample and 6 outliers belonging to the benign
+class that holds relatively normal values compared to the malignant cluster
+(C), as shown in (d). Therefore the suggestions for removal in C1 are valid
+since even humans cannot understand why these points are benign cases. On the
+other hand, C2 contains five rare examples and two outliers that serve as a
+bridge between the two classes, cf. (c). Interestingly, the three most
+important features differentiate the right group of points (IDs: 64, 102, and
+134) from the left, i.e., _size_un_ , _shape_un_ , and _bare_nuc_ in (e). This
+diversity is crucial when predicting difficult to classify instances, hence
+the analyst chooses to keep this cluster despite the NCR algorithm’s
+suggestion for removal. C3 is the final selection, with most outliers being
+removed because the model badly predicted them, as seen in (f). This leads to
+(g), which presents an improved performance with 6 confused test instances
+that are cancer-free but predicted as the opposite. The malignant class is
+secure due to the rare cases being intact.
+
+In Figure 4(d), the deletion of one rare instance during the first NCR phase,
+the removal of two safe instances during the second NCR phase, and the
+oversampling phase utilizing ADASYN for generating a safe and a borderline
+instance is visible. Also, the confusion of a test instance is highlighted in
+Figure 4(e) with the decisions of the automatic algorithm hurting the
+performance and the manual decisions in steps 2, 4, and 7/8 improving the
+predictive power of the ML model.
+
+##  5 Use Cases
+
+In this section, we present a hypothetical usage scenario and a use case about
+how HardVis can evaluate suggestions based on local data characteristics to
+build trust in ML and to improve the balanced accuracy and f1-score scores for
+both training and testing sets.
+
+###  5.1 Usage Scenario: Local Assessment of Undersampling
+
+Supposedly Zoe is a data analyst in a hospital, working primarily with
+healthcare data. She receives a manually-labeled data set with 9 features
+related to _breast cancer_ [DG17b]. This data set is rather imbalanced, with
+458 _benign_ and 241 _malignant_ cases. From her experience, she knows that
+instance hardness and class imbalance can be troublesome for the ML model.
+Thus, she wants to experiment with well-known algorithms for undersampling and
+oversampling the data. However, especially with medical records, the use of
+merely automated methods is questionable because they cannot be trusted
+blindly. The doctors need explanations, and the minority class in this binary
+classification problem is of more importance than the majority consisting of
+healthy patients. In reality, patients who are healthy but predicted as ill
+will undergo extensive follow-up diagnostic tests before treatments such as
+surgery and chemotherapy are advised; however, the opposite is not true. To
+accomplish this main objective and to control the sampling techniques, Zoe
+deploys HardVis.
+
+Choosing an accurate projection. Zoe begins with the selection of a _number of
+neighbors_ parameter by activating a window containing data types projections
+(cf. Figure 5(a)). HardVis enables her to compare a grid of diverse
+projections, as presented in Figure 5(b). The one with the highest SDC score
+(i.e., 75.21%) is a noteworthy candidate because the two classes are clearly
+separated. Rare cases and outliers are also easily visible, forming a bridge
+between benign and malignant instances. She clicks on the bar with the number
+13 in Figure 5(a), and this projection becomes the main for further
+exploration. At this initial phase, 6 benign test instances were incorrectly
+classified, while the remaining 4 out of the 10 misclassified patients were
+actually malignant cases.
+
+![Refer to caption]() Figure 6: The examination of diverse structures of data
+types and alternative suggestions while undersampling with OSS. View (a) shows
+the selection of the number of neighbors value of 13, which is also used as
+input to KNN for sampling similarly in the high-dimensional space. This
+decision was made after a careful review of the 9 projections in (b), leading
+to a distribution of mostly safe instances, then borderline examples, next
+rare cases, and finally a few outliers. This is the second-best projection in
+terms of Shepard diagram correlation (SDC) score, but it preserves
+exceptionally well the clusters of buses in purple vs. vans in orange color at
+the bottom-left region. In (c), we experiment with the maximum seed value for
+the OSS algorithm, but it seems that several safe instances that could have
+been proposed for removal are actually not. Thus, we reduce the seed value in
+half to check if the new suggestion fits our viewpoint, as depicted in (d).
+The goal we set has been accomplished, however, a cluster of rare cases mixed
+in two classes is about to be deleted. In (e), we investigate further this
+group of points at the bottom-left corner; these instances differ mainly
+because of either _MaxLensAspRat_ or _HollowsRat_. Such rare cases are
+critical information for the model to split these two classes; hence, we
+exclude the rare cases from the automatic algorithm, see (f). From the
+remaining 260 under consideration instances, there are four outliers that
+caught our interest. Only 1 out of the 4 outliers appears problematic based on
+(g). As a result, we exclude the outliers from the analysis and Execute
+Undersample to the remaining 256 points.
+
+Examining unsafe instances proposed for removal. Afterwards, she activates the
+NCR algorithm with the default settings (k-value is synchronized to 13 due to
+the previously-selected projection) from the Undersampling (US) tab. Cluster 1
+(C1) in Figure 5(c) is interesting because 7 benign cases (mostly marked as
+outliers) are in between the malignant class. She chooses to compare the
+selected points in C1 against these suggestions of undersampling, as depicted
+in the box plots (Figure 5(d)). In summary, the values are lower for these
+points but still in between normal margins. Therefore, it would have been
+almost impossible for the doctors to conclude that these are healthy patients
+with benign cancer. A thorough check should be performed in these cases, e.g.,
+to determine if the labels are erroneous. She first notifies the data
+collection team and doctors about this important finding and then removes C1
+suggestions. On the contrary, C2 includes five rare cases and two outliers
+with _size_un_ , _shape_un_ , and _bare_nuc_ features separating the points
+closer to the benign class from the rest, as illustrated in the table heatmap
+view (Figure 5(e)). The right group of points has mostly lower values for the
+_size_un_ and _shape_un_ features, while the _bare_nuc_ is higher compared to
+the points on the left. Zoe understands that such diversity is important when
+dividing borderline patients located at the conjunction of the two huge
+clusters. Therefore, she uses lasso selection to grab all points except for
+C2, which will be her manual undersample strategy. The inverse polar chart in
+Figure 5(f) highlights the training instances that will be deleted, which are
+mostly completely misclassified instances or safe examples. The samples
+between the two classes already explored remain intact, which is essential
+since they all belong to the more important minority class. In Figure 5(g),
+Zoe observes that only 6 test instances were incorrectly classified as having
+malignant cancer while they were healthy. When inspecting the Balanced
+Accuracy and F1-score scores, the overall predictive performance for the test
+set seems slightly improved contrasted to the automatic algorithm.
+Nevertheless, the major gain is that the doctors might trust this modified
+data set more because the model correctly predicts all patients with malignant
+cancer (since there is no highlighted yellow star for the test set in Figure
+5(g), left). Based on prior findings [NS16], Zoe stops her exploration at this
+phase because oversampling is ineffective for data sets with mostly safe
+instances.
+
+###  5.2 Use Case: Explorative Sampling for Better Classification
+
+This use case is about a multi-class classification problem. There are 18
+features collected for the _vehicle silhouettes_ data set [Sie87]. With the
+main task of classifying 199 _vans_ , 218 _buses_ , and 429 _cars_ , the class
+distribution is somewhat unbalanced.
+
+Comparing projections and distributions of data types. Similar to the
+procedure described in Section 4, we start by exploring which projection
+represents the data types in the best possible way. Three projections reaching
+high enough SDC with _minimum distance_ parameter equals to zero are extremely
+condensed, making it hard to observe anything (see Figure 6(b)). Among the
+remaining, two of them have SDC score of more than 83%. Although they are two
+similar projections, the last one clearly shows the difference between bus and
+van classes in purple and orange, respectively (see the circled area at the
+bottom). We choose to continue with this projection; thus, we go back to
+Figure 6(a) and select a _number of neighbors_ parameter equal to 13. When we
+hover over the stacked bar chart in Figure 6(a), we observe that safe and
+borderline cases account for 47.16% and 34.54% of the training set,
+respectively. This is significantly different in the distributions of data
+created with lower values for the number of neighbors (e.g., 5). In summary,
+the visual analysis guides us in picking all the aforementioned parameters.
+
+Tuning the undersampling based on exploratory data analysis. After selecting
+the projection (which results in a specific distribution of data types), we
+decide to apply the OSS undersampling algorithm. Nevertheless, the default
+settings cause the van class to disappear completely, thus the predictive
+performance gets extremely penalized (see step 1 in Figure 1(h), right). We
+pick the highest available _seeds_ parameter to consider more points except
+for the minority class. The algorithm suggests 196 instances to be removed
+(step 2), as illustrated in Figure 6(c). It seems from the projection that our
+previous setting does not capture several buses while being safe to remove
+examples. Therefore, we decrease the parameter to 125, half of the prior
+selection. The effect is that 329 are currently suggested for removal (step
+3), as depicted in Figure 6(d). This action accomplishes our initial goal, but
+7 regional points are about to be undersampled. As we should be very careful
+when deleting rare cases, we further explore this group of points in the table
+heatmap view (Figure 6(e)). It is observable that the instance with ID 486 is
+separated from the others mainly due to the _HollowsRat_ feature, while
+instance 631 is different because of a low value in the _MaxLensAspRat_
+feature. We decide not to exclude rare cases with such high variance because
+they may be part of our test set (step 4). The new suggestion after excluding
+the rare points is visible in Figure 6(f). Another critical category of data
+types is the outliers. From all outliers in the last projection, four are
+proposed for deletion by the oversampling algorithm. Only 1 out of the 4
+points appears marginally problematic with prominent confusion between car and
+van classes, as depicted in the inverse polar chart (see Figure 6(g)). Since
+the majority of points is safely predicted correctly, we decide to keep the
+outliers in the training set. After this step, 256 out of the 634 points are
+getting removed (steps 5 and 6).
+
+Deciding to oversample all types except outliers. To understand if a new round
+of undersampling would be beneficial, we activate the OSS algorithm again with
+the same settings (step 7). However, the outcome is to decrease the relatively
+safe population that much, so that the result is becoming worse. Therefore, we
+disable the algorithm and stop the undersampling phase (step 8). Moving on to
+the oversampling phase, we aim at utilizing SMOTE to generate artificial
+points for increasing the number of instances in the underrepresented classes.
+The oversampling of all data types reduces both Balanced Accuracy and F1-score
+(step 9 in Figure 1(h)). From Figure 6(f), we can understand that several
+problematic outliers are not considered for removal at all by the OSS
+algorithm during the previous phase. In particular, four outliers are
+predicted as vans while they belong to the car class according to the ground
+truth, as shown in Figure 6(g), at the bottom-left region. The oversampling
+algorithm should not eternalize this confusion. Consequently, we choose to
+exclude all 6 outliers from the pool of instances in order to primarily
+generate safe and borderline instances for the van and bus classes (cf. Figure
+1(a)). The resulting distribution of points achieves our goal (see Figure
+1(c)) and leads to an improvement in the overall predictive power (step 10).
+
+Tracking the process and evaluating the results. To verify our sampling
+execution actions, we continuously monitor the process through the Sankey
+diagram, as shown in Figure 1(g). From this representation, we acknowledge
+that the population of safe instances decreased drastically when the
+undersampling was executed. The manual undersampling and oversampling
+processes (described previously) led to the best predictive result we managed
+to accomplish, with 9 confused test instances (7 of them belonging to the car
+class, as presented in Figure 1(h), left). From the horizontal bar chart in
+Figure 1(h), right, the performance difference in each step suggests that
+using directly the automated sampling algorithms led to worse results (cf.
+steps 1 and 9). With the help of HardVis, we managed to improve, even more,
+both Balanced Accuracy and F1-score by approximately +2%percent2+2\%\+ 2 %. To
+sum up, our VA system guided us in systematically setting the parameters of
+the sampling algorithms and applying them in subsets of the data throughout
+the various rounds of undersampling and oversampling. As pointed out by the
+experts in Section 6, this would have been (almost) impossible without direct
+human intervention.
+
+##  6 Evaluation
+
+We performed online, semi-structured interviews with five independent experts
+to gain qualitative feedback on our system’s usefulness, using the procedure
+described in prior works [MXLM20, XXM∗19]. The first ML expert (E1) is a full
+professor with a PhD in computer science. He has 15 years of experience with
+ML, and he is head of the natural language processing (NLP) group at his
+university. The second ML expert (E2) is a full professor in ML and data
+science addressing mainly challenges in humanities. He has worked with ML for
+the past 30 years, and he holds a PhD in applied mathematics. The third ML
+expert (E3) is an assistant professor working with ML and deep learning, with
+7 years of experience in ML. His PhD is in media technology. The fourth ML
+expert (E4) is a postdoc also focusing on ML and deep learning, and she has 8
+years of experience in ML. Finally, the fifth ML expert (E5) is a postdoc with
+20 years of experience in ML. The latter two experts have PhDs in computer
+science. E1 was the only one who reported a colorblindness issue
+(deuteranomaly), but he affirmed having no problem perceiving correctly the
+specific color combinations we used in HardVis. Each interview lasted about 1
+hour and 15 minutes, and the interviews were structured as follows: (1)
+introduction of the primary objectives of HardVis, including the analytical
+tasks and design goals of Section 3; (2) presentation of the functionality of
+every visualization and interaction with the system using the _iris flower_
+data set (as in Section 4); and (3) explanation of the steps taken to arrive
+at the results in Section 5. We asked the participants to freely comment on
+anything. Their responses are summarized below.
+
+Workflow. All experts agreed that HardVis’ workflow is well designed and
+reasonable from their perspective. They characterized the workflow as
+straightforward and aligned with respective fully-automated sampling
+processes. E1 and E2 repeatedly commented positively upon our systematic and
+fine-grained approach that they have never seen before in all those years of
+developing new and deploying already existent ML models. “The offered
+granularity of undersampling and oversampling is exceptional, i.e., the fact
+that several phases can be applied in a row and for different subsets of the
+data space is something that I believe is almost impossible to accomplish
+without such a tool”, said E1. E2 underlined the clear benefit of controlling
+the automatic algorithms’ suggestions since blindly following them could
+overfit the training set (and hurt generalization). He then stated that
+letting users be completely free to remove or generate artificial instances
+manually could probably harm the predictive performance similarly. Thus, E2
+found that our tool combines the best of both worlds.
+
+Visualization and interaction. The promising findings we were able to obtain
+with the help of our VA system in the usage scenario of Section 5 amazed E3
+and E4. While using the same value for the number of neighbors parameter and
+the k-value for the distribution of data types, E3 appreciated that the
+k-value could still be adapted freely, as illustrated in Figure 3(c). The most
+intuitive visualization according to E2, E4, and E5 was the box plots view
+(Figure 3(f)) which was found exceptionally well-linked with the UMAP
+projection (Figure 3(d)). Especially with this view, these experts were able
+to understand the decisions we made in Section 4 and Section 5. The inverse
+polar chart (cf. Figure 3(i)) was the most confusing view at first. However,
+after a careful explanation from our side, all experts understood its meaning
+and claimed this visualization was the most novel visual representation of our
+tool. Since the same encoding as with the UMAP projection makes this view
+intuitive, they were able to inspect the instances immediately with low
+predicted probability (and with which specific class) from the eyes of the
+model. An interesting suggestion by E2 was to visualize the KNN-graph for a
+particular instance when users hover over a specific point/instance. Although
+HardVis already enables users to make justifiable actions by exploring all
+training instances from both global and local perspectives, this
+recommendation could be seen as an extra validation step for the projection.
+He also mentioned that for a more unsupervised-focused approach, the main
+color of the projected points could show the data types, and the outline of
+points could be used for the ground truth labels (if there are any). Despite
+that, E3 and E4 thought that with the current color scale, the focus is on
+unsafe cases, which could decrease the model’s accuracy if they are removed
+before or without reasoning about them at all.
+
+Limitations identified by the experts. E1 and E2 were concerned about the
+_scalability_ of the system. The former concentrated on the problem of
+visualizing hundreds of features, while the latter on the exploration of more
+than three classes. E1 acknowledged that the box plots and the table heatmap
+view are interactive with zooming and panning functionalities, which could
+partially address this issue. Also, the feature importance could be useful for
+deciding which features are not informative for a provided data set to exclude
+them beforehand. Regarding the second issue, the main bottlenecks are the
+inverse polar chart and the extensive use of colors. The proposed
+visualization could be further improved to scale with more than three classes
+by using advanced RadViz-based approaches [POSC∗15, TBVLH∗14]. Furthermore, E2
+noted that multi-class classification problems could be resolved as being
+binary due to the one-vs-rest strategy. E5 proposed to deploy HardVis in a
+cloud server supporting parallel processing to improve further the
+_efficiency_ of the system. E1 and E3 mentioned that heavily modifying our VA
+system is inevitable in case we would like to extend it to _other types of
+data_ , e.g., image or NLP data sets that consist of non-interpretable
+features such as pixels and word vectors. However, they completely agreed that
+this was not our original intention. E1 stated that non-expert users or even
+domain experts could find it difficult to operate HardVis and be advised by
+all visualizations concurrently, despite the views being logically positioned
+in a single window. Therefore, as an improvement of _generalizability to other
+target groups_ , he proposed to separate the views in different tabs depending
+on the certain domain problem at hand and the users’ prior experience to
+reduce the cognitive load. However, for ML experts, this deep level of
+granularity and the guidance received from the tool are necessary for making
+decisions. Finally, E3 described that as with any other VA tool and ML model
+in general, the _quality of the data set_ would probably affect negatively the
+capability of the tool to explore a complex and low-quality data set to the
+point that it could be challenging to improve the predictive performance. A
+preprocessing phase that handles missing values and wrangles the data could
+alleviate this problem. We plan to work on methods to surpass such
+limitations.
+
+Overall assessment. The provided feedback was encouraging and in favor of
+HardVis compared to employing automatic approaches. All experts were confident
+about the benefits of using our VA system.
+
+##  7 Discussion
+
+In this section, we discuss the visual design and overall limitations of our
+approach as well as the current implementation.
+
+###  7.1 Visual Design
+
+Here, we elaborate further on the key design concepts of our VA system that
+were presented in Section 4.
+
+Familiarity with the prevalent types of data visualization. The visual
+representations used are intentionally simple but form a powerful system when
+combined. Specifically, the benefits originate from the identification of
+areas where sampling strategies should be applied with guidance across the
+entire process. Similar to the user profile selected for the ML experts that
+participated in our interview sessions, we deem that the users of our tool
+would have worked with box plots, bar charts, tabular representations, and
+visual embeddings in the past. Therefore, there may be a gradual learning
+curve relevant to the familiarity with the visualizations. Two exceptions
+could be the Sankey diagram and the inverse polar chart. The former is for
+keeping track of their actions (usually studied under the term _provenance_ in
+visualization [XOW∗20]). A simpler alternative we considered is a log list of
+user’s actions being registered in each step, as well as empowerements of this
+representation with highlighted text. However, it would capture too much space
+for a view that can be deemed as optional, especially since the Sankey diagram
+is not crucial during the exploration and analysis phases (i.e., before either
+undersampling or oversampling take place). The latter representation needs to
+be learned but can be a game-changer for finding instances of confusion with a
+particular class and observing the distribution of SBRO types from the
+perspective of the ML model, as already mentioned in Section 6. As a
+straightforward alternative, we tried out a multi-class confusion matrix.
+However, it only provides aggregated information and fails to use the same
+visual encodings as the main view (see below).
+
+Commonality in the visual encoding and color scales. Throughout the whole
+HardVis system, the visual encodings propagate from one view to the others.
+For example, the common grayscale denotes the four distinct types of instances
+in all views. Tightly connected views—such as the UMAP projection and the
+inverse polar chart—share identical encodings, i.e., label class mapped to
+filled-in color, data type as outline color, and US/OS represented with
+symbols. The inverse polar chart is compact and uses the available space
+effectively due to its inherent design; it spares more area for the
+misclassified instances. For the table heatmap view, the diverging color scale
+emphasizes the extreme values and allows users to notice more differences on
+the left- and right-hand sides of the middle point, with five colors having
+the same origin. For example, this middle point is crucial for the _breast
+cancer_ data set, because instances with values closer to 1 for all features
+should be classified as malignant, while samples with values around 0 should
+be benign cancer. Finally in this view, hovering over a specific cell
+interaction partly resolves the ambiguity problem introduced due to
+distributing the normalized values into 10 distinct bins.
+
+###  7.2 Limitations
+
+In the following, we acknowledge limitations we have discovered for our system
+(beyond those mentioned in Section 6), which imply prospective future
+developments.
+
+Scalability for a large number of instances and features. In general, the
+number of instances and features that can be visually expressed with our
+approach has no intrinsic limit. Collaris and van Wijk [CVW22] found that
+usually the top 10–20 features were impactful for the tabular data sets they
+experimented with. For hundreds of features, it would be cognitively demanding
+for a human to analyze the influence of all these features at different levels
+of granularity. The methodology that might be used is first to limit the space
+under inspection using an additional preprocessing phase in the pipeline
+before employing HardVis for a deep analysis of features, as already stated by
+an ML expert in Section 6. Collaris and van Wijk [CVW22] also limited the
+number of instances to 5,000 in order to prevent overplotting issues in their
+projection-based view. Arguably, similar constraints should apply to our tool,
+especially for the UMAP projection and the inverse polar chart view. However
+in our case, zooming and panning functionalities implemented for both views
+can partly solve this problem along with overlap removal strategies that could
+be helpful [HMJE∗19, YXX∗21]. Regarding the table heatmap view, it is mostly
+useful for comparing a group of instances after a lasso selection has been
+performed. Additionally, we have the box plots that offer an overview first
+and scale better to many more instances.
+
+Table 1: Time taken to complete each activity of the sampling process for all use cases. The completion time is expressed in _minute:second_ format. Please note that for the _iris flower_ data set, the undersampling time refers to two consecutive rounds. Data set | Sampling process  
+---|---  
+| Data types | Undersampling | Oversampling  
+Iris flower | 0:45 | 2:57 | 1:06  
+Breast cancer | 1:53 | 6:52 | -  
+Vehicle silhouettes | 3:29 | 8:58 | 5:12  
+  
+Other kinds of data sets. Despite the vast range of application domains
+covered with all our use cases, HardVis has merely been evaluated with
+structured tabular data consisting of numerical values [SZA22]. We want to
+enable other data types in the future. Nevertheless, the features of each data
+set under investigation should be meaningful, because we focus on human
+expertise and knowledge to resolve problematic situations where essential
+instances for the generalizability of unseen data are being considered for
+deletion and to avoid the generation of artificial samples that negatively
+impact the predictive performance of the model. Overall, since our prototype
+tool is a proof-of-concept, the system’s workflow and theoretical
+contributions are generalizable in this respect.
+
+Target group. The primarily targeted users that would gain the most from
+adopting our approach are ML experts. We suppose that they understand the
+fundamentals of their data sets and know how to interpret common visual
+representations, but they require additional assistance with the sampling
+procedure. As evident from Section 6, the five ML experts who participated in
+our 1-hour and 15-minute interview sessions were able to grasp the main
+concepts and operate HardVis. Another potential here is to create a more basic
+version of our tool, geared explicitly for ML developers and even
+inexperienced ML users with a low level of visualization literacy.
+
+Completion time for each activity. The frontend of HardVis has been developed
+in JavaScript and uses Vue.js [vue14], D3.js [D311], and Plotly.js [plo10],
+while the backend has been written in Python and uses Flask [Fla10] and
+Scikit-learn [PVG∗11]. More technical details are made available on GitHub
+[Har22]. All experiments were performed on a MacBook Pro 2019 with a 2.6 GHz
+(6-Core) Intel Core i7 CPU, an AMD Radeon Pro 5300M 4 GB GPU, 16 GB of DDR4
+RAM at 2667 Mhz, and running macOS Monterey. By taking into account the
+specifications of the computer, we recorded the total wall-clock time
+dedicated to completing the sampling process for each data set (see Table 1,
+rows). For the time reported, we aggregate both the computational analysis and
+the execution of the user’s actions, as described in Sections 4.5 and 5. Table
+1 columns map the time for each activity of the sampling process (i.e.,
+distribution of data types, undersampling phase, and oversampling phase). In
+particular, as the number of instances and features to be examined grows, so
+does the time necessary to compare alternative options and finalize the user-
+defined actions. Unsurprisingly, the undersampling phase took the longest in
+all situations, followed by the oversampling phase, and lastly the
+distribution of data types. Depending on the quantity and importance of the
+extracted patterns, these values might become rather different. In general,
+the rendering time after a major user’s action is restricted to a couple of
+seconds for all the data sets we tried. To sum up, the efficiency of HardVis
+could be increased in various ways, as explained before.
+
+##  8 Conclusion
+
+In this paper, we developed HardVis, a VA system that uses hardly-configurable
+undersampling and oversampling techniques to handle instance hardness. As part
+of an intensively iterative process, multiple coordinated views assist users
+in defining an ideal distribution of data types, undersampling particular safe
+for removal samples, and oversampling others. Additionally, it facilitates the
+exploration of algorithmic suggestions using a variety of visual clues to
+confirm non-harmful removal or addition proposals. Finally, our VA approach is
+ideal for dealing with the instance hardness and class imbalance challenges
+because it makes the entire process adjustable and more transparent. The
+effectiveness of HardVis was investigated using real-world data sets, which
+revealed an increase of trustworthiness and in performance due to removed and
+synthetically-generated instances. The workflow and visualizations of our
+system received positive feedback from experts suggesting that such in-depth
+sampling would be impossible without our tool. They also assisted us in
+identifying the existing limitations of HardVis, which we are considering as
+future research directions.
+
+## Acknowledgements
+
+This work was partially supported through the ELLIIT environment for strategic
+research in Sweden.
+
+## References
+
+  * [ACD∗15] Amershi S., Chickering M., Drucker S. M., Lee B., Simard P., Suh J.:  ModelTracker: Redesigning performance analysis tools for machine learning.  In _Proc. of 33rd Annual ACM Conference on Human Factors in Computing Systems_ (2015), ACM, pp. 337–346.  doi:10.1145/2702123.2702509. 
+  * [AHH∗14] Alsallakh B., Hanbury A., Hauser H., Miksch S., Rauber A.:  Visual methods for analyzing probabilistic classification data.  _IEEE TVCG 20_ , 12 (2014), 1703–1712.  doi:10.1109/TVCG.2014.2346660. 
+  * [Alt92] Altman N. S.:  An introduction to kernel and nearest-neighbor nonparametric regression.  _The American Statistician 46_ , 3 (1992), 175–185. 
+  * [AY19] Arakawa R., Yakura H.:  REsCUE: A framework for real-time feedback on behavioral cues using multimodal anomaly detection.  In _Proc. of ACM CHI_ (2019), ACM, p. 1–13.  doi:10.1145/3290605.3300802. 
+  * [BHS∗21] Bernard J., Hutter M., Sedlmair M., Zeppelzauer M., Munzner T.:  A taxonomy of property measures to unify active learning and human-centered approaches to data labeling.  _ACM Transactions on Interactive Intelligent Systems 11_ , 3–4 (sep 2021).  doi:10.1145/3439333. 
+  * [BHZ∗18] Bernard J., Hutter M., Zeppelzauer M., Fellner D., Sedlmair M.:  Comparing visual-interactive labeling with active learning: An experimental study.  _IEEE TVCG 24_ , 1 (2018), 298–308.  doi:10.1109/TVCG.2017.2744818. 
+  * [BKNS00] Breunig M. M., Kriegel H.-P., Ng R. T., Sander J.:  LOF: Identifying density-based local outliers.  _ACM SIGMOD Record 29_ , 2 (May 2000), 93–104.  doi:10.1145/335191.335388. 
+  * [BNR20] Bäuerle A., Neumann H., Ropinski T.:  Classifier-guided visual correction of noisy labels for image classification tasks.  _Computer Graphics Forum 39_ , 3 (2020), 195–205.  doi:10.1111/cgf.13973. 
+  * [BS03] Bay S. D., Schwabacher M.:  Mining distance-based outliers in near linear time with randomization and a simple pruning rule.  In _Proc. of ACM SIGKDD_ (2003), ACM, p. 29–38.  doi:10.1145/956750.956758. 
+  * [BSL09] Bunkhumpornpat C., Sinapiromsaran K., Lursinsap C.:  Safe-Level-SMOTE: Safe-Level-Synthetic Minority Over-sampling TEchnique for handling the class imbalanced problem.  In _Proc. of Advances in Knowledge Discovery and Data Mining_ (2009), Springer Berlin Heidelberg, pp. 475–482. 
+  * [BZL∗18] Bernard J., Zeppelzauer M., Lehmann M., Müller M., Sedlmair M.:  Towards user-centered active learning algorithms.  _Computer Graphics Forum 37_ , 3 (2018), 121–132.  doi:10.1111/cgf.13406. 
+  * [CBHK02] Chawla N. V., Bowyer K. W., Hall L. O., Kegelmeyer W. P.:  SMOTE: Synthetic minority over-sampling technique.  _JAIR 16_ , 1 (June 2002), 321–357. 
+  * [CBK09] Chandola V., Banerjee A., Kumar V.:  Anomaly detection: A survey.  _ACM Computing Surveys 41_ , 3 (July 2009).  doi:10.1145/1541880.1541882. 
+  * [CCS06] Cieslak D., Chawla N., Striegel A.:  Combating imbalance in network intrusion datasets.  In _Proc. of IEEE GrC_ (2006), pp. 732–737.  doi:10.1109/GRC.2006.1635905. 
+  * [CdMP14] Castor de Melo C. E., Prudencio R. B. C.:  Cost-sensitive measures of algorithm similarity for meta-learning.  In _Proc. of BRACIS_ (2014), pp. 7–12.  doi:10.1109/BRACIS.2014.13. 
+  * [CG16] Chen T., Guestrin C.:  XGBoost: A scalable tree boosting system.  In _Proc. of ACM KDD_ (2016), ACM, pp. 785–794.  doi:10.1145/2939672.2939785. 
+  * [CLGD18] Cao N., Lin Y.-R., Gotz D., Du F.:  Z-Glyph: Visualizing outliers in multivariate data.  _Information Visualization 17_ , 1 (2018), 22–40.  doi:10.1177/1473871616686635. 
+  * [CMJ∗20] Chatzimparmpas A., Martins R. M., Jusufi I., Kucher K., Rossi F., Kerren A.:  The state of the art in enhancing trust in machine learning models with the use of visualizations.  _Computer Graphics Forum 39_ , 3 (June 2020), 713–756.  doi:10.1111/cgf.14034. 
+  * [CMJK20] Chatzimparmpas A., Martins R. M., Jusufi I., Kerren A.:  A survey of surveys on the use of visualization for interpreting machine learning models.  _Information Visualization 19_ , 3 (July 2020), 207–233.  doi:10.1177/1473871620904671. 
+  * [CMK20] Chatzimparmpas A., Martins R. M., Kerren A.:  t-viSNE: Interactive assessment and interpretation of t-SNE projections.  _IEEE TVCG 26_ , 8 (Aug. 2020), 2696–2714.  doi:10.1109/TVCG.2020.2986996. 
+  * [CMK22] Chatzimparmpas A., Martins R. M., Kerren A.:  VisRuler: Visual analytics for extracting decision rules from bagged and boosted decision treest.  _Information Visualization_ (2022).  To appear. 
+  * [CMKK21a] Chatzimparmpas A., Martins R. M., Kucher K., Kerren A.:  StackGenVis: Alignment of data, algorithms, and models for stacking ensemble learning using performance metrics.  _IEEE TVCG 27_ , 2 (Feb. 2021), 1547–1557.  doi:10.1109/TVCG.2020.3030352. 
+  * [CMKK21b] Chatzimparmpas A., Martins R. M., Kucher K., Kerren A.:  VisEvol: Visual analytics to support hyperparameter search through evolutionary optimization.  _Computer Graphics Forum 40_ , 3 (June 2021), 201–214.  doi:10.1111/cgf.14300. 
+  * [CMKK22] Chatzimparmpas A., Martins R. M., Kucher K., Kerren A.:  FeatureEnVi: Visual analytics for feature engineering using stepwise selection and semi-automatic extraction approaches.  _IEEE TVCG 28_ , 4 (2022), 1773–1791.  doi:10.1109/TVCG.2022.3141040. 
+  * [CSL∗16] Cao N., Shi C., Lin S., Lu J., Lin Y.-R., Lin C.-Y.:  TargetVue: Visual analysis of anomalous user behaviors in online communication systems.  _IEEE TVCG 22_ , 1 (2016), 280–289.  doi:10.1109/TVCG.2015.2467196. 
+  * [CT17] Czarnecki W. M., Tabor J.:  Extreme entropy machines: Robust information theoretic classification.  _Pattern Analysis and Applications 20_ , 2 (2017), 383–400. 
+  * [CVW22] Collaris D., Van Wijk J.:  StrategyAtlas: Strategy analysis for machine learning interpretability.  _IEEE TVCG_ (2022), 1–1.  doi:10.1109/TVCG.2022.3146806. 
+  * [CZV13] Cano A., Zafra A., Ventura S.:  Weighted data gravitation classification for standard and imbalanced data.  _IEEE Transactions on Cybernetics 43_ , 6 (2013), 1672–1687.  doi:10.1109/TSMCB.2012.2227470. 
+  * [D311] D3 — Data-driven documents.  https://d3js.org/, 2011.  Accessed June 30, 2022. 
+  * [DB21] Deng J., Brown E. T.:  RISSAD: Rule-based interactive semi-supervised anomaly detection.  In _Proc. of EuroVis — Short Papers_ (2021), The Eurographics Association.  doi:10.2312/evs.20211050. 
+  * [DG17a] Dua D., Graff C.:  UCI machine learning repository.  http://archive.ics.uci.edu/ml, 2017.  Accessed June 30, 2022. 
+  * [DG17b] Dua D., Graff C.:  UCI Machine Learning Repository, 2017. 
+  * [EMK∗21] Espadoto M., Martins R. M., Kerren A., Hirata N. S. T., Telea A. C.:  Toward a quantitative survey of dimension reduction techniques.  _IEEE TVCG 27_ , 3 (2021), 2153–2173.  doi:10.1109/TVCG.2019.2944182. 
+  * [FH89] Fix E., Hodges J. L.:  Discriminatory analysis. Nonparametric discrimination: Consistency properties.  _International Statistical Review/Revue Internationale de Statistique 57_ , 3 (1989), 238–247. 
+  * [FIS36] FISHER R. A.:  The use of multiple measurements in taxonomic problems.  _Annals of Eugenics 7_ , 2 (1936), 179–188.  doi:10.1111/j.1469-1809.1936.tb02137.x. 
+  * [Fla10] Flask — A micro web framework written in Python, 2010.  Accessed June 30, 2022. 
+  * [FSA99] Freund Y., Schapire R., Abe N.:  A short introduction to boosting.  _Journal of Japanese Society for Artificial Intelligence 14_ , 5 (Sept. 1999), 771–780. 
+  * [GBSW21] Grossmann N., Bernard J., Sedlmair M., Waldner M.:  Does the layout really matter? A study on visual model accuracy estimation.  In _Proc. of IEEE VIS_ (2021), pp. 61–65.  doi:10.1109/VIS49827.2021.9623326. 
+  * [GSM07] García V., Sánchez J., Mollineda R.:  An empirical study of the behavior of classifiers on imbalanced and overlapped data sets.  In _Proc. of CIARP_ (2007), Springer-Verlag, p. 397–406. 
+  * [HA04] Hodge V., Austin J.:  A survey of outlier detection methodologies.  _Artificial Intelligence Review 22_ , 2 (2004), 85–126. 
+  * [Ham22] Hamid O. H.:  From model-centric to data-centric AI: A paradigm shift or rather a complementary approach?  In _Proc. of the 8th International Conference on Information Technology Trends (ITT)_ (2022), pp. 196–199.  doi:10.1109/ITT56123.2022.9863935. 
+  * [Har68] Hart P.:  The condensed nearest neighbor rule (corresp.).  _IEEE Transactions on Information Theory 14_ , 3 (1968), 515–516.  doi:10.1109/TIT.1968.1054155. 
+  * [Har22] HardVis Code, 2022.  Accessed June 30, 2022.  URL: https://github.com/angeloschatzimparmpas/HardVis. 
+  * [HBGL08] He H., Bai Y., Garcia E. A., Li S.:  ADASYN: Adaptive synthetic sampling approach for imbalanced learning.  In _Proc. of IEEE IJCNN_ (2008), pp. 1322–1328.  doi:10.1109/IJCNN.2008.4633969. 
+  * [HCG∗14] Huang H., Chiew K., Gao Y., He Q., Li Q.:  Rare category exploration.  _Expert Systems with Applications 41_ , 9 (2014), 4197–4210.  doi:10.1016/j.eswa.2013.12.039. 
+  * [HG09] He H., Garcia E. A.:  Learning from imbalanced data.  _IEEE Transactions on Knowledge and Data Engineering 21_ , 9 (2009), 1263–1284.  doi:10.1109/TKDE.2008.239. 
+  * [HHHM11] Huang H., He Q., He J., Ma L.:  RADAR: Rare category detection via computation of boundary degree.  In _Proc. of Advances in Knowledge Discovery and Data Mining_ (2011), Springer Berlin Heidelberg, pp. 258–269. 
+  * [HHWB02] Hawkins S., He H., Williams G., Baxter R.:  Outlier detection using replicator neural networks.  In _Proc. of Data Warehousing and Knowledge Discovery_ (2002), Springer Berlin Heidelberg, pp. 170–180. 
+  * [HKB18] Herland M., Khoshgoftaar T. M., Bauder R. A.:  Big data fraud detection using multiple medicare data sources.  _Journal of Big Data 5_ , 1 (2018), 1–21. 
+  * [HLL08] He J., Liu Y., Lawrence R.:  Graph-based rare category detection.  In _Proc. of IEEE ICDM_ (2008), pp. 833–838.  doi:10.1109/ICDM.2008.122. 
+  * [HM13] He H., Ma Y.:  Imbalanced learning: Foundations, algorithms, and applications.  _Intelligent Systems & Agents_ (2013). 
+  * [HMJE∗19] Hilasaca G. M., Marcílio-Jr W. E., Eler D. M., Martins R. M., Paulovich F. V.:  Overlap removal of dimensionality reduction scatterplot layouts.  _ArXiv e-prints 1903.06262_ (2019).  arXiv:1903.06262. 
+  * [HWM05] Han H., Wang W.-Y., Mao B.-H.:  Borderline-SMOTE: A new over-sampling method in imbalanced data sets learning.  In _Proc. of Advances in Intelligent Computing_ (2005), Springer Berlin Heidelberg, pp. 878–887. 
+  * [Jap01] Japkowicz N.:  Concept-learning in the presence of between-class and within-class imbalances.  In _Proc. of Advances in Artificial Intelligence_ (2001), Springer Berlin Heidelberg, pp. 67–77. 
+  * [KGW17] Ksieniewicz P., Grana M., Woźniak M.:  Paired feature multilayer ensemble–concept and evaluation of a classifier.  _Journal of Intelligent & Fuzzy Systems 32_, 2 (2017), 1427–1436. 
+  * [KHM98] Kubat M., Holte R. C., Matwin S.:  Machine learning for the detection of oil spills in satellite radar images.  _Machine learning 30_ , 2 (1998), 195–215. 
+  * [KK17] Kwak S. K., Kim J. H.:  Statistical data preparation: Management of missing values and outliers.  _Korean Journal of Anesthesiology 70_ , 4 (2017), 407. 
+  * [KM97] Kubat M., Matwin S.:  Addressing the curse of imbalanced training sets: One-sided selection.  In _Proc. of ICML_ (1997), Morgan Kaufmann, pp. 179–186. 
+  * [Kra16] Krawczyk B.:  Learning from imbalanced data: open challenges and future directions.  _Progress in Artificial Intelligence 5_ , 4 (2016), 221–232. 
+  * [Kru64] Kruskal J. B.:  Multidimensional scaling by optimizing goodness of fit to a nonmetric hypothesis.  _Psychometrika 29_ , 1 (Mar. 1964), 1–27.  doi:10.1007/BF02289565. 
+  * [Lau01] Laurikkala J.:  Improving identification of difficult small classes by balancing class distribution.  In _Proc. of AIME_ (2001), Springer-Verlag, p. 63–66. 
+  * [LCH∗14] Liu Z., Chiew K., He Q., Huang H., Huang B.:  Prior-free rare category detection: More effective and efficient solutions.  _Expert Systems with Applications 41_ , 17 (Dec. 2014), 7691–7706.  doi:10.1016/j.eswa.2014.06.026. 
+  * [LFM∗18] Li H., Fang S., Mukhopadhyay S., Saykin A. J., Shen L.:  Interactive machine learning by visualization: A small data solution.  In _Proc. of IEEE BigData_ (2018), pp. 3513–3521.  doi:10.1109/BigData.2018.8621952. 
+  * [LGG∗18] Lin H., Gao S., Gotz D., Du F., He J., Cao N.:  RCLens: Interactive rare category exploration and identification.  _IEEE TVCG 24_ , 7 (2018), 2223–2237.  doi:10.1109/TVCG.2017.2711030. 
+  * [MC03] Mahoney M., Chan P.:  Learning rules for anomaly detection of hostile network traffic.  In _Proc. of IEEE ICDM_ (2003), pp. 601–604.  doi:10.1109/ICDM.2003.1250987. 
+  * [Mel02] Melnik O.:  Decision region connectivity analysis: A method for analyzing high-dimensional classifiers.  _Machine Learning 48_ , 1–3 (Sep. 2002), 321–351.  doi:10.1023/A:1013968124284. 
+  * [MHM18] McInnes L., Healy J., Melville J.:  UMAP: Uniform manifold approximation and projection for dimension reduction.  _ArXiv e-prints 1802.03426_ (Feb. 2018).  arXiv:1802.03426. 
+  * [MLC07] Münz G., Li S., Carle G.:  Traffic anomaly detection using k-means clustering.  In _GI/ITG Workshop MMBnet_ (2007), vol. 7, p. 9. 
+  * [MM21] Ma Y., Maciejewski R.:  Visual analysis of class separations with locally linear segments.  _IEEE TVCG 27_ , 1 (2021), 241–253.  doi:10.1109/TVCG.2020.3011155. 
+  * [MQB19] Ming Y., Qu H., Bertini E.:  RuleMatrix: Visualizing and understanding classifiers with rules.  _IEEE TVCG 25_ , 1 (2019), 342–352.  doi:10.1109/TVCG.2018.2864812. 
+  * [MS94] Martinetz T., Schulten K.:  Topology representing networks.  _Neural Networks 7_ , 3 (1994), 507–522.  doi:10.1016/0893-6080(94)90109-0. 
+  * [MXLM20] Ma Y., Xie T., Li J., Maciejewski R.:  Explaining vulnerabilities to adversarial machine learning through visual analytics.  _IEEE TVCG 26_ , 1 (Jan. 2020), 1075–1085.  doi:10.1109/TVCG.2019.2934631. 
+  * [Nog14] Nogueira F.:  Bayesian Optimization.  https://git.io/vov5M, 2014.  Accessed June 30, 2022. 
+  * [NS16] Napierala K., Stefanowski J.:  Types of minority class examples and their influence on learning classifiers from imbalanced data.  _JIIS 46_ , 3 (2016), 563–597. 
+  * [NSW10] Napierała K., Stefanowski J., Wilk S.:  Learning from imbalanced data in presence of noisy and borderline examples.  In _Proc. of RSCTC_ (2010), Springer Berlin Heidelberg, pp. 158–167. 
+  * [PBM04] Prati R. C., Batista G. E. A. P. A., Monard M. C.:  Class imbalances versus class overlapping: An analysis of a learning system behavior.  In _Proc. of MICAI_ (2004), Springer Berlin Heidelberg, pp. 312–321. 
+  * [PHOMU15] Prudêncio R. B., Hernández-Orallo J., Martınez-Usó A.:  Analysis of instance hardness in machine learning using item response theory.  In _Proc. of LMCE_ (2015). 
+  * [plo10] Plotly — JavaScript open source graphing library.  https://plot.ly, 2010.  Accessed June 30, 2022. 
+  * [POSC∗15] Piazentin Ono J. H., Sikansi F., Corrêa D. C., Paulovich F. V., Paiva A., Nonato L. G.:  Concentric RadViz: Visual exploration of multi-task classification.  In _Proc. of 28th SIBGRAPI Conference on Graphics, Patterns and Images_ (2015), pp. 165–172.  doi:10.1109/SIBGRAPI.2015.38. 
+  * [PSPM15] Paiva J. G. S., Schwartz W. R., Pedrini H., Minghim R.:  An approach to supporting incremental visual data classification.  _IEEE TVCG 21_ , 1 (2015), 4–17.  doi:10.1109/TVCG.2014.2331979. 
+  * [PVG∗11] Pedregosa F., Varoquaux G., Gramfort A., Michel V., Thirion B., Grisel O., Blondel M., Prettenhofer P., Weiss R., Dubourg V., Vanderplas J., Passos A., Cournapeau D., Brucher M., Perrot M., Duchesnay E.:  Scikit-Learn: Machine learning in Python.  _JMLR 12_ (Nov. 2011), 2825–2830.  doi:10.5555/1953048.2078195. 
+  * [RAL∗17] Ren D., Amershi S., Lee B., Suh J., Williams J. D.:  Squares: Supporting interactive performance analysis for multiclass classifiers.  _IEEE TVCG 23_ , 1 (Jan. 2017), 61–70.  doi:10.1109/TVCG.2016.2598828. 
+  * [RAS∗21] Rostamzadeh N., Abdullah S. S., Sedig K., Garg A. X., McArthur E.:  VERONICA: Visual analytics for identifying feature groups in disease classification.  _Information 12_ , 9 (2021).  doi:10.3390/info12090344. 
+  * [Rav11] Ravindran S.:  Learning with imprecise classes, rare instances, and complex relationships.  In _Proc. of AAAI/SIGART Doctoral Consortium_ (2011). 
+  * [RKN06] Rao R. B., Krishnan S., Niculescu R. S.:  Data mining for improved cardiac care.  _ACM SIGKDD Explorations Newsletter 8_ , 1 (June 2006), 3–10.  doi:10.1145/1147234.1147236. 
+  * [RVM19] Ramamurthy K. N., Varshney K., Mody K.:  Topological data analysis of decision boundaries with application to model selection.  In _Proc. of ICML_ (09–15 June 2019), vol. 97, PMLR, pp. 5351–5360. 
+  * [RVV∗15] Ramentol E., Vluymans S., Verbiest N., Caballero Y., Bello R., Cornelis C., Herrera F.:  IFROWANN: Imbalanced fuzzy-rough ordered weighted average nearest neighbor classification.  _IEEE Transactions on Fuzzy Systems 23_ , 5 (2015), 1622–1637.  doi:10.1109/TFUZZ.2014.2371472. 
+  * [SAPV16] Salgado C. M., Azevedo C., Proença H., Vieira S. M.:  _Noise versus outliers_.  Springer International Publishing, 2016, pp. 163–183.  doi:10.1007/978-3-319-43742-2_14. 
+  * [Set12] Settles B.:  Active learning.  _Synthesis lectures on artificial intelligence and machine learning 6_ , 1 (2012), 1–114. 
+  * [SHB∗14] Sedlmair M., Heinzl C., Bruckner S., Piringer H., Möller T.:  Visual parameter space analysis: A conceptual framework.  _IEEE TVCG 20_ , 12 (2014), 2161–2170.  doi:10.1109/TVCG.2014.2346321. 
+  * [Sie87] Siebert J. P.:  _Vehicle Recognition Using Rule Based Methods_.  Research Memorandum TIRM-87-018, Turing Institute, Mar. 1987. 
+  * [SK17] Skryjomski P., Krawczyk B.:  Influence of minority class instance types on smote imbalanced data oversampling.  In _Proc. of LIDTA_ (Sep. 2017), vol. 74, PMLR, pp. 7–21. 
+  * [SLSH15] Sáez J. A., Luengo J., Stefanowski J., Herrera F.:  SMOTE–IPF: Addressing the noisy and borderline examples problem in imbalanced classification by a re-sampling method with filtering.  _Information Sciences 291_ (2015), 184–203.  doi:10.1016/j.ins.2014.08.051. 
+  * [SMGC14] Smith M. R., Martinez T., Giraud-Carrier C.:  An instance level analysis of data complexity.  _Machine learning 95_ , 2 (2014), 225–256. 
+  * [SPBW12] Syarif I., Prugel-Bennett A., Wills G.:  Unsupervised clustering approach for network anomaly detection.  In _Proc. of Networked Digital Technologies_ (2012), Springer Berlin Heidelberg, pp. 135–145. 
+  * [Ste16] Stefanowski J.:  Dealing with data difficulty factors while learning from imbalanced data.  In _Challenges in Computational Statistics and Data Mining_. Springer, 2016, pp. 333–363. 
+  * [SZA22] Shwartz-Ziv R., Armon A.:  Tabular data: Deep learning is not all you need.  _Inf. Fus. 81_ (2022), 84–90.  doi:10.1016/j.inffus.2021.11.011. 
+  * [TBVLH∗14] Thanh Binh H. T., Van Long T., Hoai N. X., Anh N. D., Truong P. M.:  Reordering dimensions for Radial Visualization of multidimensional data — A Genetic Algorithms approach.  In _Proc. of IEEE CEC_ (2014), pp. 951–958.  doi:10.1109/CEC.2014.6900619. 
+  * [Tom76] Tomek I.:  An experiment with the edited nearest-neighbor rule.  _IEEE Transactions on Systems, Man, and Cybernetics SMC-6_ , 6 (1976), 448–452.  doi:10.1109/TSMC.1976.4309523. 
+  * [VC17] Vanerio J., Casas P.:  Ensemble-learning approaches for network security and anomaly detection.  In _Proc. of ACM Big-DAMA_ (2017), ACM, p. 1–6.  doi:10.1145/3098593.3098594. 
+  * [VK09] Van Hulse J., Khoshgoftaar T.:  Knowledge discovery from imbalanced and noisy data.  _Data & Knowledge Engineering 68_, 12 (2009), 1513–1542.  doi:10.1016/j.datak.2009.08.005. 
+  * [vue14] Vue.js — The progressive JavaScript framework.  https://vuejs.org/, 2014.  Accessed June 30, 2022. 
+  * [VW09] Vatturi P., Wong W.-K.:  Category detection using hierarchical mean shift.  In _Proc. of ACM SIGKDD_ (2009), ACM, p. 847–856.  doi:10.1145/1557019.1557112. 
+  * [WDC∗22] Wu A., Deng D., Cheng F., Wu Y., Liu S., Qu H.:  In defence of visual analytics systems: Replies to critics.  _IEEE TVCG_ (2022), 1–11.  doi:10.1109/TVCG.2022.3209360. 
+  * [WGC14] Woźniak M., Graña M., Corchado E.:  A survey of multiple classifier systems as hybrid systems.  _Inf. Fus. 16_ (2014), 3–17.  doi:10.1016/j.inffus.2013.04.006. 
+  * [WH00] Weiss G. M., Hirsh H.:  A quantitative study of small disjuncts.  _AAAI/IAAI 2000_ , 665-670 (2000), 15. 
+  * [Wil72] Wilson D. L.:  Asymptotic properties of nearest neighbor rules using edited data.  _IEEE Transactions on Systems, Man, and Cybernetics SMC-2_ , 3 (1972), 408–421.  doi:10.1109/TSMC.1972.4309137. 
+  * [WLC∗13] Wei W., Li J., Cao L., Ou Y., Chen J.:  Effective detection of sophisticated online banking fraud on extremely imbalanced data.  _World Wide Web 16_ , 4 (2013), 449–475. 
+  * [WMCW03] Wong W.-K., Moore A. W., Cooper G. F., Wagner M. M.:  Bayesian network anomaly pattern detection for disease outbreaks.  In _Proc. of ICML_ (2003), pp. 808–815. 
+  * [XOW∗20] Xu K., Ottley A., Walchshofer C., Streit M., Chang R., Wenskovitch J.:  Survey on the analysis of user interactions and visualization provenance.  _Computer Graphics Forum 39_ , 3 (2020), 757–783.  doi:10.1111/cgf.14035. 
+  * [XXM∗19] Xu K., Xia M., Mu X., Wang Y., Cao N.:  EnsembleLens: Ensemble-based visual exploration of anomaly detection algorithms with multidimensional data.  _IEEE TVCG 25_ , 1 (Jan. 2019), 109–119.  doi:10.1109/TVCG.2018.2864825. 
+  * [XYX∗19] Xiang S., Ye X., Xia J., Wu J., Chen Y., Liu S.:  Interactive correction of mislabeled training data.  In _Proc. of 2019 IEEE Conference on Visual Analytics Science and Technology (VAST)_ (2019), pp. 57–68.  doi:10.1109/VAST47406.2019.8986943. 
+  * [YCY∗21] Yuan J., Chen C., Yang W., Liu M., Xia J., Liu S.:  A survey of visual analytics techniques for machine learning.  _Computational Visual Media 7_ , 1 (2021), 3–36.  doi:10.1007/s41095-020-0191-7. 
+  * [YLF∗21] Yu S., Li X., Feng Y., Zhang X., Chen S.:  An instance-oriented performance measure for classification.  _Information Sciences 580_ (2021), 598–619.  doi:10.1016/j.ins.2021.08.094. 
+  * [YLW∗21] Yu S., Li X., Wang H., Zhang X., Chen S.:  BIDI: A classification algorithm with instance difficulty invariance.  _Expert Systems with Applications 165_ (2021), 113920.  doi:10.1016/j.eswa.2020.113920. 
+  * [YTWM04] Yamanishi K., Takeuchi J.-I., Williams G., Milne P.:  On-line unsupervised outlier detection using finite mixtures with discounting learning algorithms.  _Data Mining and Knowledge Discovery 8_ , 3 (2004), 275–300. 
+  * [YXX∗21] Yuan J., Xiang S., Xia J., Yu L., Liu S.:  Evaluation of sampling methods for scatterplots.  _IEEE TVCG 27_ , 2 (2021), 1720–1730.  doi:10.1109/TVCG.2020.3030432. 
+  * [ZCW∗14] Zhao J., Cao N., Wen Z., Song Y., Lin Y.-R., Collins C.:  #FluxFlow: Visual analysis of anomalous information spreading on social media.  _IEEE TVCG 20_ , 12 (2014), 1773–1782.  doi:10.1109/TVCG.2014.2346922. 
+  * [ZCW∗19] Zhao X., Cui W., Wu Y., Zhang H., Qu H., Zhang D.:  Oui! Outlier interpretation on multi-dimensional data via visual analytics.  _Computer Graphics Forum 38_ , 3 (June 2019), 213–224.  doi:10.1111/cgf.13683. 
+  * [ZDH∗17] Zhang X., Dou W., He Q., Zhou R., Leckie C., Kotagiri R., Salcic Z.:  LSHiForest: A generic framework for fast tree isolation based ensemble anomaly analysis.  In _Proc. of IEEE ICDE_ (2017), pp. 983–994.  doi:10.1109/ICDE.2017.145. 
+  * [ZOS∗22] Zhang X., Ono J. P., Song H., Gou L., Ma K.-L., Ren L.:  SliceTeller : A data slice-driven approach for machine learning model validation.  _IEEE TVCG_ (2022), 1–11.  doi:10.1109/TVCG.2022.3209465. 

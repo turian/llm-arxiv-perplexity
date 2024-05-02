@@ -1,0 +1,438 @@
+  1. 1 Introduction
+  2. 2 Related work
+    1. 2.1 Large Language Model
+    2. 2.2 Multimodal Large Language Model
+  3. 3 LaVy
+    1. 3.1 Architecture
+    2. 3.2 Data Curation
+    3. 3.3 Training Procedure
+  4. 4 Experiment
+    1. 4.1 Implementation details
+    2. 4.2 LaVy-Bench
+      1. 4.2.1 Zero-shot Visual Question Answering (VQA)
+      2. 4.2.2 In-the-wild benchmark
+  5. 5 Limitations
+  6. 6 Conclusion
+
+HTML conversions sometimes display errors due to content that did not convert
+correctly from the source. This paper uses the following packages that are not
+yet supported by the HTML conversion tool. Feedback on these issues are not
+necessary; they are known and are being worked on.
+
+  * failed: vntex
+  * failed: inconsolata
+  * failed: etoc
+  * failed: axessibility
+
+Authors: achieve the best HTML results from your LaTeX submissions by
+following these best practices.
+
+License: CC BY 4.0
+
+arXiv:2404.07922v4 [cs.CL] 17 Apr 2024
+
+# LaVy: Vietnamese Multimodal Large Language Model
+
+Chi Tran  
+Hanoi University of Science and Technology  
+chi.tb200083@sis.hust.edu.vn  
+&Huong Le Thanh  
+Hanoi University of Science and Technology  
+huonglt@soict.hust.edu.vn
+
+###### Abstract
+
+Large Language Models (LLMs) and Multimodal Large language models (MLLMs) have
+taken the world by storm with impressive abilities in complex reasoning and
+linguistic comprehension. Meanwhile there are plethora of works related to
+Vietnamese Large Language Models, the lack of high-quality resources in
+multimodality limits the progress of Vietnamese MLLMs. In this paper, we
+pioneer in address this by introducing LaVy, a state-of-the-art Vietnamese
+MLLM, and we also introduce LaVy-Bench benchmark designated for evaluating
+MLLMs’s understanding on Vietnamese visual language tasks. All code and model
+weights are public at https://github.com/baochi0212/LaVy
+
+##  1 Introduction
+
+In recent years, Large Language Models (LLMs) have demonstrated remarkable
+capabilities in various natural language processing tasks, showcasing their
+proficiency in complex reasoning and linguistic comprehension. The success of
+LLMs has inspired researchers to explore the potential of Multimodal Large
+Language Models (MLLMs), which incorporate visual information alongside
+textual data. MLLMs have shown promising results in tasks that require
+understanding the interplay between language and vision, such as image
+captioning, visual question answering, and multimodal machine translation.
+
+While there has been significant progress in developing Vietnamese LLMs, the
+lack of high-quality multimodal resources has hindered the advancement of
+Vietnamese MLLMs. The availability of diverse and well-annotated datasets is
+crucial for training and evaluating MLLMs, as they rely on the integration of
+visual and textual information to perform multimodal tasks effectively.
+
+To address this limitation and foster research in Vietnamese multimodal
+language understanding, we introduce LaVy, Vietnamese first MLLM and achieve
+state-of-the-art performance in Vietnamese vision language tasks. LaVy is
+designed to leverage the rich visual and linguistic information present in
+Vietnamese data, enabling it to tackle a wide range of multimodal tasks with
+improved performance. Our model outperforms a multilingual baseline mBLIP
+Geigle et al. (2023) on different tasks by a large margin. By developing LaVy,
+we aim to bridge the gap between Vietnamese LLMs and MLLMs, providing
+researchers and practitioners with a powerful tool for exploring the
+intersection of language and vision in the Vietnamese context.
+
+Furthermore, to facilitate the evaluation and comparison of Vietnamese MLLMs,
+we propose the LaVy-Bench benchmark. This benchmark consists an open VQA task
+and an in-the-wild test set, specifically designed to assess the visual
+language understanding and generation capabilities of MLLMs in the Vietnamese
+and in-the-wild images. By establishing a standardized evaluation framework,
+we aim to promote the development and benchmarking of Vietnamese MLLMs,
+driving innovation and collaboration within the research community.
+
+In this paper, we present LaVy and the LaVy-Bench benchmark as significant
+contributions to the field of Vietnamese multimodal language understanding. We
+provide a detailed description of LaVy’s architecture, data curation and
+training procedure. Additionally, we introduce the LaVy-Bench benchmark,
+discussing its design principles, task composition, and evaluation metrics.
+Through extensive experiments and analysis, we demonstrate the effectiveness
+of LaVy and the utility of the LaVy-Bench benchmark in advancing Vietnamese
+MLLM research.
+
+##  2 Related work
+
+###  2.1 Large Language Model
+
+Recent advancements in Large Language Models (LLMs) have showcased remarkable
+capabilities across various natural language processing tasks, including
+dialogue, creative writing, and problem-solving. Models such as LLaMA Touvron
+et al. (2023a, b), Mistral Jiang et al. (2023), and Gemma Mesnard et al.
+(2024) have leveraged scalable Transformer-based architectures Vaswani et al.
+(2017) and large-scale data to become foundation models for general reasoning
+tasks. These models have demonstrated impressive performance and have set new
+benchmarks in the field.
+
+Following the trend of LLMs, several Vietnamese language models emerged such
+as PhoGPT Nguyen et al. (2023b), Vistral Nguyen et al. (2023a) perform
+outstandingly in Vietnamese LLM benchmarks and NLP tasks.
+
+###  2.2 Multimodal Large Language Model
+
+Witness the exceptional performance of GPT-4 Achiam et al. (2023) and Gemini
+Pro Vision Anil et al. (2023) in visual language tasks, recent research has
+focused on developing Multimodal Large Language Models (MLLMs) to achieve
+unified understanding and reasoning across different modalities, building upon
+the success of Large Language Models (LLMs). Various methods have been
+proposed to integrate information from multiple modalities into pre-trained
+LLM architectures. For instance, Flamingo Alayrac et al. (2022) and BLIP-2 Li
+et al. (2023) introduce different techniques for fusing visual tokens with
+frozen LLMs using gated attention or Q-former. Inspired by the effectiveness
+of instruction tuning, LLaVA Liu et al. (2023) and MiniGPT-4 Zhu et al. (2024)
+align visual input with LLMs through visual instruction tuning, demonstrating
+impressive results. Another active line of work is researching efficient
+MLLMs, resulting in lightweight model families like Bunny He et al. (2024).
+Meanwhile, recent works are pioneering development in vision-language tasks
+for low-resource languages, such as Peacock Alwajih et al. (2024)
+
+##  3 LaVy
+
+###  3.1 Architecture
+
+Our model are built with LlaVA architecture Liu et al. (2023) using three main
+components:
+
+  * •
+
+Vision Encoder: The CLIP-Large model Radford et al. (2023), is used as the
+vision encoder.
+
+  * •
+
+MLP Projector: A two-layer Multi-Layer Perceptron (MLP) projector is employed
+to align the output representations from the visual and language modalities.
+This projector ensures that the visual and textual information is transformed
+into a common space.
+
+  * •
+
+Language Model: The third component is a Large Language Model, which is a
+language model responsible for generating textual information, take the
+aligned representations from the MLP projector.
+
+###  3.2 Data Curation
+
+The barrier for Vietnamese MLLMs’ development is resource for training, which
+is handled by the our novel pipeline of data collection.
+
+  * •
+
+Translated then Refined: We utilize LlaVA training data composing of filtered
+558K LAION-CC-SBU captions and 150K GPT-generated multimodal instructions.
+With the acknowledgement of the insufficient competency of open-source
+translation projects and translation API like VinAI Translate Nguyen et al.
+(2022), Google Translate, … in convert English data to Vietnamese high-quality
+data, we firstly translate a sample with VinAI translation, then we prompt
+Gemini Pro to rewrite it in more accurate and natural way for Vietnamese
+language by pairing translated sample and original English sample in Gemini
+prompt. Because the captions dataset is massive, we only refine a subset of
+150K randomly sampled captions, and combine it with 558K non-write captions to
+finalize a captioning dataset. Finally, GPT-generated instructions is all
+refined to make 150K high-quality Vietnamese instructions
+
+  * •
+
+Synthetic: Understanding the difference between Vietnamese images and LlaVA’s
+images, we crawl 8.000 images from web in various topics (for example:
+Vietnamese event images with keyword \hAnh s. ki.n Vi.t Nam) and prompt Gemini
+Pro Vision to generated concise and detailed description of them to enhance
+LaVy’s performance in Vietnamese images. Totally, we have 16.000 Vietnamese
+descriptions for crawled images and merge them with rewritten instructions
+
+In eventuality, we curated Vietnamese datasets with 708K image-caption pairs
+for pretraining and 166K high-quality instructions for finetuning in training
+step. Our pipeline is clearly illustrated in Image 1.
+
+![Refer to caption](extracted/5541435/images/2.jpg) Image 1: Data pipeline
+
+###  3.3 Training Procedure
+
+The training procedure is divided into 2 steps:
+
+  * •
+
+Pretraining: Align the vision embeddings from a pre-trained vision encoder
+with the text embeddings from the LLM by optimizing only the cross-modality
+projector using a cross-entropy loss for next token prediction.
+
+  * •
+
+Finetuning: We apply visual instruction tuning to fully utilize the MLLM’s
+capabilities across different multimodal tasks. We use the same cross-entropy
+loss as in the pre-training stage, but this time, they employ Low-Rank
+Adaptation (LoRA) to train both the cross-modality projector and the LLM
+backbone.
+
+##  4 Experiment
+
+###  4.1 Implementation details
+
+We use Vistral 7B as LLM backbone and CLIP large visual encoder. The training
+process for the LaVy consists of two stages. In the first stage, the model is
+pretrained using a dataset of 708k captions for 1 epoch, with a global batch
+size of 64 and a learning rate of 1e-3. During this stage, all model
+parameters are frozen, except the MLP layers. Besides, we don’t shuffle data
+but train the model to learn from unrefined data to refined data.
+
+The second stage involves finetuning the model using an instructions dataset.
+This stage also spans 1 epoch, with a global batch size of 32 and a learning
+rate of 2e-5. In this phase, only the newly introduced LoRA (Low-Rank
+Adaptation) parameters are trainable.  
+Besides, in evaluation, we apply greedy decoding to generate all models’
+responses Lin and Chen (2023)
+
+###  4.2 LaVy-Bench
+
+We construct LaVy-Bench to benchmark models’ Vietnamese Visual Language
+understanding.
+
+####  4.2.1 Zero-shot Visual Question Answering (VQA)
+
+We evaluate the zero-shot Visual Question Answering (VQA) performance of
+models on the OpenViVQA Nguyen et al. (2023c) dev set, which consists of 3,505
+samples. This dataset challenges the models’ understanding of the
+relationships between Vietnamese images and natural language. Furthermore, we
+propose a new metric for automatic evaluation to replace older metrics, such
+as BLEU Papineni et al. (2002), which do not accurately reflect models’
+competency in the VQA tasks. Our metric is inspired by LLM-as-a-Judge Zheng et
+al. (2023), which utilizes Gemini Pro to verify the accuracy of generated
+responses for question-answer pairs. In Table 1, it’s apparent that LaVy’s
+zero-shot VQA performance (35.2%) outshadows mBLIP-Bloomz-7B (27.9%) and
+mBLIP-mT0-XL-5B (20.0%). However, roughly half of the OpenViVQA dataset is
+composed of TextQA samples (1,733 samples) that do not appear in our training
+dataset, making OpenViVQA particularly challenging for our model, not mention
+to our traning instructions just includes descriptions of 8.000 Vietnamese
+crawled images.
+
+Model | Accuracy  
+---|---  
+mBLIP (mT0-XL-5B) | 20.0  
+mBLIP (BLOOMZ-7B) | 27.9  
+LaVy | 35.2  
+Table 1: Zero-shot VQA on OpenViVQA dev set. Models’ output accuracy are
+evaluated by Gemini Pro
+
+####  4.2.2 In-the-wild benchmark
+
+To further assess the models’ comprehension, we follow the evaluation
+methodology LLaVA benchmark (in-the-wild) Liu et al. (2023) and recollect set
+of 24 diverse images and 60 questions in 3 main types: Complex Reasoning,
+Detail Description and Conversation. The collected images and manually crafted
+questions aim to diversify the test set in various aspects: culture, race,
+image types,… and avoiding opting for images in crawled training images. For
+each question, we then prompt Gemini Pro Vision to generate detailed
+description of image and answer the question, and finally use Gemini Pro to
+rate the models’ response on the scale of 1 to 5 while taking Gemini Pro’s
+response as ground-truth. We opted against using detailed descriptions as
+references (unlike LlaVA) due to their occasional irrelevance. Instead, we
+found Gemini Pro Vision’s in-the-wild benchmark responses to be closely
+pertinent. Then we ask model to score outputs in 3 criteria: relevancy,
+accuracy and naturalness, and sum them all for final score at the end  
+In comparison with mBLIP baselines in Table 2, LaVy outperforms sharply in all
+types of questions: Conversation (+36.5%), Detail Description (+59%) and
+Complex Reasoning (+51%). In overall, our model is scored 61.5 by Gemini Pro.
+Some qualitative test cases are depicted in Table 3.
+
+Model | Conversation | Detail description | Complex reasoning | All  
+---|---|---|---|---  
+mBLIP (mT0-XL-5B) | 47.0 | 29.0 | 28.3 | 34.8  
+mBLIP (BLOOMZ-7B) | 52.6 | 29.0 | 44.0 | 41.9  
+LaVy | 71.8 | 46.3 | 66.5 | 61.5  
+Table 2: Performance on in-the-wild benchmark
+
+##  5 Limitations
+
+Our model still have several limitations:
+
+  * •
+
+Although LaVy exhibits deep understanding in Vietnamese visual language tasks
+but still faces many challenges, for example: TextQA, due to lack of high-
+quality annotated data for these tasks.
+
+  * •
+
+Moreover, like other MLLMs, our model still suffers from hallucination where
+it generates irrelevant information, redundant details or misinformation.
+
+##  6 Conclusion
+
+In this paper, we have introduced LaVy, a pioneering state-of-the-art
+Vietnamese Multimodal Large Language Model (MLLM) that aims to address the
+lack of high-quality resources in multimodality for the Vietnamese language.
+LaVy represents a significant step forward in the development of Vietnamese
+MLLMs, enabling complex reasoning and linguistic comprehension in tasks that
+involve both visual and textual information.
+
+Furthermore, we have presented LaVy-Bench, a comprehensive benchmark designed
+specifically for evaluating the performance of MLLMs on Vietnamese visual
+language tasks. This benchmark provides a standardized platform for assessing
+the capabilities of Vietnamese MLLMs, facilitating the comparison and
+advancement of these models. Our model also have proved SOTA perfomance in
+comparison with mBLIP baselines in test sets of benchmark.
+
+As future work, we plan to expand the capabilities of LaVy by incorporate
+diverse instructions to entirely handle challenging tasks like Vietnamese OCR,
+Object Counting. We hope our work will contribute to the advancement of
+Vietnamese MLLMs’ development.
+
+![\[Uncaptioned image\]](extracted/5541435/images_official/019.jpg) |  Đây là nhân v.t lịch s\h Vi.t Nam n\hi ti´ng nào?   
+Nhân v.t lịch s\h Vi.t Nam n\hi ti´ng trong b´c \hanh là H` Chí Minh, ng`i
+sáng l.p và lãnh đạo Đ\hang C.ng s\han Vi.t Nam. Ông là m.t nhà cách mạng,
+chính trị gia và nhà lãnh đạo quân s., đóng vai trò quan trọng trong cu.c đ´u
+tranh giành đ.c l.p c\hua Vi.t Nam kh\hoi s. cai trị c\hua th.c dân Pháp. B´c
+\hanh cho th´y H` Chí Minh đang phát bi\hu tr´c đám đông, th\h hi.n s. \hung
+h. và \hanh h\hng c\hua ông đ´i v´i ng`i dân Vi.t Nam.  
+B´c \hanh có ý nghĩa nh th´ nào v´i lịch s\h Vi.t Nam?  
+B´c \hanh đen tr´ng này có ý nghĩa lịch s\h vì nó kh´c họa hình \hanh m.t ng`i
+đàn ông Vi.t Nam, có th\h là m.t nhà lãnh đạo, đang đ´ng tr´c m.t lá c` đ\ho.
+Lá c` đ\ho t.ng trng cho ch\hu nghĩa c.ng s\han và s. đoàn k´t c\hua ng`i dân
+Vi.t Nam. B´c \hanh có th\h đ.c chụp vào th`i đi\hm quan trọng trong lịch s\h
+Vi.t Nam, khi đ´t n´c đang tr\hai qua nh~ng thay đ\hi chính trị ho.c xã h.i.
+Hình \hanh ng`i đàn ông và lá c` đ\ho th\h hi.n s. đoàn k´t và quy´t tâm c\hua
+ng`i dân Vi.t Nam trong vi.c theo đu\hi m.t tng lai t´t đẹp hn. B´c \hanh này
+có th\h là m.t l`i nh´c nh\h v` nh~ng hy sinh và đ´u tranh mà ng`i dân Vi.t
+Nam đã tr\hai qua trong quá kh´, cũng nh nh~ng thành t.u và ti´n b. mà họ đã
+đạt đ.c.  
+  
+---|---  
+![\[Uncaptioned image\]](extracted/5541435/images_official/018.jpg) |  Các con v.t nào xu´t hi.n trong \hanh, và chúng đang làm gì   
+Trong \hanh có m.t con g´u, m.t con th\ho và m.t con mèo. Chúng đang ng`i
+quanh bàn ăn, cùng nhau th\hng th´c b~a ăn.  
+Vi´t m.t câu chuy.n c\h tích cho b´c \hanh trên.  
+Ngày x\ha ngày xa, trong m.t khu r`ng xanh ti, có m.t chú g´u, m.t chú mèo và
+m.t chú th\ho. Chúng là nh~ng ng`i bạn t´t, th`ng dành th`i gian bên nhau,
+cùng nhau khám phá khu r`ng và t.n h\hng v\he đẹp c\hua thiên nhiên. M.t ngày
+nọ, khi đang đi dạo, chúng tình c` g.p m.t chi´c bàn nh\ho b`ng g~, trên đó có
+m.t đĩa th´c ăn và m.t tách trà. Chúng r´t ngạc nhiên và tò mò, không bi´t ai
+đã đ.t nó \h đó. Chúng quy´t định ng`i xu´ng và cùng nhau th\hng th´c b~a ăn.
+Khi ăn, chúng trò chuy.n vui v\he, chia s\he nh~ng câu chuy.n và kinh nghi.m
+c\hua mình. Chúng r´t vui khi đ.c \h bên nhau và cùng nhau t.n h\hng kho\hanh
+kh´c này. Sau b~a ăn, chúng ti´p tục cu.c phiêu lu c\hua mình, khám phá khu
+r`ng và t.n h\hng tình bạn c\hua nhau. Và t` đó, chúng tr\h thành nh~ng ng`i
+bạn t´t nh´t, luôn \h bên nhau, b´t k\h khó khăn hay th\h thách nào x\hay ra.  
+![\[Uncaptioned image\]](extracted/5541435/images_official/004.jpg) |  B´c \hanh đ.c chụp \h s. ki.n nào?   
+B´c \hanh đ.c chụp tại l~ trao gi\hai FIFA World Cup, ni m.t c`u th\hu bóng đá
+đang c`m chi´c cúp vàng.  
+Bạn có bi´t tên c\hua ng`i đàn ông trong b´c \hanh là gì?  
+Đúng v.y, ng`i đàn ông trong b´c \hanh là Lionel Messi.  
+Miêu t\ha c\ham xúc c\hua ng`i đàn ông trong b´c hình  
+Ng`i đàn ông trong b´c hình đang th\h hi.n c\ham xúc vui m`ng và t. hào. Anh
+ta đang c`m chi´c cúp vàng, bi\hu t.ng c\hua chi´n th´ng và thành tích. Nụ c`i
+c\hua anh ´y cho th´y anh ´y r´t hạnh phúc và t. hào v` thành tích c\hua mình.
+Kho\hanh kh´c này ghi lại ni`m vui và s. hài lòng c\hua ng`i đàn ông khi đạt
+đ.c mục tiêu ho.c thành t.u đáng k\h.  
+![\[Uncaptioned image\]](extracted/5541435/images_official/006.jpg) |  Bạn có bi´t ai vẽ b´c tranh này không   
+B´c tranh này đ.c vẽ b\hi Leonardo da Vinci, m.t họa sĩ n\hi ti´ng ng`i Ý th`i
+Phục hng. B´c tranh n\hi ti´ng này, có tên là M̈ona Lisa,̈ đ.c vẽ vào kho\hang
+năm 1503 đ´n 1506 và hi.n đang đ.c trng bày tại B\hao tàng Louvre \h Paris,
+Pháp. B´c tranh kh´c họa m.t ng`i phụ n~ v´i nụ c`i bí \hn, đ.c cho là t. họa
+ho.c chân dung c\hua Lisa Gherardini, v. c\hua thng gia Florentine Francesco
+del Giocondo. B´c tranh đ.c đánh giá cao v` kỹ thu.t h.i họa, s. chú ý đ´n
+t`ng chi ti´t và bi\hu c\ham đ.c đáo c\hua ng`i phụ n~.  
+Th\hao lu.n v` tác đ.ng lịch s\h và ý nghĩa c\hua b´c tranh này trong th´ gi´i
+ngh. thu.t.  
+B´c tranh Mona Lisa c\hua Leonardo da Vinci là m.t ki.t tác ngh. thu.t có
+\hanh h\hng l´n đ´n th´ gi´i ngh. thu.t. B´c tranh đ.c vẽ vào th´ k\hy 16,
+th`i kỳ Phục hng, đánh d´u s. phát tri\hn c\hua ngh. thu.t và s. ra đ`i c\hua
+các kỹ thu.t m´i nh ph´i c\hanh và chiaroscuro. B´c tranh đã tr\h thành bi\hu
+t.ng c\hua ngh. thu.t Phục hng và là m.t trong nh~ng tác ph\hm ngh. thu.t đ.c
+công nh.n và yêu thích nh´t trên th´ gi´i. B´c tranh Mona Lisa đ.c bi´t đ´n
+v´i nụ c`i bí \hn, đã khi d.y s. tò mò và tranh lu.n c\hua các nhà s\h học,
+nhà phê bình ngh. thu.t và công chúng trong nhi`u th´ k\hy. B´c tranh cũng đã
+truy`n c\ham h´ng cho vô s´ tác ph\hm ngh. thu.t, văn học và phim \hanh,
+c\hung c´ vị th´ c\hua nó nh m.t bi\hu t.ng văn hóa. Ngoài ra, b´c tranh Mona
+Lisa còn có ý nghĩa lịch s\h vì nó đ.c coi là m.t trong nh~ng tác ph\hm ngh.
+thu.t có giá trị nh´t trên th´ gi´i, v´i giá trị ´c tính lên t´i hàng trăm
+tri.u đô la. B´c tranh đã đ.c trng bày tại nhi`u b\hao tàng và phòng trng bày
+trên th´ gi´i, thu hút hàng tri.u du khách m~i năm, tr\h thành m.t ph`n không
+th\h thi´u trong di s\han văn hóa c\hua nhân loại.  
+  
+![\[Uncaptioned image\]](extracted/5541435/images_official/024.jpg) |  B´c \hanh ph\han ánh v´n đ` xã h.i gì? Có nh~ng gi\hai pháp nào đ\h gi\hai quy´t v´n đ` này?   
+B´c \hanh cho th´y m.t con ph´ đông đúc v´i nhi`u ng`i đi b. và phng ti.n giao
+thông, bao g`m ô tô, xe buýt và xe máy. Tình trạng t´c nghẽn này có th\h gây
+ra nhi`u v´n đ` xã h.i nh ô nhi~m không khí, ti´ng `n, ch.m tr~ giao thông và
+nguy c tai nạn cao hn. Đ\h gi\hai quy´t v´n đ` này, có th\h áp dụng nhi`u
+gi\hai pháp. M.t gi\hai pháp là khuy´n khích s\h dụng phng ti.n giao thông
+công c.ng nh xe buýt, giúp gi\ham s´ l.ng xe cá nhân trên đ`ng. Ngoài ra,
+thành ph´ có th\h đ`u t vào c s\h hạ t`ng dành cho ng`i đi b. nh v\hia hè và
+l´i đi dành cho ng`i đi b. đ\h khuy´n khích đi b. và gi\ham s. phụ thu.c vào
+phng ti.n giao thông. Hn n~a, các chi´n dịch nâng cao nh.n th´c có th\h đ.c
+tri\hn khai đ\h thúc đ\hy các phng th´c giao thông thân thi.n v´i môi tr`ng nh
+đi xe đạp ho.c đi chung xe. Cu´i cùng, vi.c th.c hi.n các quy định giao thông
+nghiêm ng.t hn và c\hai thi.n qu\han lý giao thông có th\h giúp gi\ham ùn t´c
+và c\hai thi.n ch´t l.ng cu.c s´ng cho ng`i dân thành ph´.  
+Table 3:  Qualitative test cases of LaVy. In-the-wild images and questions are
+varied in image type, topic, culture…
+
+## References
+
+  * Achiam et al. (2023) Achiam, Josh, Adler, Steven, Agarwal, Sandhini, Ahmad, Lama, Akkaya, Ilge, Aleman, Florencia Leoni, Almeida, Diogo, Altenschmidt, Janko, Altman, Sam, Anadkat, Shyamal, et al. 2023.  Gpt-4 technical report.  _arXiv preprint arXiv:2303.08774_. 
+  * Alayrac et al. (2022) Alayrac, Jean-Baptiste, Donahue, Jeff, Luc, Pauline, Miech, Antoine, Barr, Iain, Hasson, Yana, Lenc, Karel, Mensch, Arthur, Millican, Katherine, Reynolds, Malcolm, et al. 2022.  Flamingo: a visual language model for few-shot learning.  _Advances in Neural Information Processing Systems_ , 35:23716–23736. 
+  * Alwajih et al. (2024) Fakhraddin Alwajih, El Moatez Billah Nagoudi, Gagan Bhatia, Abdelrahman Mohamed, and Muhammad Abdul-Mageed. 2024.  Peacock: A family of arabic multimodal large language models and benchmarks.  _arXiv preprint arXiv:2403.01031_. 
+  * Anil et al. (2023) Rohan Anil, Sebastian Borgeaud, Jean-Baptiste Alayrac, Jiahui Yu, Radu Soricut, Johan Schalkwyk, Andrew M. Dai, Anja Hauth, Katie Millican, David Silver, Melvin Johnson, Ioannis Antonoglou, Julian Schrittwieser, Amelia Glaese, Jilin Chen, Emily Pitler, et al. 2023.  Gemini: a family of highly capable multimodal models.  _arXiv preprint arXiv:2312.11805_. 
+  * Geigle et al. (2023) Gregor Geigle, Abhay Jain, Radu Timofte, and Goran Glavaš. 2023.  mblip: Efficient bootstrapping of multilingual vision-llms.  _arXiv preprint arXiv:2307.06930_. 
+  * He et al. (2024) Muyang He, Yexin Liu, Boya Wu, Jianhao Yuan, Yueze Wang, Tiejun Huang, and Bo Zhao. 2024.  Efficient multimodal learning from data-centric perspective.  _arXiv preprint arXiv:2402.11530_. 
+  * Jiang et al. (2023) Albert Q. Jiang, Alexandre Sablayrolles, Arthur Mensch, Chris Bamford, Devendra Singh Chaplot, Diego de las Casas, Florian Bressand, Gianna Lengyel, Guillaume Lample, Lucile Saulnier, Lélio Renard Lavaud, Marie-Anne Lachaux, Pierre Stock, Teven Le Scao, Thibaut Lavril, Thomas Wang, Timothée Lacroix, and William El Sayed. 2023.  Mistral 7b.  _arXiv preprint arXiv:2310.06825_. 
+  * Li et al. (2023) Li, Junnan, Li, Dongxu, Savarese, Silvio, Hoi, and Steven. 2023.  BLIP-2: Bootstrapping language-image pre-training with frozen image encoders and large language models.  In _Proceedings of the 40th International Conference on Machine Learning_ , volume 202 of _Proceedings of Machine Learning Research_ , pages 19730–19742. PMLR. 
+  * Lin and Chen (2023) Yen-Ting Lin and Yun-Nung Chen. 2023.  Llm-eval: Unified multi-dimensional automatic evaluation for open-domain conversations with large language models.  _arXiv preprint arXiv:2305.13711_. 
+  * Liu et al. (2023) Haotian Liu, Chunyuan Li, Qingyang Wu, and Yong Jae Lee. 2023.  Visual instruction tuning.  In _Thirty-seventh Conference on Neural Information Processing Systems_. 
+  * Mesnard et al. (2024) Thomas Mesnard, Cassidy Hardin, Robert Dadashi, Surya Bhupatiraju, Shreya Pathak, Laurent Sifre, Morgane Rivière, Mihir Sanjay Kale, Juliette Love, Pouya Tafti, Léonard Hussenot, Aakanksha Chowdhery, Adam Roberts, Aditya Barua, Alex Botev, Alex Castro-Ros, Ambrose Slone, Amélie Héliou, Andrea Tacchetti, Anna Bulanova, Antonia Paterson, Beth Tsai, Bobak Shahriari, Charline Le Lan, Christopher A. Choquette-Choo, Clément Crepy, Daniel Cer, Daphne Ippolito, David Reid, Elena Buchatskaya, Eric Ni, Eric Noland, Geng Yan, George Tucker, George-Christian Muraru, Grigory Rozhdestvenskiy, Henryk Michalewski, Ian Tenney, Ivan Grishchenko, Jacob Austin, James Keeling, Jane Labanowski, Jean-Baptiste Lespiau, Jeff Stanway, Jenny Brennan, Jeremy Chen, Johan Ferret, Justin Chiu, Justin Mao-Jones, Katherine Lee, Kathy Yu, Katie Millican, Lars Lowe Sjoesund, Lisa Lee, Lucas Dixon, Machel Reid, Maciej Mikuła, Mateo Wirth, Michael Sharman, Nikolai Chinaev, Nithum Thain, Olivier Bachem, Oscar Chang, Oscar Wahltinez, Paige Bailey, Paul Michel, Petko Yotov, Pier Giuseppe Sessa, Rahma Chaabouni, Ramona Comanescu, Reena Jana, Rohan Anil, Ross McIlroy, Ruibo Liu, Ryan Mullins, Samuel L Smith, Sebastian Borgeaud, Sertan Girgin, Sholto Douglas, Shree Pandya, Siamak Shakeri, Soham De, Ted Klimenko, Tom Hennigan, Vlad Feinberg, Wojciech Stokowiec, Yu hui Chen, Zafarali Ahmed, Zhitao Gong, Tris Warkentin, Ludovic Peran, Minh Giang, Clément Farabet, Oriol Vinyals, Jeff Dean, Koray Kavukcuoglu, Demis Hassabis, Zoubin Ghahramani, Douglas Eck, Joelle Barral, Fernando Pereira, Eli Collins, Armand Joulin, Noah Fiedel, Evan Senter, Alek Andreev, and Kathleen Kenealy. 2024.  Gemma: Open models based on gemini research and technology.  _arXiv preprint arXiv:2403.08295_. 
+  * Nguyen et al. (2023a) Chien Van Nguyen, Thuat Nguyen, Quan Nguyen, Huy Nguyen, Björn Plüster, Nam Pham, Huu Nguyen, Patrick Schramowski, and Thien Nguyen. 2023a.  Vistral-7b-chat - towards a state-of-the-art large language model for vietnamese. 
+  * Nguyen et al. (2023b) Dat Quoc Nguyen, Linh The Nguyen, Chi Tran, Dung Ngoc Nguyen, Dinh Phung, and Hung Bui. 2023b.  Phogpt: Generative pre-training for vietnamese.  _arXiv preprint arXiv:2311.02945_. 
+  * Nguyen et al. (2023c) Nghia Hieu Nguyen, Duong T.D. Vo, Kiet Van Nguyen, and Ngan Luu-Thuy Nguyen. 2023c.  Openvivqa: Task and dataset and and multimodal fusion models for visual question answering in vietnamese.  _arXiv preprint arXiv:2305.04183_. 
+  * Nguyen et al. (2022) Thien Hai Nguyen, Tuan-Duy H. Nguyen, Duy Phung, Duy Tran-Cong Nguyen, Hieu Minh Tran, Manh Luong, Tin Duy Vo, Hung Hai Bui, Dinh Phung, and Dat Quoc Nguyen. 2022.  A Vietnamese-English Neural Machine Translation System.  In _Proceedings of the 23rd Annual Conference of the International Speech Communication Association: Show and Tell (INTERSPEECH)_. 
+  * Papineni et al. (2002) Kishore Papineni, Salim Roukos, Todd Ward, , and Wei-Jing Zhu. 2002.  Bleu: a method for automatic evaluation of machine translation.  In _Proceedings of the 40th Annual Meeting of the Associations for Computational Linguistics (ACL)_. 
+  * Radford et al. (2023) Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya Ramesh, Gabriel Goh, Sandhini Agarwal, Girish Sastry, Amanda Askell, Pamela Mishkin, Jack Clark, Gretchen Krueger, and Ilya Sutskever. 2023.  Learning transferable visual models from natural language supervision.  _arXiv preprint arXiv:2103.00020_. 
+  * Touvron et al. (2023a) Touvron, Hugo, Lavril, Thibaut, Izacard, Gautier, Martinet, Xavier, Lachaux, Marie-Anne, Lacroix, Timothée, Rozière, Baptiste, Goyal, Naman, Hambro, Eric, Azhar, Faisal, et al. 2023a.  Llama: Open and efficient foundation language models.  _arXiv preprint arXiv:2302.13971_. 
+  * Touvron et al. (2023b) Touvron, Hugo, Martin, Louis, Stone, Kevin, Albert, Peter, Almahairi, Amjad, Babaei, Yasmine, Bashlykov, Nikolay, Batra, Soumya, Bhargava, Prajjwal, Bhosale, Shruti, et al. 2023b.  Llama 2: Open foundation and fine-tuned chat models.  _arXiv preprint arXiv:2307.09288_. 
+  * Vaswani et al. (2017) Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N. Gomez, Łukasz Kaiser, and Illia Polosukhin. 2017.  Attention is all you need.  In _Advances in Neural Information Processing Systems 30 (NIPS 2017)_. 
+  * Zheng et al. (2023) Lianmin Zheng, Wei-Lin Chiang, Ying Sheng, Siyuan Zhuang, Zhanghao Wu, Yonghao Zhuang, Zi Lin, Zhuohan Li, Dacheng Li, Eric P. Xing, Hao Zhang, Joseph E. Gonzalez, and Ion Stoica. 2023.  Judging llm-as-a-judge with mt-bench and chatbot arena.  _arXiv preprint arXiv:2306.05685_. 
+  * Zhu et al. (2024) Deyao Zhu, Jun Chen, Xiaoqian Shen, Xiang Li, and Mohamed Elhoseiny. 2024.  MiniGPT-4: Enhancing vision-language understanding with advanced large language models.  In _The Twelfth International Conference on Learning Representations_. 

@@ -1,0 +1,1219 @@
+  1. OmniSSR: Zero-shot Omnidirectional Image Super-Resolution using Stable Diffusion Model
+    1. 1 Introduction
+    2. 2 Related Work
+      1. 2.1 Single Image Super-Resolution (SISR)
+      2. 2.2 Omnidirectional Image Super-Resolution
+    3. 3 Method
+      1. 3.1 Preliminaries
+        1. 3.1.1 ERPâ†”â†”\leftrightarrowâ†”TP Transformation
+        2. 3.1.2 Iterative Denoising for Super-Resolution
+      2. 3.2 Overview
+      3. 3.3 Octadecaplex Tangent Information Interaction (OTII)
+        1. 3.3.1 Motivation
+        2. 3.3.2 Information Interaction and Pre-upsampling
+      4. 3.4 Gradient Decomposition (GD) Correction for Fidelity
+    4. 4 Experiments
+      1. 4.1 Implementation Details
+        1. 4.1.1 Datasets and Pretrained Models
+        2. 4.1.2 Settings
+      2. 4.2 Comparison of OmniSSR with diffusion-based methods
+      3. 4.3 Comparison with end-to-end supervised methods
+      4. 4.4 Ablation Studies
+    5. 5 Limitation and Discussion
+    6. 6 Conclusion
+    7. 0.A Extra Experiments
+      1. 0.A.1 Ablation Studies
+        1. 0.A.1.1 Ablation study of Î³ğ›¾\gammaitalic_Î³ on Gradient Decomposition (GD) correction
+        2. 0.A.1.2 Ablation study of SR backbone
+      2. 0.A.2 Further Exploration of ERPâ†”â†”\leftrightarrowâ†”TP Transformation
+      3. 0.A.3 Exploration of SD Encoder and Decoder
+      4. 0.A.4 The Global Continuity of ODIs
+      5. 0.A.5 Time Consumption
+    8. 0.B Theoretical Discussion
+
+HTML conversions sometimes display errors due to content that did not convert
+correctly from the source. This paper uses the following packages that are not
+yet supported by the HTML conversion tool. Feedback on these issues are not
+necessary; they are known and are being worked on.
+
+  * failed: axessibility
+
+Authors: achieve the best HTML results from your LaTeX submissions by
+following these best practices.
+
+License: arXiv.org perpetual non-exclusive license
+
+arXiv:2404.10312v2 [cs.CV] 17 Apr 2024
+
+11institutetext: School of Electronic and Computer Engineering, Peking
+University
+
+# OmniSSR: Zero-shot Omnidirectional Image Super-Resolution using Stable
+Diffusion Model
+
+Runyi Liâ€ â€ {}^{\kern 0.5pt\dagger}start_FLOATSUPERSCRIPT â€
+end_FLOATSUPERSCRIPT â€ƒâ€ƒ Xuhan Shengâ€ â€ {}^{\kern
+0.5pt\dagger}start_FLOATSUPERSCRIPT â€ end_FLOATSUPERSCRIPT â€ƒâ€ƒ Weiqi Li
+â€ƒâ€ƒ Jian Zhang âœ‰âœ‰
+
+###### Abstract
+
+Omnidirectional images (ODIs) are commonly used in real-world visual tasks,
+and high-resolution ODIs help improve the performance of related visual tasks.
+Most existing super-resolution methods for ODIs use end-to-end learning
+strategies, resulting in inferior realness of generated images and a lack of
+effective out-of-domain generalization capabilities in training methods. Image
+generation methods represented by diffusion model provide strong priors for
+visual tasks and have been proven to be effectively applied to image
+restoration tasks. Leveraging the image priors of the Stable Diffusion (SD)
+model, we achieve omnidirectional image super-resolution with both fidelity
+and realness, dubbed as OmniSSR. Firstly, we transform the equirectangular
+projection (ERP) images into tangent projection (TP) images, whose
+distribution approximates the planar image domain. Then, we use SD to
+iteratively sample initial high-resolution results. At each denoising
+iteration, we further correct and update the initial results using the
+proposed Octadecaplex Tangent Information Interaction (OTII) and Gradient
+Decomposition (GD) technique to ensure better consistency. Finally, the TP
+images are transformed back to obtain the final high-resolution results. Our
+method is zero-shot, requiring no training or fine-tuning. Experiments of our
+method on two benchmark datasets demonstrate the effectiveness of our proposed
+method.
+
+###### Keywords:
+
+Omnidirectional Imaging Super-Resolution Latent Diffusion Model
+
+â€ â€ â€ â€ \daggerâ€  means equal contribution.â€ â€ âœ‰ means corresponding
+author.
+
+##  1 Introduction
+
+Omnidirectional images (ODIs) capture the entire scene in all directions,
+exceeding the narrow field of view (FOV) offered by planar images. Super-
+Resolution (SR) techniques enhance the visual quality of ODIs by increasing
+their resolution, thereby revealing finer details and enabling more accurate
+scene analysis and interpretation. This becomes particularly crucial in
+applications like virtual reality and surveillance, where high-resolution ODIs
+are essential for precise perception and decision-making.
+
+Current research in omnidirectional image super-resolution (ODISR) explores
+various methodologies to enhance the resolution of ODIsÂ [38, 15]. SphereSRÂ
+[60] addresses non-uniformity in different projections by learning upsampling
+processes and ensuring information consistency using LIIFÂ [5]. OSRTÂ [61]
+designs a distortion-aware Transformer to modulate equirectangular projection
+(ERP) distortions continuously and self-adaptively. Without a cumbersome
+process, OSRT outperforms previous methods remarkably. However, existing ODISR
+methods face the following challenges: (1) The majority are end-to-end models
+that can only produce a deterministic output, always better data fidelity but
+worse visual perception qualityÂ [18]. Itâ€™s promising to develop a
+generation-based model, but requiring high data demands, yet high-resolution
+ODIs are high cost to collectÂ [56, 57]. (2) Most methods directly perform SR
+on ERP format ODIs, while users usually watch ODIs in a narrow FOV using
+tangent projection (TP). So another promising direction is to use off-the-
+shelf planar models on TP images. Recent times have witnessed the introduction
+and widespread application of diffusion modelsÂ [24, 45], especially Stable
+Diffusion (SD)Â [40], which have provided a robust backbone for visual tasksÂ
+[25, 58, 62, 22], including SRÂ [53, 49, 42, 32, 54, 63]. However, if TP
+images are trivially one-by-one processed using diffusion-based SR models,
+they will exhibit discrepancies in the overlapping region when re-projected
+onto the ERP image. As a result, the global continuity is compromised.
+
+Leveraging the strong image prior provided by SD, we propose the first
+diffusion-based zero-shot method for ODISR, named OmniSSR. Specifically, we
+propose Octadecaplex Tangent Information Interaction (OTII). OTII entails
+iterative conversion of intermediate SR results between ERP and TP
+representations, bridging the domain gap between ODIs and planar images.
+Building upon OTII, we further employ an approximate analytical solution of
+gradient descent, namely as Gradient Decomposition, to guide high-fidelity,
+high-quality omnidirectional image super-resolution. By capitalizing on SDâ€™s
+effective image prior, our approach strikes a balance between fidelity and
+realness, ensuring that the restored ODIs exhibit both fidelity to the input
+data and realistic visual details. This method shows potential for advancing
+the current state of ODISR, providing improved resolution and visual quality
+across various applications. Fig.Â 1 showcases results fully demonstrating the
+superiority and performance of our proposed methods.
+
+![Refer to caption](x1.png) Figure 1: We address omnidirectional image super-
+resolution in a zero-shot manner via OmniSSR. Presented above are select
+outcomes that sketch the essence of OmniSSR compared with current state-of-
+the-art approach OSRTÂ [61]. Part (a) and (b) illustrate that OmniSSR upholds
+fidelity and visual realness at the same time, providing vivid and realistic
+details, while OSRT outputs over-smoothed and distorted results. Zoom in for
+more details.
+
+Our main contributions are summarized as follows:
+
+  * â€¢
+
+We propose OmniSSR, the first zero-shot ODISR method, using an off-the-shelf
+diffusion-based model, requiring no training or fine-tuning, leveraging
+existing image generation model priors to solve ODISR task.
+
+  * â€¢
+
+To bridge the domain gap between ODIs and planar images, we introduce
+Octadecaplex Tangent Information Interaction by repeatedly transforming ODIs
+between ERP format and TP format, enabling ODISR task with pretrained
+diffusion models on planar images.
+
+  * â€¢
+
+By iteratively updating images using the developed Gradient Decomposition
+technique, we introduce consistency constraints into the sampling process of
+the latent diffusion model, ensuring a trade-off between fidelity and realness
+in the reconstructed results.
+
+  * â€¢
+
+Extensive experiments are conducted on the benchmark datasets, demonstrating
+the superior performance of our method over existing state-of-the-art
+approaches, which validate the effectiveness of OmniSSR.
+
+##  2 Related Work
+
+###  2.1 Single Image Super-Resolution (SISR)
+
+Image super-resolution methods based on deep learning have undergone
+significant development over an extended period. Currently, they can be
+broadly classified into two categories of solutions. The first category
+involves end-to-end network training methods, which utilize image pairs
+consisting of low-resolution degraded images and high-resolution ground truth
+images for network trainingÂ [8, 6, 64, 34, 33, 29, 67, 7]. The network
+architectures employed in this category include CNNÂ [17], TransformersÂ [48],
+etc. The second category employs image generation models as priors, such as
+GANÂ [21], diffusion modelsÂ [24, 45], etc., where low-resolution images are
+used as conditions to generate high-resolution images. We will mainly
+introduce the methods using generative prior.
+
+Single Image SR using GAN prior In SR works utilizing GAN priorsÂ [35, 13, 39,
+4, 59], including real-world senariosÂ [52, 51, 8, 66], pre-trained GAN
+networks are employed to transform image features into latent space, where the
+corresponding latent code for the high-resolution image is searched,
+ultimately yielding the reconstructed high-resolution result.
+
+Single Image SR using diffusion prior The diffusion model provides a powerful
+image prior, and the diffusion sampling process can generate highly realistic
+images. This strong prior distribution can be applied to various image
+restoration tasks, including super-resolutionÂ [53, 9, 10, 44, 20, 42]. Image-
+domain diffusion models directly provide prior distributions of image-domain
+data. DDNMÂ [53] based on the mathematical method of Range-Nullspace
+Decomposition, iteratively refines content on the zero space, combining image
+prior content in the value domain to achieve image restoration. DDRMÂ [26]
+uses SVD decomposition to obtain restoration results, which is similar to
+DDNM. DPSÂ [9] transforms the image super-resolution problem into an
+optimization problem with consistency constraints, using gradient descent
+algorithms to guide the generation of image-domain diffusion models. GDPÂ [20]
+further uses such gradient to update the degradation operator to tackle blind
+image inverse problems. Other methods including MCGÂ [10], DDS[9] and unified
+control of diffusion generationÂ [44, 20] use same strategy for image
+restoration, especially image super-resolution.
+
+The latent space diffusion model encodes data from various modalities into a
+latent space, samples its distribution, and then decodes it into the target
+domain. Image super-resolution works based on latent space domain include
+PSLDÂ [41], P2LÂ [11] and TextRegÂ [28]. PSLD transfers the gradient-guided
+method of DPSÂ [9] to the latent space diffusion model, while P2L furthermore
+considers prompt design, iteratively optimizing the prompt embedding of SD to
+improve the quality and visual effects of image reconstruction. TextReg
+applies the textual description of the preconception of the solution of the
+image inverse problem during the reverse sampling phase, of which the
+description is dynamically reinforced through null-text optimization for
+adaptive negation.
+
+###  2.2 Omnidirectional Image Super-Resolution
+
+Omnidirectional image super-resolution (ODISR) aims to enhance the resolution
+of omnidirectional or 360-degree images, which are commonly captured by
+cameras with a wide field of view. This field has garnered increasing
+attention due to its applications in virtual reality, omnidirectional video
+streaming, and surveillance. Several approaches have been proposed to address
+the unique challenges of ODISRÂ [2, 46, 37, 3, 1]. For instance, KÃ¤mÃ¤rÃ¤inen
+et al.Â [19] propose a deep learning-based approach for omnidirectional super-
+resolution, leveraging convolutional neural networks to effectively upscale
+low-resolution omnidirectional images while preserving spatial details.
+Similarly, Smolic et al.Â [38] introduce a novel omnidirectional super-
+resolution algorithm utilizing generative adversarial networks (GANs) to
+enhance the visual quality of omnidirectional images by hallucinating high-
+frequency details.
+
+For evaluation purposes, researchers commonly utilize datasets such as the
+ODI-SR dataset from LAU-NetÂ [14], and SUN 360 Panorama datasetÂ [55]. These
+datasets enable the quantitative assessment of ODISR algorithms across various
+scenarios and facilitate fair comparisons between different methods.
+
+##  3 Method
+
+In this section, we first briefly introduce the preliminary background of our
+method (Sec.Â 3.1), and give an overall view of our proposed OmniSSR (Sec.Â
+3.2). Then, we discuss the designs of Octadecaplex Tangent Information
+Interaction, which transform ODIs between ERP and TP formats with pre-
+upsampling strategy (SecÂ 3.3), and the Gradient Decomposition correction
+(Sec.Â 3.4).
+
+###  3.1 Preliminaries
+
+####  3.1.1 ERPâ†”â†”\leftrightarrowâ†”TP Transformation
+
+The essence of projection transformations between ERP and TP lie in
+determining the positions of target image pixels within the source image and
+computing their corresponding pixel values using interpolation algorithms, as
+digital images are always stored discretelyÂ [30]. Therefore, the
+ERPâ†’â†’\rightarrowâ†’TP transformation involves locating the TP image pixels
+on the ERP imaging plane, and vice versa. Gnomonic projectionÂ [12] provides
+the correspondence between ERP image pixels and TP image pixels.
+
+For a pixel
+Peâ¢(xe,ye)subscriptğ‘ƒğ‘’subscriptğ‘¥ğ‘’subscriptğ‘¦ğ‘’P_{e}(x_{e},y_{e})italic_P
+start_POSTSUBSCRIPT italic_e end_POSTSUBSCRIPT ( italic_x start_POSTSUBSCRIPT
+italic_e end_POSTSUBSCRIPT , italic_y start_POSTSUBSCRIPT italic_e
+end_POSTSUBSCRIPT ) within the ERP image, we first find its corresponding
+pixel Psâ¢(Î¸,Ï•)subscriptğ‘ƒğ‘ ğœƒitalic-Ï•P_{s}(\theta,\phi)italic_P
+start_POSTSUBSCRIPT italic_s end_POSTSUBSCRIPT ( italic_Î¸ , italic_Ï• ) on
+the unit sphere using Eq.Â 1:
+
+| Î¸=2â¢Ï€â¢xe/W,Ï•=Ï€â¢ye/H,formulae-sequenceğœƒ2ğœ‹subscriptğ‘¥ğ‘’ğ‘Šitalic-Ï•ğœ‹subscriptğ‘¦ğ‘’ğ»\theta=2\pi x_{e}/W,\;\phi=\pi y_{e}/H,italic_Î¸ = 2 italic_Ï€ italic_x start_POSTSUBSCRIPT italic_e end_POSTSUBSCRIPT / italic_W , italic_Ï• = italic_Ï€ italic_y start_POSTSUBSCRIPT italic_e end_POSTSUBSCRIPT / italic_H , |  | (1)  
+---|---|---|---  
+  
+where Hğ»Hitalic_H and Wğ‘ŠWitalic_W are the height and width of the ERP
+image. The Cartesian coordinates of the ERP image and the angular coordinates
+on the unit sphere exhibit a straightforward one-to-one linear relationship,
+suggesting a conceptual equivalence between these two projection formats.
+
+Given the spherical coordinates of the tangent plane center
+(Î¸c,Ï•c)subscriptğœƒğ‘subscriptitalic-Ï•ğ‘(\theta_{c},\phi_{c})( italic_Î¸
+start_POSTSUBSCRIPT italic_c end_POSTSUBSCRIPT , italic_Ï• start_POSTSUBSCRIPT
+italic_c end_POSTSUBSCRIPT ), The transformation from
+Psâ¢(Î¸,Ï•)subscriptğ‘ƒğ‘ ğœƒitalic-Ï•P_{s}(\theta,\phi)italic_P
+start_POSTSUBSCRIPT italic_s end_POSTSUBSCRIPT ( italic_Î¸ , italic_Ï• ) to
+Ptâ¢(xt,yt)subscriptğ‘ƒğ‘¡subscriptğ‘¥ğ‘¡subscriptğ‘¦ğ‘¡P_{t}(x_{t},y_{t})italic_P
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ( italic_x start_POSTSUBSCRIPT
+italic_t end_POSTSUBSCRIPT , italic_y start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT ), i.e. ERPâ†’â†’\rightarrowâ†’TP, is defined as:
+
+|  | xt=(cosâ¡(Ï•)â¢sinâ¡(Î¸âˆ’Î¸c))/Î¶,subscriptğ‘¥ğ‘¡italic-Ï•ğœƒsubscriptğœƒğ‘ğœ\displaystyle x_{t}=\big{(}\cos(\phi)\sin(\theta-\theta_{c})\big{)}\big{/}\zeta,italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT = ( roman_cos ( italic_Ï• ) roman_sin ( italic_Î¸ - italic_Î¸ start_POSTSUBSCRIPT italic_c end_POSTSUBSCRIPT ) ) / italic_Î¶ , |  | (2)  
+---|---|---|---|---  
+|  | yt=(cosâ¡(Ï•c)â¢sinâ¡(Ï•)âˆ’sinâ¡(Ï•c)â¢cosâ¡(Ï•)â¢cosâ¡(Î¸âˆ’Î¸c))/Î¶,subscriptğ‘¦ğ‘¡subscriptitalic-Ï•ğ‘italic-Ï•subscriptitalic-Ï•ğ‘italic-Ï•ğœƒsubscriptğœƒğ‘ğœ\displaystyle y_{t}=\big{(}\cos(\phi_{c})\sin(\phi)-\sin(\phi_{c})\cos(\phi)% \cos(\theta-\theta_{c})\big{)}\big{/}\zeta,italic_y start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT = ( roman_cos ( italic_Ï• start_POSTSUBSCRIPT italic_c end_POSTSUBSCRIPT ) roman_sin ( italic_Ï• ) - roman_sin ( italic_Ï• start_POSTSUBSCRIPT italic_c end_POSTSUBSCRIPT ) roman_cos ( italic_Ï• ) roman_cos ( italic_Î¸ - italic_Î¸ start_POSTSUBSCRIPT italic_c end_POSTSUBSCRIPT ) ) / italic_Î¶ , |   
+  
+where
+Î¶=sinâ¡(Ï•c)â¢sinâ¡(Ï•)+cosâ¡(Ï•c)â¢cosâ¡(Ï•)â¢cosâ¡(Î¸âˆ’Î¸c)ğœsubscriptitalic-Ï•ğ‘italic-Ï•subscriptitalic-Ï•ğ‘italic-Ï•ğœƒsubscriptğœƒğ‘\zeta=\sin(\phi_{c})\sin(\phi)+\cos(\phi_{c})\cos(\phi)\cos(\theta-\theta_{c})italic_Î¶
+= roman_sin ( italic_Ï• start_POSTSUBSCRIPT italic_c end_POSTSUBSCRIPT )
+roman_sin ( italic_Ï• ) + roman_cos ( italic_Ï• start_POSTSUBSCRIPT italic_c
+end_POSTSUBSCRIPT ) roman_cos ( italic_Ï• ) roman_cos ( italic_Î¸ - italic_Î¸
+start_POSTSUBSCRIPT italic_c end_POSTSUBSCRIPT ).
+
+The corresponding inverse transformation, i.e. TPâ†’â†’\rightarrowâ†’ERP, is:
+
+|  | Î¸=Î¸c+arctanâ¡((xtâ¢sinâ¡(c))/(Ïâ¢cosâ¡(Ï•1)â¢cosâ¡(c)âˆ’ytâ¢sinâ¡(Ï•c)â¢sinâ¡(c))),ğœƒsubscriptğœƒğ‘subscriptğ‘¥ğ‘¡ğ‘ğœŒsubscriptitalic-Ï•1ğ‘subscriptğ‘¦ğ‘¡subscriptitalic-Ï•ğ‘ğ‘\displaystyle\theta=\theta_{c}+\arctan\big{(}(x_{t}\sin(c))/(\rho\cos(\phi_{1}% )\cos(c)-y_{t}\sin(\phi_{c})\sin(c))\big{)},italic_Î¸ = italic_Î¸ start_POSTSUBSCRIPT italic_c end_POSTSUBSCRIPT + roman_arctan ( ( italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT roman_sin ( italic_c ) ) / ( italic_Ï roman_cos ( italic_Ï• start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT ) roman_cos ( italic_c ) - italic_y start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT roman_sin ( italic_Ï• start_POSTSUBSCRIPT italic_c end_POSTSUBSCRIPT ) roman_sin ( italic_c ) ) ) , |  | (3)  
+---|---|---|---|---  
+|  | Ï•=arcsinâ¡(cosâ¡(c)â¢sinâ¡(Ï•c)+ytâ¢sinâ¡(c)â¢cosâ¡(Ï•c)/Ï),italic-Ï•ğ‘subscriptitalic-Ï•ğ‘subscriptğ‘¦ğ‘¡ğ‘subscriptitalic-Ï•ğ‘ğœŒ\displaystyle\phi=\arcsin\big{(}\cos(c)\sin(\phi_{c})+y_{t}\sin(c)\cos(\phi_{c% })/\rho\big{)},italic_Ï• = roman_arcsin ( roman_cos ( italic_c ) roman_sin ( italic_Ï• start_POSTSUBSCRIPT italic_c end_POSTSUBSCRIPT ) + italic_y start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT roman_sin ( italic_c ) roman_cos ( italic_Ï• start_POSTSUBSCRIPT italic_c end_POSTSUBSCRIPT ) / italic_Ï ) , |   
+  
+where
+Ï=xt2+yt2ğœŒsuperscriptsubscriptğ‘¥ğ‘¡2superscriptsubscriptğ‘¦ğ‘¡2\rho=\sqrt{x_{t}^{2}+y_{t}^{2}}italic_Ï
+= square-root start_ARG italic_x start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT + italic_y
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT 2
+end_POSTSUPERSCRIPT end_ARG and c=arctanâ¡(Ï)ğ‘ğœŒc=\arctan(\rho)italic_c =
+roman_arctan ( italic_Ï ).
+
+With Eq.Â 2 and Eq.Â 3, we can build one-to-one forward and inverse mapping
+functions between pixels on the ERP image and pixels on the TP images. An
+illustration of the ERPâ†’â†’\rightarrowâ†’TP transformation is shown in Fig.Â
+2(a).
+
+![Refer to caption](x2.png) Figure 2: Details about gnomonic transformations.
+(a) conversion from ERP to TP. (b) pre-upsampling proposed in Octadecaplex
+Tangent Information Interaction (Sec.Â 3.3) mitigating loss during
+transformation.
+
+####  3.1.2 Iterative Denoising for Super-Resolution
+
+Utilizing the rich image priors provided by SD, we can super-resolve planar images. During initialization, the images are passed through the encoder â„°â„°\mathcal{E}caligraphic_E of SD to obtain latent codes, which are then added to pure noise to generate initial noise ğ³Tsubscriptğ³ğ‘‡\mathbf{z}_{T}bold_z start_POSTSUBSCRIPT italic_T end_POSTSUBSCRIPT. Following the approach proposed by StableSRÂ [49], we pass the images through a time-aware adapter ğ’¯ğ’¯\mathcal{T}caligraphic_T. This adapter network structure is similar to the down-sampling part in denoising UNet, taking the image and the time step tğ‘¡titalic_t of diffusion sampling as inputs to obtain the latent code feature for step tğ‘¡titalic_t. This feature, along with the latent code ğ³tsubscriptğ³ğ‘¡\mathbf{z}_{t}bold_z start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT for each step and the time step tğ‘¡titalic_t, is then passed through denoising UNet to calculate the denoised result ğ³0|tsubscriptğ³conditional0ğ‘¡\mathbf{z}_{0|t}bold_z start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT and the latent code ğ³tâˆ’1subscriptğ³ğ‘¡1\mathbf{z}_{t-1}bold_z start_POSTSUBSCRIPT italic_t - 1 end_POSTSUBSCRIPT for the next sampling step. By iterating this process Tğ‘‡Titalic_T times, we can obtain the final super-resolution result via decoder ğ’Ÿğ’Ÿ\mathcal{D}caligraphic_D of SD, yielding high-resolution images.
+
+###  3.2 Overview
+
+![Refer to caption](x3.png) Figure 3: Overview of our proposed OmniSSR. Input
+low-resolution omnidirectional image
+ğ„iâ¢nâ¢iâ¢tsubscriptğ„ğ‘–ğ‘›ğ‘–ğ‘¡\mathbf{E}_{init}bold_E start_POSTSUBSCRIPT
+italic_i italic_n italic_i italic_t end_POSTSUBSCRIPT in ERP format is first
+projected onto Tangent Projection (TP) images
+ğ±iâ¢nâ¢iâ¢t(1),ğ±iâ¢nâ¢iâ¢t(2),â€¦,ğ±iâ¢nâ¢iâ¢t(m)superscriptsubscriptğ±ğ‘–ğ‘›ğ‘–ğ‘¡1superscriptsubscriptğ±ğ‘–ğ‘›ğ‘–ğ‘¡2â€¦superscriptsubscriptğ±ğ‘–ğ‘›ğ‘–ğ‘¡ğ‘š\mathbf{x}_{init}^{(1)},\mathbf{x}_{init}^{(2)},...,\mathbf{x}_{init}^{(m)}bold_x
+start_POSTSUBSCRIPT italic_i italic_n italic_i italic_t end_POSTSUBSCRIPT
+start_POSTSUPERSCRIPT ( 1 ) end_POSTSUPERSCRIPT , bold_x start_POSTSUBSCRIPT
+italic_i italic_n italic_i italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT (
+2 ) end_POSTSUPERSCRIPT , â€¦ , bold_x start_POSTSUBSCRIPT italic_i italic_n
+italic_i italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_m )
+end_POSTSUPERSCRIPT, then iteratively refined via Stable Diffusion (SD) with a
+time-aware adapter and controllable feature wrapping (CFW) module. In each
+step of diffusion sampling, we adopt the Gradient Decomposition (GD)
+correction technique to introduce consistency constraints for the restored
+intermediate results. After Tğ‘‡Titalic_T steps of sampling, we obtain the
+final result ğ„~0subscript~ğ„0\mathbf{\tilde{\mathbf{E}}}_{0}over~ start_ARG
+bold_E end_ARG start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT with high resolution
+and better visual quality.
+
+Our approach can be divided into three parts. The first part is pre-
+processing, where we initially up-sample the low-resolution ERP images
+ğ„iâ¢nâ¢iâ¢tsubscriptğ„ğ‘–ğ‘›ğ‘–ğ‘¡\mathbf{E}_{init}bold_E start_POSTSUBSCRIPT
+italic_i italic_n italic_i italic_t end_POSTSUBSCRIPT, then project them onto
+tangent planes to obtain a series of TP images. These TP images are
+transformed to the latent space by the SD encoder, iteratively processed
+through denoising UNet and time-aware adapter network, and then decoded to
+obtain high-resolution TP images. During each denoising step, these TP images
+are transformed back via inverse transformation to ERP images, employing the
+Gradient Decomposition correction to ensure consistency constraints in
+diffusion sampling. After Tğ‘‡Titalic_T iterations, the final super-resolution
+result is obtained. A formulaic description for OmniSSR pipeline is shown in
+Algo.Â 1. Fig.Â 3 shows the overview of our proposed pipeline.
+
+Input: ğ„iâ¢nâ¢iâ¢tsubscriptğ„ğ‘–ğ‘›ğ‘–ğ‘¡\mathbf{E}_{init}bold_E
+start_POSTSUBSCRIPT italic_i italic_n italic_i italic_t end_POSTSUBSCRIPT,
+â„±â„±\mathcal{F}caligraphic_F,
+â„±âˆ’1superscriptâ„±1\mathcal{F}^{-1}caligraphic_F start_POSTSUPERSCRIPT - 1
+end_POSTSUPERSCRIPT, ğ€ğ€\mathbf{A}bold_A, ğ€â€ superscriptğ€â€
+\mathbf{A}^{\dagger}bold_A start_POSTSUPERSCRIPT â€ end_POSTSUPERSCRIPT,
+â„°â„°\mathcal{E}caligraphic_E, ğ’Ÿğ’Ÿ\mathcal{D}caligraphic_D, Tğ‘‡Titalic_T
+
+Output: SR result ğ„~0subscript~ğ„0\tilde{\mathbf{E}}_{0}over~ start_ARG
+bold_E end_ARG start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT
+
+1
+{ğ±iâ¢nâ¢iâ¢t(1),ğ±iâ¢nâ¢iâ¢t(2),â€¦,ğ±iâ¢nâ¢iâ¢t(m)}=â„±â¢(ğ„iâ¢nâ¢iâ¢t)superscriptsubscriptğ±ğ‘–ğ‘›ğ‘–ğ‘¡1superscriptsubscriptğ±ğ‘–ğ‘›ğ‘–ğ‘¡2â€¦superscriptsubscriptğ±ğ‘–ğ‘›ğ‘–ğ‘¡ğ‘šâ„±subscriptğ„ğ‘–ğ‘›ğ‘–ğ‘¡\\{\mathbf{x}_{init}^{(1)},\mathbf{x}_{init}^{(2)},...,\mathbf{x}_{init}^{(m)}%
+\\}=\mathcal{F}(\mathbf{E}_{init}){ bold_x start_POSTSUBSCRIPT italic_i
+italic_n italic_i italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( 1 )
+end_POSTSUPERSCRIPT , bold_x start_POSTSUBSCRIPT italic_i italic_n italic_i
+italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( 2 ) end_POSTSUPERSCRIPT ,
+â€¦ , bold_x start_POSTSUBSCRIPT italic_i italic_n italic_i italic_t
+end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_m ) end_POSTSUPERSCRIPT } =
+caligraphic_F ( bold_E start_POSTSUBSCRIPT italic_i italic_n italic_i italic_t
+end_POSTSUBSCRIPT )
+
+2 forÂ  _i =1ğ‘–1i=1italic_i = 1 to mğ‘šmitalic_m_Â do
+
+3Â Â Â Â Â Â
+ğ³iâ¢nâ¢iâ¢t(i)=â„°â¢(ğ±iâ¢nâ¢iâ¢t(i))superscriptsubscriptğ³ğ‘–ğ‘›ğ‘–ğ‘¡ğ‘–â„°superscriptsubscriptğ±ğ‘–ğ‘›ğ‘–ğ‘¡ğ‘–\mathbf{z}_{init}^{(i)}=\mathcal{E}(\mathbf{x}_{init}^{(i)})bold_z
+start_POSTSUBSCRIPT italic_i italic_n italic_i italic_t end_POSTSUBSCRIPT
+start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT = caligraphic_E (
+bold_x start_POSTSUBSCRIPT italic_i italic_n italic_i italic_t
+end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT )
+
+4Â Â Â Â Â Â  Ïµ(i)âˆ¼ğ’©â¢(ğŸ,ğˆ)similar-tosuperscriptbold-italic-
+Ïµğ‘–ğ’©0ğˆ\boldsymbol{\epsilon}^{(i)}\sim\mathcal{N}(\mathbf{0},\mathbf{I})bold_italic_Ïµ
+start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT âˆ¼ caligraphic_N (
+bold_0 , bold_I )
+
+5Â Â Â Â Â Â
+ğ³T(i)=Î±Â¯Tâ¢ğ³iâ¢nâ¢iâ¢t(i)+1âˆ’Î±Â¯Tâ¢Ïµ(i)superscriptsubscriptğ³ğ‘‡ğ‘–subscriptÂ¯ğ›¼ğ‘‡superscriptsubscriptğ³ğ‘–ğ‘›ğ‘–ğ‘¡ğ‘–1subscriptÂ¯ğ›¼ğ‘‡superscriptbold-
+italic-
+Ïµğ‘–\mathbf{z}_{T}^{(i)}=\sqrt{\overline{\alpha}_{T}}\mathbf{z}_{init}^{(i)}+\sqrt%
+{1-\overline{\alpha}_{T}}\boldsymbol{\epsilon}^{(i)}bold_z start_POSTSUBSCRIPT
+italic_T end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_i )
+end_POSTSUPERSCRIPT = square-root start_ARG overÂ¯ start_ARG italic_Î± end_ARG
+start_POSTSUBSCRIPT italic_T end_POSTSUBSCRIPT end_ARG bold_z
+start_POSTSUBSCRIPT italic_i italic_n italic_i italic_t end_POSTSUBSCRIPT
+start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT + square-root start_ARG
+1 - overÂ¯ start_ARG italic_Î± end_ARG start_POSTSUBSCRIPT italic_T
+end_POSTSUBSCRIPT end_ARG bold_italic_Ïµ start_POSTSUPERSCRIPT ( italic_i )
+end_POSTSUPERSCRIPT
+
+6Â Â Â Â Â Â
+
+7 end for
+
+8Get{ğ³0(1),ğ³0(2),â€¦,ğ³0(m)}superscriptsubscriptğ³01superscriptsubscriptğ³02â€¦superscriptsubscriptğ³0ğ‘š\\{\mathbf{z}_{0}^{(1)},\mathbf{z}_{0}^{(2)},...,\mathbf{z}_{0}^{(m)}\\}{
+bold_z start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( 1 )
+end_POSTSUPERSCRIPT , bold_z start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT
+start_POSTSUPERSCRIPT ( 2 ) end_POSTSUPERSCRIPT , â€¦ , bold_z
+start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_m )
+end_POSTSUPERSCRIPT } from Algo.Â 2
+
+9 forÂ  _i =1ğ‘–1i=1italic_i = 1 to mğ‘šmitalic_m_Â do
+
+10Â Â Â Â Â Â
+ğ±0(i)=ğ’Ÿâ¢(ğ³0(i))superscriptsubscriptğ±0ğ‘–ğ’Ÿsuperscriptsubscriptğ³0ğ‘–\mathbf{x}_{0}^{(i)}=\mathcal{D}(\mathbf{z}_{0}^{(i)})bold_x
+start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_i )
+end_POSTSUPERSCRIPT = caligraphic_D ( bold_z start_POSTSUBSCRIPT 0
+end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT )
+
+11 end for
+
+12ğ„0=â„±âˆ’1â¢({ğ±0(1),ğ±0(2),â€¦,ğ±0(m)})subscriptğ„0superscriptâ„±1superscriptsubscriptğ±01superscriptsubscriptğ±02â€¦superscriptsubscriptğ±0ğ‘š\mathbf{E}_{0}=\mathcal{F}^{-1}(\\{\mathbf{x}_{0}^{(1)},\mathbf{x}_{0}^{(2)},..%
+.,\mathbf{x}_{0}^{(m)}\\})bold_E start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT =
+caligraphic_F start_POSTSUPERSCRIPT - 1 end_POSTSUPERSCRIPT ( { bold_x
+start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( 1 )
+end_POSTSUPERSCRIPT , bold_x start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT
+start_POSTSUPERSCRIPT ( 2 ) end_POSTSUPERSCRIPT , â€¦ , bold_x
+start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_m )
+end_POSTSUPERSCRIPT } )
+
+13 ğ„~0=ğ„0+Î³pâ¢ğ€â€
+â¢(ğ„iâ¢nâ¢iâ¢tâˆ’ğ€ğ„0)subscript~ğ„0subscriptğ„0subscriptğ›¾ğ‘superscriptğ€â€
+subscriptğ„ğ‘–ğ‘›ğ‘–ğ‘¡subscriptğ€ğ„0\tilde{\mathbf{E}}_{0}=\mathbf{E}_{0}+\gamma_{p}\mathbf{A}^{\dagger}(\mathbf{E%
+}_{init}-\mathbf{A}\mathbf{E}_{0})over~ start_ARG bold_E end_ARG
+start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT = bold_E start_POSTSUBSCRIPT 0
+end_POSTSUBSCRIPT + italic_Î³ start_POSTSUBSCRIPT italic_p end_POSTSUBSCRIPT
+bold_A start_POSTSUPERSCRIPT â€ end_POSTSUPERSCRIPT ( bold_E
+start_POSTSUBSCRIPT italic_i italic_n italic_i italic_t end_POSTSUBSCRIPT -
+bold_AE start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT )
+
+return ğ„~0subscript~ğ„0\tilde{\mathbf{E}}_{0}over~ start_ARG bold_E end_ARG
+start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT
+
+AlgorithmÂ 1 OmniSSR Pipeline
+
+Input: ğ„iâ¢nâ¢iâ¢tsubscriptğ„ğ‘–ğ‘›ğ‘–ğ‘¡\mathbf{E}_{init}bold_E
+start_POSTSUBSCRIPT italic_i italic_n italic_i italic_t end_POSTSUBSCRIPT,
+â„±â„±\mathcal{F}caligraphic_F,
+â„±âˆ’1superscriptâ„±1\mathcal{F}^{-1}caligraphic_F start_POSTSUPERSCRIPT - 1
+end_POSTSUPERSCRIPT, ğ€ğ€\mathbf{A}bold_A, ğ€â€ superscriptğ€â€
+\mathbf{A}^{\dagger}bold_A start_POSTSUPERSCRIPT â€ end_POSTSUPERSCRIPT,
+â„°â„°\mathcal{E}caligraphic_E, ğ’Ÿğ’Ÿ\mathcal{D}caligraphic_D,
+ğ’¯ğ’¯\mathcal{T}caligraphic_T, Tğ‘‡Titalic_T
+
+Output: Latent code
+{ğ³0(1),ğ³0(2),â€¦,ğ³0(m)}superscriptsubscriptğ³01superscriptsubscriptğ³02â€¦superscriptsubscriptğ³0ğ‘š\\{\mathbf{z}_{0}^{(1)},\mathbf{z}_{0}^{(2)},...,\mathbf{z}_{0}^{(m)}\\}{
+bold_z start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( 1 )
+end_POSTSUPERSCRIPT , bold_z start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT
+start_POSTSUPERSCRIPT ( 2 ) end_POSTSUPERSCRIPT , â€¦ , bold_z
+start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_m )
+end_POSTSUPERSCRIPT }
+
+1 forÂ  _t =Tğ‘¡ğ‘‡t=Titalic_t = italic_T to 1111_Â do
+
+2Â Â Â Â Â Â  forÂ  _i =1ğ‘–1i=1italic_i = 1 to mğ‘šmitalic_m_Â do
+
+3Â Â Â Â Â Â Â Â Â Â Â Â
+Ïµt=ÏµÎ¸â¢(ğ³t(i),ğ’¯â¢(ğ³iâ¢nâ¢iâ¢t(i),t),t)subscriptbold-italic-
+Ïµğ‘¡subscriptbold-italic-
+Ïµğœƒsuperscriptsubscriptğ³ğ‘¡ğ‘–ğ’¯superscriptsubscriptğ³ğ‘–ğ‘›ğ‘–ğ‘¡ğ‘–ğ‘¡ğ‘¡\boldsymbol{\epsilon}_{t}=\boldsymbol{\epsilon}_{\theta}(\mathbf{z}_{t}^{(i)},%
+\mathcal{T}(\mathbf{z}_{init}^{(i)},t),t)bold_italic_Ïµ start_POSTSUBSCRIPT
+italic_t end_POSTSUBSCRIPT = bold_italic_Ïµ start_POSTSUBSCRIPT italic_Î¸
+end_POSTSUBSCRIPT ( bold_z start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT
+start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT , caligraphic_T (
+bold_z start_POSTSUBSCRIPT italic_i italic_n italic_i italic_t
+end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT ,
+italic_t ) , italic_t )
+
+4Â Â Â Â Â Â Â Â Â Â Â Â  ğ³0|t(i)=1Î±Â¯tâ¢(ğ³t(i)âˆ’Ïµtâ¢1âˆ’Î±Â¯t)superscriptsubscriptğ³conditional0ğ‘¡ğ‘–1subscriptÂ¯ğ›¼ğ‘¡superscriptsubscriptğ³ğ‘¡ğ‘–subscriptbold-italic-Ïµğ‘¡1subscriptÂ¯ğ›¼ğ‘¡\mathbf{z}_{0|t}^{(i)}=\frac{1}{\sqrt{\overline{\alpha}_{t}}}(\mathbf{z}_{t}^{% (i)}-\boldsymbol{\epsilon}_{t}\sqrt{1-\overline{\alpha}_{t}})bold_z start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT = divide start_ARG 1 end_ARG start_ARG square-root start_ARG overÂ¯ start_ARG italic_Î± end_ARG start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG end_ARG ( bold_z start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT - bold_italic_Ïµ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT square-root start_ARG 1 - overÂ¯ start_ARG italic_Î± end_ARG start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG )
+
+5Â Â Â Â Â Â Â Â Â Â Â Â  ğ±0|t(i)=ğ’Ÿâ¢(ğ³0|t(i))superscriptsubscriptğ±conditional0ğ‘¡ğ‘–ğ’Ÿsuperscriptsubscriptğ³conditional0ğ‘¡ğ‘–\mathbf{x}_{0|t}^{(i)}=\mathcal{D}(\mathbf{z}_{0|t}^{(i)})bold_x start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT = caligraphic_D ( bold_z start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT )
+
+6Â Â Â Â Â Â Â Â Â Â Â Â
+
+7Â Â Â Â Â Â  end for
+
+8Â Â Â Â Â Â ğ„0|t=â„±âˆ’1â¢({ğ±0|t(1),ğ±0|t(2),â€¦,ğ±0|t(m)})subscriptğ„conditional0ğ‘¡superscriptâ„±1superscriptsubscriptğ±conditional0ğ‘¡1superscriptsubscriptğ±conditional0ğ‘¡2â€¦superscriptsubscriptğ±conditional0ğ‘¡ğ‘š\mathbf{E}_{0|t}=\mathcal{F}^{-1}(\\{\mathbf{x}_{0|t}^{(1)},\mathbf{x}_{0|t}^{(% 2)},...,\mathbf{x}_{0|t}^{(m)}\\})bold_E start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT = caligraphic_F start_POSTSUPERSCRIPT - 1 end_POSTSUPERSCRIPT ( { bold_x start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( 1 ) end_POSTSUPERSCRIPT , bold_x start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( 2 ) end_POSTSUPERSCRIPT , â€¦ , bold_x start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_m ) end_POSTSUPERSCRIPT } )
+
+9Â Â Â Â Â Â  ğ„~0|t=ğ„0|t+Î³eâ¢ğ€â€ â¢(ğ„iâ¢nâ¢iâ¢tâˆ’ğ€ğ„0|t)subscript~ğ„conditional0ğ‘¡subscriptğ„conditional0ğ‘¡subscriptğ›¾ğ‘’superscriptğ€â€ subscriptğ„ğ‘–ğ‘›ğ‘–ğ‘¡subscriptğ€ğ„conditional0ğ‘¡\tilde{\mathbf{E}}_{0|t}=\mathbf{E}_{0|t}+\gamma_{e}\mathbf{A}^{\dagger}(% \mathbf{E}_{init}-\mathbf{A}\mathbf{E}_{0|t})over~ start_ARG bold_E end_ARG start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT = bold_E start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT + italic_Î³ start_POSTSUBSCRIPT italic_e end_POSTSUBSCRIPT bold_A start_POSTSUPERSCRIPT â€ end_POSTSUPERSCRIPT ( bold_E start_POSTSUBSCRIPT italic_i italic_n italic_i italic_t end_POSTSUBSCRIPT - bold_AE start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT )
+
+10Â Â Â Â Â Â  {ğ±~0|t(1),ğ±~0|t(2),â€¦,ğ±~0|t(m)}=â„±â¢(ğ„~0|t)superscriptsubscript~ğ±conditional0ğ‘¡1superscriptsubscript~ğ±conditional0ğ‘¡2â€¦superscriptsubscript~ğ±conditional0ğ‘¡ğ‘šâ„±subscript~ğ„conditional0ğ‘¡\\{\tilde{\mathbf{x}}_{0|t}^{(1)},\tilde{\mathbf{x}}_{0|t}^{(2)},...,\tilde{% \mathbf{x}}_{0|t}^{(m)}\\}=\mathcal{F}(\tilde{\mathbf{E}}_{0|t}){ over~ start_ARG bold_x end_ARG start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( 1 ) end_POSTSUPERSCRIPT , over~ start_ARG bold_x end_ARG start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( 2 ) end_POSTSUPERSCRIPT , â€¦ , over~ start_ARG bold_x end_ARG start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_m ) end_POSTSUPERSCRIPT } = caligraphic_F ( over~ start_ARG bold_E end_ARG start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT )
+
+11Â Â Â Â Â Â  forÂ  _i =1ğ‘–1i=1italic_i = 1 to mğ‘šmitalic_m_Â do
+
+12Â Â Â Â Â Â Â Â Â Â Â Â  ğ³~0|t(i)=(1âˆ’Î³l)â¢ğ³0|t(i)+Î³lâ¢â„°â¢(ğ±~0|t(i))superscriptsubscript~ğ³conditional0ğ‘¡ğ‘–1subscriptğ›¾ğ‘™superscriptsubscriptğ³conditional0ğ‘¡ğ‘–subscriptğ›¾ğ‘™â„°superscriptsubscript~ğ±conditional0ğ‘¡ğ‘–\tilde{\mathbf{z}}_{0|t}^{(i)}=(1-\gamma_{l})\mathbf{z}_{0|t}^{(i)}+\gamma_{l}% \mathcal{E}(\tilde{\mathbf{x}}_{0|t}^{(i)})over~ start_ARG bold_z end_ARG start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT = ( 1 - italic_Î³ start_POSTSUBSCRIPT italic_l end_POSTSUBSCRIPT ) bold_z start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT + italic_Î³ start_POSTSUBSCRIPT italic_l end_POSTSUBSCRIPT caligraphic_E ( over~ start_ARG bold_x end_ARG start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT )
+
+13Â Â Â Â Â Â Â Â Â Â Â Â  ğ³tâˆ’1(i)âˆ¼pâ¢(ğ³tâˆ’1(i)|ğ³t(i),ğ³~0|t(i))similar-tosuperscriptsubscriptğ³ğ‘¡1ğ‘–ğ‘conditionalsuperscriptsubscriptğ³ğ‘¡1ğ‘–superscriptsubscriptğ³ğ‘¡ğ‘–superscriptsubscript~ğ³conditional0ğ‘¡ğ‘–\mathbf{z}_{t-1}^{(i)}\sim p(\mathbf{z}_{t-1}^{(i)}|\mathbf{z}_{t}^{(i)},% \tilde{\mathbf{z}}_{0|t}^{(i)})bold_z start_POSTSUBSCRIPT italic_t - 1 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT âˆ¼ italic_p ( bold_z start_POSTSUBSCRIPT italic_t - 1 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT | bold_z start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT , over~ start_ARG bold_z end_ARG start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT )
+
+14Â Â Â Â Â Â Â Â Â Â Â Â
+
+15Â Â Â Â Â Â  end for
+
+16Â Â Â Â Â Â
+
+17 end for
+
+return
+{ğ³0(1),ğ³0(2),â€¦,ğ³0(m)}superscriptsubscriptğ³01superscriptsubscriptğ³02â€¦superscriptsubscriptğ³0ğ‘š\\{\mathbf{z}_{0}^{(1)},\mathbf{z}_{0}^{(2)},...,\mathbf{z}_{0}^{(m)}\\}{
+bold_z start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( 1 )
+end_POSTSUPERSCRIPT , bold_z start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT
+start_POSTSUPERSCRIPT ( 2 ) end_POSTSUPERSCRIPT , â€¦ , bold_z
+start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_m )
+end_POSTSUPERSCRIPT }
+
+AlgorithmÂ 2 Iterative Denoising with GD Correction
+
+###  3.3 Octadecaplex Tangent Information Interaction (OTII)
+
+####  3.3.1 Motivation
+
+To apply SD for ODISR, a straightforward way is to perform the
+ERPâ†’â†’\rightarrowâ†’TP transformation on the input ERP image. Then, each
+obtained TP image is fed into the SD-based model for SR. Finally, the
+TPâ†’â†’\rightarrowâ†’ERP transformation yields the ultimate super-resolved
+ERP image. OmniFusionÂ [30] employs a similar approach for depth estimation.
+However, this simplistic strategy fractures the inherent global coherence of
+ODIs, leading to pixel-level discontinuities in the fused ERP images.
+Moreover, interpolation algorithms cause significant information loss in the
+original projection transformations, resulting in more blurred images. If
+applied multiple times, this exacerbates the information loss even further. To
+mitigate this, a trivial solution is to increase the pixel count (resolution)
+of the intermediate projection imaging plane. However, excessively high
+resolutions in TP images can introduce unnecessary computational overhead
+during the denoising stage and potentially compromise the denoising
+performance.
+
+####  3.3.2 Information Interaction and Pre-upsampling
+
+Based on the observations and analysis presented above, we propose OTII by
+alternating the intermediate results between ERP and TP formats at each
+denoising step, where a single ERP image is represented by 18 TP images. From
+Sec.Â 3.1.1, we can achieve the ERPâ†’â†’\rightarrowâ†’TP transformation
+(denoted as â„±â¢(â‹…)â„±â‹…\mathcal{F}(\cdot)caligraphic_F ( â‹… )) and the
+TPâ†’â†’\rightarrowâ†’ERP transformation (denoted as
+â„±âˆ’1â¢(â‹…)superscriptâ„±1â‹…\mathcal{F}^{-1}(\cdot)caligraphic_F
+start_POSTSUPERSCRIPT - 1 end_POSTSUPERSCRIPT ( â‹… )). Through the
+ERPâ†’â†’\rightarrowâ†’TP transformation, we can convert distorted ERP images
+into TP images with content distributions that approximate those of planar
+images. This enables the use of the original SD super-resolution method for
+planar images. Conversely, through the TPâ†’â†’\rightarrowâ†’ERP
+transformation, we can fuse information between different TP images
+holistically, while providing ERP-format input for the subsequent GD
+Correction in Sec.Â 3.4. To handle information loss during projection
+transformation, we further propose to pre-upsample the source image before
+projection transformations, as shown in Fig.Â 2(b). Our experiments in Sec.Â
+4.4 demonstrate that this pre-upsampling strategy can significantly mitigate
+the information loss caused by projection transformations.
+
+###  3.4 Gradient Decomposition (GD) Correction for Fidelity
+
+SD-based methods, as introduced in Sec.Â 3.1.2, can perform SR on sliced TP
+images. However, relying solely on the SR results from SD may lack consistency
+and fail to accurately preserve the original semantic information and details
+of the low-resolution image.111This claim will be further illustrated in
+subsequent experiments. To enhance the consistency of the SR results from SD,
+we opt to use convex optimization methods to iteratively refine them. Modeling
+the SR task as an image inverse problem, the following equation is formulated:
+
+| ğ²=ğ€ğ±+ğ§,ğ§âˆ¼ğ’©â¢(ğŸ,ğˆ),formulae-sequenceğ²ğ€ğ±ğ§similar-toğ§ğ’©0ğˆ\mathbf{y}=\mathbf{Ax}+\mathbf{n},\quad\mathbf{n}\sim\mathcal{N}(\mathbf{0},% \mathbf{I}),bold_y = bold_Ax + bold_n , bold_n âˆ¼ caligraphic_N ( bold_0 , bold_I ) , |  | (4)  
+---|---|---|---  
+  
+where ğ±ğ±\mathbf{x}bold_x represents the original image, ğ²ğ²\mathbf{y}bold_y
+denotes the degraded result, ğ€ğ€\mathbf{A}bold_A is the degradation operator
+(e.g., bicubic downsampling for super-resolution), and ğ§ğ§\mathbf{n}bold_n is
+random noise. The objective we aim to solve can be expressed as the following
+convex optimization problem:
+
+| argminğ±â¢â€–ğ²âˆ’ğ€ğ±â€–22+Î»â¢â„›â¢(ğ±),ğ±argminsuperscriptsubscriptnormğ²ğ€ğ±22ğœ†â„›ğ±\underset{\mathbf{x}}{\mathrm{argmin}}||\mathbf{y}-\mathbf{Ax}||_{2}^{2}+% \lambda\mathcal{R}(\mathbf{x}),underbold_x start_ARG roman_argmin end_ARG | | bold_y - bold_Ax | | start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT + italic_Î» caligraphic_R ( bold_x ) , |  | (5)  
+---|---|---|---  
+  
+where the first term is the data-fidelity term, ensuring the consistency of
+image reconstruction, and the second term is the regulation term, ensuring the
+sparsity of the reconstruction result, thus making the image more realistic.
+The regularization term can be the 1-norm, Total Variation, etc. The
+aforementioned convex optimization problem can be solved using a series of
+algorithms, such as gradient descent, ADMM, etc. Considering the trade-off
+between time and performance, we turn to find a solution based on gradient
+descent, and provide an approximate analytical solution composed of a fidelity
+term and a realness term, named "Gradient Decomposition (GD)":
+
+| ğ„~0|tsubscript~ğ„conditional0ğ‘¡\displaystyle\tilde{\mathbf{E}}_{0|t}over~ start_ARG bold_E end_ARG start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT | =ğ„0|t+Î±â¢âˆ‡ğ„0|tâ¢â€–ğ„iâ¢nâ¢iâ¢tâˆ’ğ€ğ„0|tâ€–F=ğ„0|t+Î±Ã—2â¢(ğ€â€ â¢ğ„iâ¢nâ¢iâ¢tâˆ’ğ€â€ â¢ğ€ğ„0|t)absentsubscriptğ„conditional0ğ‘¡ğ›¼subscriptâˆ‡subscriptğ„conditional0ğ‘¡subscriptnormsubscriptğ„ğ‘–ğ‘›ğ‘–ğ‘¡subscriptğ€ğ„conditional0ğ‘¡ğ¹subscriptğ„conditional0ğ‘¡ğ›¼2superscriptğ€â€ subscriptğ„ğ‘–ğ‘›ğ‘–ğ‘¡superscriptğ€â€ subscriptğ€ğ„conditional0ğ‘¡\displaystyle=\mathbf{E}_{0|t}+\alpha\nabla_{\mathbf{E}_{0|t}}||\mathbf{E}_{% init}-\mathbf{A}\mathbf{E}_{0|t}||_{F}=\mathbf{E}_{0|t}+\alpha\times 2(\mathbf% {A}^{\dagger}\mathbf{E}_{init}-\mathbf{A}^{\dagger}\mathbf{A}\mathbf{E}_{0|t})= bold_E start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT + italic_Î± âˆ‡ start_POSTSUBSCRIPT bold_E start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT end_POSTSUBSCRIPT | | bold_E start_POSTSUBSCRIPT italic_i italic_n italic_i italic_t end_POSTSUBSCRIPT - bold_AE start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT | | start_POSTSUBSCRIPT italic_F end_POSTSUBSCRIPT = bold_E start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT + italic_Î± Ã— 2 ( bold_A start_POSTSUPERSCRIPT â€ end_POSTSUPERSCRIPT bold_E start_POSTSUBSCRIPT italic_i italic_n italic_i italic_t end_POSTSUBSCRIPT - bold_A start_POSTSUPERSCRIPT â€ end_POSTSUPERSCRIPT bold_AE start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT ) |  | (6)  
+---|---|---|---|---  
+|  | =ğ„0|t+Î³â¢ğ€â€ â¢(ğ„iâ¢nâ¢iâ¢tâˆ’ğ€ğ„0|t)=Î³â¢ğ€â€ â¢ğ„iâ¢nâ¢iâ¢t+(ğˆâˆ’Î³â¢ğ€â€ â¢ğ€)â¢ğ„0|tabsentsubscriptğ„conditional0ğ‘¡ğ›¾superscriptğ€â€ subscriptğ„ğ‘–ğ‘›ğ‘–ğ‘¡subscriptğ€ğ„conditional0ğ‘¡ğ›¾superscriptğ€â€ subscriptğ„ğ‘–ğ‘›ğ‘–ğ‘¡ğˆğ›¾superscriptğ€â€ ğ€subscriptğ„conditional0ğ‘¡\displaystyle=\mathbf{E}_{0|t}+\gamma\mathbf{A}^{\dagger}(\mathbf{E}_{init}-% \mathbf{A}\mathbf{E}_{0|t})=\gamma\mathbf{A}^{\dagger}\mathbf{E}_{init}+(% \mathbf{I}-\gamma\mathbf{A}^{\dagger}\mathbf{A})\mathbf{E}_{0|t}= bold_E start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT + italic_Î³ bold_A start_POSTSUPERSCRIPT â€ end_POSTSUPERSCRIPT ( bold_E start_POSTSUBSCRIPT italic_i italic_n italic_i italic_t end_POSTSUBSCRIPT - bold_AE start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT ) = italic_Î³ bold_A start_POSTSUPERSCRIPT â€ end_POSTSUPERSCRIPT bold_E start_POSTSUBSCRIPT italic_i italic_n italic_i italic_t end_POSTSUBSCRIPT + ( bold_I - italic_Î³ bold_A start_POSTSUPERSCRIPT â€ end_POSTSUPERSCRIPT bold_A ) bold_E start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT |   
+  
+where ğ€â€ superscriptğ€â€ \mathbf{A}^{\dagger}bold_A start_POSTSUPERSCRIPT â€ end_POSTSUPERSCRIPTdenotes pseudo-inverse of degradation operator ğ€ğ€\mathbf{A}bold_A, ğ„iâ¢nâ¢iâ¢tsubscriptğ„ğ‘–ğ‘›ğ‘–ğ‘¡\mathbf{E}_{init}bold_E start_POSTSUBSCRIPT italic_i italic_n italic_i italic_t end_POSTSUBSCRIPT denotes initial low-resolution ERP input, ğ„0|tsubscriptğ„conditional0ğ‘¡\mathbf{E}_{0|t}bold_E start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT denotes restored result by SD, ğ„~0|tsubscript~ğ„conditional0ğ‘¡\tilde{\mathbf{E}}_{0|t}over~ start_ARG bold_E end_ARG start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT denotes corrected result by GD, Î±ğ›¼\alphaitalic_Î± denotes the learning rate of gradient descent, and Î³ğ›¾\gammaitalic_Î³ denotes the simplified hyper-parameter which is further tuned using grid search. The final setting of Î³ğ›¾\gammaitalic_Î³ on different stages is shown in Sec.Â 4.1.2, and the ablation studies of parameter choice are in Sec.Â 4.4. 
+
+This technique could be seen as a step of gradient descent optimization, and the optimized result could be decomposed of (1) Î³â¢ğ€â€ â¢ğ„iâ¢nâ¢iâ¢tğ›¾superscriptğ€â€ subscriptğ„ğ‘–ğ‘›ğ‘–ğ‘¡\gamma\mathbf{A}^{\dagger}\mathbf{E}_{init}italic_Î³ bold_A start_POSTSUPERSCRIPT â€ end_POSTSUPERSCRIPT bold_E start_POSTSUBSCRIPT italic_i italic_n italic_i italic_t end_POSTSUBSCRIPT, which ensures the consistency of the generated result, and (2) (ğˆâˆ’Î³â¢ğ€â€ â¢ğ€)â¢ğ„0|tğˆğ›¾superscriptğ€â€ ğ€subscriptğ„conditional0ğ‘¡(\mathbf{I}-\gamma\mathbf{A}^{\dagger}\mathbf{A})\mathbf{E}_{0|t}( bold_I - italic_Î³ bold_A start_POSTSUPERSCRIPT â€ end_POSTSUPERSCRIPT bold_A ) bold_E start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT, which serves as the iteratively updated generated result to improve its realness; Î³ğ›¾\gammaitalic_Î³ is a hyper-parameter balancing the data fidelity and visual quality. For a better diversity and generality of the SR process, we expand this solution to latent space, and obtain the denoising result from both denoising UNet and corrected TP images (Algo.Â 2 lineÂ 2). A more detailed understanding of the iterative denoising process and application of GD correction could be referred to Algo.Â 2. 
+
+##  4 Experiments
+
+###  4.1 Implementation Details
+
+####  4.1.1 Datasets and Pretrained Models
+
+We choose the test set of ODI-SR dataset from LAU-NetÂ [14] and SUN 360
+Panorama datasetÂ [55], comprising 97 and 100 omnidirectional images
+respectively, for experimental evaluation. The ground truth images are of size
+1024Ã—\timesÃ—2048 pixels. In SR methods such as GDPÂ [20] and PSLDÂ [41] for
+planar images, we partitioned the images into several 256Ã—\timesÃ—256 patches
+and performed super-resolution on each patch individually.
+
+For pre-trained models, we adopt from StableSRÂ [49], which provided a SR
+network for planar images based on SD. This network architecture includes a
+time-aware adapter, a controllable feature wrapping (CFW) module, and the
+original SD structure from HuggingFace. All of them are kept untrained in our
+proposed OmniSSR.
+
+####  4.1.2 Settings
+
+We set diffusion sampling steps to 200, which is the same as StableSR. The
+steps for other diffusion-based methods are set the same as their default
+settings (e.g. 1000 steps for PSLD). The degradation for low-resolution ERP
+images is bicubic down-sampling, and the implementation of its pseudo-inverse
+can be referred from code of DDRMÂ [26]222https://github.com/bahjat-
+kawar/ddrm. For choices of hyper-parameter Î³ğ›¾\gammaitalic_Î³ in GD
+correction, we set Î³p=1.0subscriptğ›¾ğ‘1.0\gamma_{p}=1.0italic_Î³
+start_POSTSUBSCRIPT italic_p end_POSTSUBSCRIPT = 1.0,
+Î³e=1.0subscriptğ›¾ğ‘’1.0\gamma_{e}=1.0italic_Î³ start_POSTSUBSCRIPT italic_e
+end_POSTSUBSCRIPT = 1.0, Î³l=0.5subscriptğ›¾ğ‘™0.5\gamma_{l}=0.5italic_Î³
+start_POSTSUBSCRIPT italic_l end_POSTSUBSCRIPT = 0.5. Our code is developed
+via PyTorch on NVIDIA 3090Ti GPU. 333Code will be made available.
+
+Table 1: SR results under bicubic downsampling on ODI-SR and SUN 360 Panorama
+datasets. For tasks not implemented in those papers, we mark N/A in
+corresponding results. Best results are shown in Red, and second best results
+are shown in Blue.
+
+Method | Scale | ODI-SR | SUN 360 Panorama  
+---|---|---|---  
+WS-PSNRâ†‘â†‘\uparrowâ†‘ |  WS-SSIMâ†‘â†‘\uparrowâ†‘ |  FIDâ†“â†“\downarrowâ†“ |  LPIPSâ†“â†“\downarrowâ†“ |  WS-PSNRâ†‘â†‘\uparrowâ†‘ |  WS-SSIMâ†‘â†‘\uparrowâ†‘ |  FIDâ†“â†“\downarrowâ†“ |  LPIPSâ†“â†“\downarrowâ†“  
+Bicubic | Ã—\timesÃ—2 | 28.14 | 0.8343 | 24.00 | 0.2164 | 28.67 | 0.8537 | 29.25 | 0.1933  
+DDRMÂ [26] | 27.90 | 0.8317 | 12.28 | 0.1661 | 29.55 | 0.8670 | 13.10 | 0.1426  
+DPSÂ [9] | 20.99 | 0.6194 | 148.30 | 0.5249 | 21.44 | 0.6598 | 148.83 | 0.5175  
+GDPÂ [20] | 27.89 | 0.8157 | 26.56 | 0.2724 | 28.60 | 0.8376 | 28.02 | 0.2445  
+PSLDÂ [41] | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A  
+DiffIRÂ [54] | 23.77 | 0.6583 | 57.23 | 0.4687 | 23.54 | 0.6775 | 58.06 | 0.4658  
+StableSRÂ [49] | 22.70 | 0.6458 | 44.87 | 0.3039 | 23.30 | 0.6907 | 43.49 | 0.2858  
+OmniSSR | 28.57 | 0.8540 | 13.01 | 0.1575 | 29.69 | 0.8781 | 12.99 | 0.1459  
+Bicubic | Ã—\timesÃ—4 | 25.43 | 0.7059 | 50.84 | 0.3755 | 25.49 | 0.7229 | 55.99 | 0.3656  
+DDRMÂ [26] | 25.43 | 0.7367 | 32.69 | 0.3206 | 25.83 | 0.7443 | 32.93 | 0.3304  
+DPSÂ [9] | 24.75 | 0.6594 | 120.74 | 0.4911 | 21.09 | 0.6119 | 175.2143 | 0.5541  
+GDPÂ [20] | 23.16 | 0.6692 | 77.43 | 0.4260 | 23.75 | 0.6569 | 90.23 | 0.4240  
+PSLDÂ [41] | 21.72 | 0.5498 | 107.99 | 0.5329 | 21.75 | 0.5828 | 141.49 | 0.5461  
+DiffIRÂ [54] | 24.01 | 0.6770 | 54.14 | 0.4367 | 23.90 | 0.7014 | 50.37 | 0.4235  
+StableSRÂ [49] | 23.33 | 0.6577 | 49.95 | 0.3135 | 23.99 | 0.6998 | 46.03 | 0.3023  
+OmniSSR | 25.77 | 0.7279 | 30.97 | 0.2977 | 26.01 | 0.7481 | 34.58 | 0.2963  
+  
+###  4.2 Comparison of OmniSSR with diffusion-based methods
+
+To evaluate the performance of proposed OmniSSR, we compare our method with
+recent state-of-the-art zero-shot methods for single image SR task: DPSÂ [9],
+DDRMÂ [26], GDPÂ [20] which are based on the image-domain diffusion model, and
+PSLDÂ [41], which is based on latent diffusion model. We also choose
+supervised diffusion-based super-resolution approaches including StableSRÂ
+[49] and DiffIRÂ [54] for comparison. We conduct experiments on Ã—\timesÃ—2
+and Ã—\timesÃ—4 SR with ERP bicubic downsampling, on ODI-SR test-set and SUN
+test-set. We choose WS-PSNRÂ [47], WS-SSIMÂ [68], FIDÂ [23], and LPIPSÂ [65]
+as the main metrics.
+
+Quantitative results are presented in Tab.Â 1. With proposed OTII and GD
+correction, OmniSSR out-performs previous methods in terms of both Fidelity
+(from WS-PSNR and WS-SSIM) and Realness (from FID, LPIPS ), which shows
+superior performance to existing diffusion-based methods for ODISR tasks on
+different scales.
+
+Qualitative results are shown in Fig.Â 4 and Fig.Â 5, which illustrates the
+visualization of SR results on SUN test set and ODI-SR test set with
+Ã—\timesÃ—2 and Ã—\timesÃ—4 scales, by different methods. The visual results
+indicate that our OmniSSR exhibits superior capability for detail recovery
+compared to other methods, particularly evident in textual elements (e.g., the
+text "flapping" in upper part of Fig.Â 4), complex objects (e.g., the black
+desk with a screen in lower part of Fig.Â 4, patterns above the white door in
+lower part of Fig.Â 5), and small-scale objects (e.g., the person and clock
+behind the desk in upper part of Fig.Â 5). OmniSSR demonstrates the ability to
+recover highly detailed and realistic visual effects from TP images.
+
+![Refer to caption](extracted/5541663/duibi/sun0001_patch.png) SUN 360
+(Ã—\timesÃ—2): 001 ![Refer to caption](x4.png) ![Refer to caption](x5.png)
+![Refer to caption](x6.png) ![Refer to caption](x7.png) HR Bicubic DPS [9]
+DDRM [26] PSNR/SSIM 28.67dB/0.8317 24.02dB/0.5849 30.04dB/0.8855 ![Refer to
+caption](x8.png) ![Refer to caption](x9.png) ![Refer to caption](x10.png)
+![Refer to caption](x11.png) GDP [20] DiffIR [54] StableSR [49] OmniSSR(ours)
+30.07dB/0.8802 24.47dB/0.6421 23.81dB/0.7384 30.15dB/0.8859  
+---  
+![Refer to caption](extracted/5541663/duibi/sun0009_patch.png) SUN 360
+(Ã—\timesÃ—4): 009 ![Refer to caption](x12.png) ![Refer to caption](x13.png)
+![Refer to caption](x14.png) ![Refer to caption](x15.png) HR Bicubic DPS [9]
+DDRM [26] PSNR/SSIM 24.65dB/0.7753 22.57dB/0.7188 25.36dB/0.8029 ![Refer to
+caption](x16.png) ![Refer to caption](x17.png) ![Refer to caption](x18.png)
+![Refer to caption](x19.png) GDP [20] DiffIR [54] StableSR [49] OmniSSR(ours)
+23.02dB/0.7525 23.48dB/0.7799 24.62dB/0.7981 26.53dB/0.8265  
+Figure 4: Visualized comparison of Ã—\timesÃ—2 and Ã—\timesÃ—4 SR results on
+SUN 360 testset. 001 and 009 is the id number in testset filenames. We also
+calculate the PSNR and SSIM to HR ground truth of each SR result and
+downsampled image. ![Refer to
+caption](extracted/5541663/duibi/odisr_0067_patch.png) ODI-SR (Ã—\timesÃ—2):
+067 ![Refer to caption](x20.png) ![Refer to caption](x21.png) ![Refer to
+caption](x22.png) ![Refer to caption](x23.png) HR Bicubic DPS [9] DDRM [26]
+PSNR/SSIM 27.67dB/0.8095 22.93dB/0.5653 29.91dB/0.8809 ![Refer to
+caption](x24.png) ![Refer to caption](x25.png) ![Refer to caption](x26.png)
+![Refer to caption](x27.png) GDP [20] DiffIR [54] StableSR [49] OmniSSR(ours)
+28.51dB/0.8258 22.65dB/0.6248 21.80dB/0.5892 29.99dB/0.8798  
+---  
+![Refer to caption](extracted/5541663/duibi/odisr_0049_patch.png) ODI-SR
+(Ã—\timesÃ—4): 049 ![Refer to caption](x28.png) ![Refer to caption](x29.png)
+![Refer to caption](x30.png) ![Refer to caption](x31.png) HR Bicubic DPS [9]
+DDRM [26] PSNR/SSIM 25.44dB/0.7536 26.21dB/0.7574 27.12dB/0.8129 ![Refer to
+caption](x32.png) ![Refer to caption](x33.png) ![Refer to caption](x34.png)
+![Refer to caption](x35.png) GDP [20] DiffIR [54] StableSR [49] OmniSSR(ours)
+24.15dB/0.7179 24.25dB/0.7594 21.80dB/0.5892 27.20dB/0.8168  
+Figure 5: Visualized comparison of Ã—\timesÃ—2 and Ã—\timesÃ—4 SR results on
+ODI-SR test set. 067 and 049 are the id numbers in test set filenames. We also
+calculate the PSNR and SSIM between ground truth and each SR result as well as
+downsampled image.
+
+###  4.3 Comparison with end-to-end supervised methods
+
+The experiments of comparison in Sec.Â 4.2 are mainly focused on zero-shot
+image super-resolution methods, and supervised single image super-resolution
+methods, where the approaches are not trained or fine-tuned on omnidirectional
+images. In this part, we will compare OmniSSR to supervised end-to-end methods
+with end-to-end training on ODI datasets, including SwinIR and OSRT. Besides
+the main metrics in Sec.Â 4.2, we also use NIQEÂ [36] and DISTSÂ [16] to
+evaluate the visual perception of SR outputs. Results are presented in Tab.Â
+2, which shows that although our OmniSSR exhibits inferior fidelity metrics
+compared to end-to-end supervised methods trained directly on ODI datasets, it
+demonstrates notable improvements in the visual quality and authenticity of
+super-resolved images. Notably, end-to-end methods often produce smoothed
+reconstructions with distortions, whereas our approach preserves finer details
+and adheres more closely to the realistic distribution. Considering that our
+method has never been trained or tuned on ODI datasets, nor having
+omnidirectional images prior, this result is acceptable.
+
+Table 2: Comparison on Ã—\timesÃ—4 SR task with supervised methods trained on ODI-SR dataset, including SwinIR and OSRT. The best results are shown in Bold. Method | Dataset |  WS-PSNRâ†‘â†‘\uparrowâ†‘ |  WS-SSIMâ†‘â†‘\uparrowâ†‘ |  FIDâ†“â†“\downarrowâ†“ |  LPIPSâ†“â†“\downarrowâ†“ |  NIQEâ†“â†“\downarrowâ†“ |  DISTSâ†“â†“\downarrowâ†“  
+---|---|---|---|---|---|---|---  
+SwinIRÂ [31] | ODI-SR | 26.76 | 0.7620 | 27.94 | 0.3321 | 5.3961 | 0.1710  
+OSRTÂ [61] | 26.89 | 0.7646 | 27.39 | 0.3258 | 5.4364 | 0.1695  
+OmniSSR | 25.77 | 0.7279 | 30.97 | 0.2977 | 5.2891 | 0.1541  
+SwinIRÂ [31] | SUN 360 | 26.02 | 0.7692 | 39.90 | 0.3419 | 5.2440 | 0.1325  
+OSRTÂ [61] | 26.33 | 0.7766 | 39.22 | 0.3364 | 5.2984 | 0.1312  
+OmniSSR | 26.01 | 0.7481 | 34.58 | 0.2963 | 5.1329 | 0.1299  
+  
+###  4.4 Ablation Studies
+
+We first sequentially validate the performance improvement of the proposed
+strategy in OmniSSR including input image type, OTII and GD correction, on the
+ODI-SR test-set with Ã—\timesÃ—2 SR task, thereby demonstrating the
+significance of these strategies. The details are demonstrated as follows:
+
+1) we do not use any proposed strategy in the SR task, which is equivalent to
+the vanilla StableSR baseline;
+
+2) we transform the degraded ERP image to TP images and feed them separately
+into StableSR pipeline, instead of directly inputting ERP images;
+
+3) based on 2), we add OTII strategy during the denoising process of SD
+(Algo.Â 2 lineÂ 2);
+
+4) based on 2), we add GD correction at the post-processing stage (Algo.Â 1
+lineÂ 1) of the overall pipeline;
+
+5) based on 3) and 4), we add GD correction at every step and post-processing
+stage of sampling, to improve the consistency of the restored result.
+
+Note that the execution of GD correction requires the execution of OTII in the
+denoising process simultaneously, there is no scenario where only GD
+correction is executed without the execution of OTII in the denoising process.
+
+Table 3: Ablation studies of OmniSSR on input type, OTII, and GD correction, on the test set of the ODI-SR dataset. Best results are shown in Bold. Input type | OTII | GD Correction |  WS-PSNRâ†‘â†‘\uparrowâ†‘ |  WS-SSIMâ†‘â†‘\uparrowâ†‘ |  FIDâ†“â†“\downarrowâ†“ |  LPIPSâ†“â†“\downarrowâ†“  
+---|---|---|---|---|---|---  
+ERP | Ã—\timesÃ— | Ã—\timesÃ— | 22.69 | 0.6458 | 44.87 | 0.3039  
+TP | Ã—\timesÃ— | Ã—\timesÃ— | 23.53 | 0.6849 | 43.91 | 0.3113  
+TP | âœ“âœ“\checkmarkâœ“ | Ã—\timesÃ— | 23.74 | 0.6847 | 65.35 | 0.3748  
+TP | Ã—\timesÃ— |  âœ“âœ“\checkmarkâœ“ (in post-process only) | 26.77 | 0.8192 | 15.41 | 0.1691  
+TP | âœ“âœ“\checkmarkâœ“ | âœ“âœ“\checkmarkâœ“ | 28.58 | 0.8540 | 13.01 | 0.1575  
+Table 4: Results of pre-upsampling strategy on different scales, where (xğ‘¥xitalic_x,yğ‘¦yitalic_y) denotes bicubic-based upsampling at xÃ—x\timesitalic_x Ã— scale to ERP before ERPâ†’â†’\rightarrowâ†’TP, and yÃ—y\timesitalic_y Ã— scale to TP before TPâ†’â†’\rightarrowâ†’ERP transformation. Best results are shown in Bold. ERPâ†’â†’\rightarrowâ†’TPâ†’â†’\rightarrowâ†’ERP | (1, 1) | (1, 4) | (4, 1) | (4, 2) | (2, 4) | (4, 4)  
+---|---|---|---|---|---|---  
+WS-PSNRâ†‘â†‘\uparrowâ†‘ | 28.98 | 38.11 | 28.99 | 33.91 | 38.05 | 38.18  
+WS-SSIMâ†‘â†‘\uparrowâ†‘ | 0.8859 | 0.9838 | 0.8862 | 0.9626 | 0.9837 | 0.9841  
+  
+Quantitative results of ablation studies are shown in Tab.Â 3. From the result
+shown below, we could come to the claim that the OTII helps improve the
+performance on the domain level, and the transformation between ERP and TP
+images provides information fusion among adjacent TP images. Our proposal of
+Gradient Decomposition corrects such restoration result, improving fidelity
+and realness significantly at the same time, and it would be better if it is
+applied at each step of the overall denoising pipeline. Tab.Â 4 shows the
+effect of mitigating information loss via proposed pre-upsampling strategy.
+
+![Refer to caption](x36.png) Figure 6: Ablation of choices on
+Î³psubscriptğ›¾ğ‘\gamma_{p}italic_Î³ start_POSTSUBSCRIPT italic_p
+end_POSTSUBSCRIPT, Î³esubscriptğ›¾ğ‘’\gamma_{e}italic_Î³ start_POSTSUBSCRIPT
+italic_e end_POSTSUBSCRIPT and Î³lsubscriptğ›¾ğ‘™\gamma_{l}italic_Î³
+start_POSTSUBSCRIPT italic_l end_POSTSUBSCRIPT. For better readability, WS-
+PSNR and LPIPS are chosen as evaluation metrics for fidelity and visual
+quality, respectively, to demonstrate the performance under different choices
+of the gamma parameter. We illustrate the results of (a)
+Î³psubscriptğ›¾ğ‘\gamma_{p}italic_Î³ start_POSTSUBSCRIPT italic_p
+end_POSTSUBSCRIPT and Î³esubscriptğ›¾ğ‘’\gamma_{e}italic_Î³
+start_POSTSUBSCRIPT italic_e end_POSTSUBSCRIPT fixed, while adjusting
+Î³lsubscriptğ›¾ğ‘™\gamma_{l}italic_Î³ start_POSTSUBSCRIPT italic_l
+end_POSTSUBSCRIPT; (b) Î³esubscriptğ›¾ğ‘’\gamma_{e}italic_Î³
+start_POSTSUBSCRIPT italic_e end_POSTSUBSCRIPT and
+Î³lsubscriptğ›¾ğ‘™\gamma_{l}italic_Î³ start_POSTSUBSCRIPT italic_l
+end_POSTSUBSCRIPT fixed, while adjusting Î³psubscriptğ›¾ğ‘\gamma_{p}italic_Î³
+start_POSTSUBSCRIPT italic_p end_POSTSUBSCRIPT; (c)
+Î³psubscriptğ›¾ğ‘\gamma_{p}italic_Î³ start_POSTSUBSCRIPT italic_p
+end_POSTSUBSCRIPT and Î³lsubscriptğ›¾ğ‘™\gamma_{l}italic_Î³
+start_POSTSUBSCRIPT italic_l end_POSTSUBSCRIPT fixed, while adjusting
+Î³esubscriptğ›¾ğ‘’\gamma_{e}italic_Î³ start_POSTSUBSCRIPT italic_e
+end_POSTSUBSCRIPT. It can be observed that when
+Î³p=1subscriptğ›¾ğ‘1\gamma_{p}=1italic_Î³ start_POSTSUBSCRIPT italic_p
+end_POSTSUBSCRIPT = 1, Î³e=1subscriptğ›¾ğ‘’1\gamma_{e}=1italic_Î³
+start_POSTSUBSCRIPT italic_e end_POSTSUBSCRIPT = 1, and
+Î³l=0.5subscriptğ›¾ğ‘™0.5\gamma_{l}=0.5italic_Î³ start_POSTSUBSCRIPT italic_l
+end_POSTSUBSCRIPT = 0.5, OmniSSR achieves the relatively best performance.
+
+For Î³ğ›¾\gammaitalic_Î³ in the GD correction technique, we use grid search to
+obtain better results on ODI-SR dataset and Ã—\timesÃ—4 SR task. Fig.Â 6 shows
+performance on different choices of Î³psubscriptğ›¾ğ‘\gamma_{p}italic_Î³
+start_POSTSUBSCRIPT italic_p end_POSTSUBSCRIPT in Algo.Â 1 lineÂ 1,
+Î³esubscriptğ›¾ğ‘’\gamma_{e}italic_Î³ start_POSTSUBSCRIPT italic_e
+end_POSTSUBSCRIPT in Algo.Â 2 lineÂ 2, and
+Î³lsubscriptğ›¾ğ‘™\gamma_{l}italic_Î³ start_POSTSUBSCRIPT italic_l
+end_POSTSUBSCRIPT in Algo.Â 2 lineÂ 2. The entire ablation of
+Î³psubscriptğ›¾ğ‘\gamma_{p}italic_Î³ start_POSTSUBSCRIPT italic_p
+end_POSTSUBSCRIPT, Î³esubscriptğ›¾ğ‘’\gamma_{e}italic_Î³ start_POSTSUBSCRIPT
+italic_e end_POSTSUBSCRIPT and Î³lsubscriptğ›¾ğ‘™\gamma_{l}italic_Î³
+start_POSTSUBSCRIPT italic_l end_POSTSUBSCRIPT, with WS-PSNR, WS-SSIM, FID and
+LPIPS score all calculated and compared, will be provided in Supplementary
+Materials.
+
+To evaluate the generalizability of our proposed modules, including Pre-
+Upsampling, OTII, and GD correction, we further conducted ablation studies on
+two super-resolution backbones, StableSR and SwinIR. The results underscore
+substantial performance enhancements facilitated by our modules across both
+backbones, which is provided in Supplementary Materials.
+
+##  5 Limitation and Discussion
+
+Although OmniSSR bridges the gap between omnidirectional and planar images,
+achieving competitive performance and better visual results in ODISR, it still
+exhibits the following limitations: (1) The inference of the diffusion model
+requires a considerable amount of time, approximately 14 minutes per ERP-
+formatted omnidirectional image to be super-resolved into size
+1024Ã—2048102420481024\times 20481024 Ã— 2048, making real-time super-
+resolution challenging; (2) Multiple conversions between ERP and TP are
+required in the pipeline, leading to improved performance but consuming
+additional inference time; (3) Further exploration of the convex optimization
+properties of GD correction is warranted, such as designing gradient term
+coefficients adaptive to reconstruction results and degradation types.
+
+This study explores the application of image generation models to ODISR tasks.
+In future work, the framework behind OmniSSR can be extended beyond the
+confines of image super-resolution in a single scenario and venture into more
+complex ODI-based real-world scenarios. These include ODI editing, ODI
+inpainting, enhancing the quality of 3D Gaussian Splatting scenesÂ [27, 43]
+obtained after super-resolving ERP images, as well as enhancing the quality of
+omnidirectional videosÂ [50].
+
+##  6 Conclusion
+
+This paper leverages the image prior of Stable Diffusion (SD) and employs the
+Octadecaplex Tangent Information Interaction (OTII) to achieve zero-shot
+omnidirectional image super-resolution. Additionally, we propose the Gradient
+Decomposition (GD) correction based on convex optimization algorithms to
+refine the initial super-resolution results, enhancing the fidelity and
+realness of the restored images. The superior performance of our proposed
+method, OmniSSR, is demonstrated on benchmark datasets. By bridging the gap
+between omnidirectional and planar images, we establish a training-free
+approach, mitigating the data demand and over-fitting associated with end-to-
+end training. The application scope of our method can be further extended to
+various applications, presenting potential value across multiple visual tasks.
+
+## References
+
+  * [1] An, H., Zhang, X.: Perception-oriented omnidirectional image super-resolution based on transformer network. In: Proceedings of the IEEE International Conference on Image Processing (ICIP) (2023) 
+  * [2] Arican, Z., Frossard, P.: Joint registration and super-resolution with omnidirectional images. IEEE Transactions on Image Processing (TIP) (2011) 
+  * [3] Cao, M., Mou, C., Yu, F., Wang, X., Zheng, Y., Zhang, J., Dong, C., Li, G., Shan, Y., Timofte, R., etÂ al.: Ntire 2023 challenge on 360deg omnidirectional image and video super-resolution: Datasets, methods and results. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition Workshops (CVPRW) (2023) 
+  * [4] Chan, K.C., Xu, X., Wang, X., Gu, J., Loy, C.C.: Glean: Generative latent bank for image super-resolution and beyond. IEEE Transactions on Pattern Analysis and Machine Intelligence (TPAMI) (2022) 
+  * [5] Chen, Y., Liu, S., Wang, X.: Learning continuous image representation with local implicit image function. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) (2021) 
+  * [6] Chen, Z., Zhang, Y., Gu, J., Kong, L., Yang, X., Yu, F.: Dual aggregation transformer for image super-resolution. In: Proceedings of the IEEE/CVF international conference on computer vision (ICCV) (2023) 
+  * [7] Cheng, M., Ma, H., Ma, Q., Sun, X., Li, W., Zhang, Z., Sheng, X., Zhao, S., Li, J., Zhang, L.: Hybrid transformer and cnn attention network for stereo image super-resolution. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) (2023) 
+  * [8] Chong, M., Yanze, W., Xintao, W., Chao, D., Jian, Z., Ying, S.: Metric learning based interactive modulation for real-world super-resolution. In: Proceedings of the European Conference on Computer Vision (ECCV) (2022) 
+  * [9] Chung, H., Kim, J., Mccann, M.T., Klasky, M.L., Ye, J.C.: Diffusion posterior sampling for general noisy inverse problems. arXiv preprint arXiv:2209.14687 (2022) 
+  * [10] Chung, H., Sim, B., Ye, J.C.: Improving diffusion models for inverse problems using manifold constraints. In: Proceedings of the Advances in Neural Information Processing Systems (NeurIPS) (2022) 
+  * [11] Chung, H., Ye, J., Milanfar, P., Delbracio, M.: Prompt-tuning latent diffusion models for inverse problems. arXiv preprint arXiv:2310.01110 (2023) 
+  * [12] Coxeter, H.S.M.: Introduction to geometry. John Wiley & Sons, Inc. (1961) 
+  * [13] Daras, G., Dean, J., Jalal, A., Dimakis, A.: Intermediate layer optimization for inverse problems using deep generative models. In: Proceedings of the International Conference on Machine Learning (ICML) (2021) 
+  * [14] Deng, X., Wang, H., Xu, M., Guo, Y., Song, Y., Yang, L.: Lau-net: Latitude adaptive upscaling network for omnidirectional image super-resolution. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) (2021) 
+  * [15] Deng, X., Wang, H., Xu, M., Li, L., Wang, Z.: Omnidirectional image super-resolution via latitude adaptive network. IEEE Transactions on Multimedia (TMM) (2022) 
+  * [16] Ding, K., Ma, K., Wang, S., Simoncelli, E.P.: Image quality assessment: Unifying structure and texture similarity. IEEE Transactions on Pattern Analysis and Machine Intelligence (TPAMI) (2020) 
+  * [17] Dong, C., Loy, C.C., He, K., Tang, X.: Image super-resolution using deep convolutional networks. IEEE Transactions on Pattern Analysis and Machine Intelligence (TPAMI) (2015) 
+  * [18] Duan, H., Zhai, G., Min, X., Zhu, Y., Fang, Y., Yang, X.: Perceptual quality assessment of omnidirectional images. In: Proceedings of the IEEE International Symposium on Circuits and Systems (ISCAS) (2018) 
+  * [19] Fakour-Sevom, V., Guldogan, E., KÃ¤mÃ¤rÃ¤inen, J.K.: 360 panorama super-resolution using deep convolutional networks. In: Proceedings of the Int. Conf. on Computer Vision Theory and Applications (VISAPP) (2018) 
+  * [20] Fei, B., Lyu, Z., Pan, L., Zhang, J., Yang, W., Luo, T., Zhang, B., Dai, B.: Generative diffusion prior for unified image restoration and enhancement. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) (2023) 
+  * [21] Goodfellow, I., Pouget-Abadie, J., Mirza, M., Xu, B., Warde-Farley, D., Ozair, S., Courville, A., Bengio, Y.: Generative adversarial nets. In: Proceedings of the Advances in Neural Information Processing Systems (NeurIPS) (2014) 
+  * [22] Guo, L., Tao, T., Cai, X., Zhu, Z., Huang, J., Zhu, L., Gu, Z., Tang, H., Zhou, R., Han, S., etÂ al.: Cas-diffcom: Cascaded diffusion model for infant longitudinal super-resolution 3d medical image completion. arXiv preprint arXiv:2402.13776 (2024) 
+  * [23] Heusel, M., Ramsauer, H., Unterthiner, T., Nessler, B., Hochreiter, S.: Gans trained by a two time-scale update rule converge to a local nash equilibrium. In: Proceedings of the Advances in Neural Information Processing Systems (NeurIPS) (2017) 
+  * [24] Ho, J., Jain, A., Abbeel, P.: Denoising diffusion probabilistic models. In: Proceedings of the Advances in Neural Information Processing Systems (NeurIPS) (2020) 
+  * [25] Jiang, Y., Chan, K.C., Wang, X., Loy, C.C., Liu, Z.: Reference-based image and video super-resolution via c2superscriptğ‘2c^{2}italic_c start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT-matching. IEEE Transactions on Pattern Analysis and Machine Intelligence (TPAMI) (2022) 
+  * [26] Kawar, B., Elad, M., Ermon, S., Song, J.: Denoising diffusion restoration models. In: Proceedings of the ICLR Workshop on Deep Generative Models for Highly Structured Data (ICLRW) (2022) 
+  * [27] Kerbl, B., Kopanas, G., LeimkÃ¼hler, T., Drettakis, G.: 3d gaussian splatting for real-time radiance field rendering. ACM Transactions on Graphics (TOG) (2023) 
+  * [28] Kim, J., Park, G.Y., Chung, H., Ye, J.C.: Regularization by texts for latent diffusion inverse solvers. arXiv preprint arXiv:2311.15658 (2023) 
+  * [29] Li, W., Chen, B., Zhang, J.: D3c2-net: Dual-domain deep convolutional coding network for compressive sensing. arXiv preprint arXiv:2207.13560 (2022) 
+  * [30] Li, Y., Guo, Y., Yan, Z., Huang, X., Duan, Y., Ren, L.: Omnifusion: 360 monocular depth estimation via geometry-aware fusion. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) (2022) 
+  * [31] Liang, J., Cao, J., Sun, G., Zhang, K., VanÂ Gool, L., Timofte, R.: Swinir: Image restoration using swin transformer. In: Proceedings of the IEEE/CVF International Conference on Computer Vision Workshops (ICCVW) (2021) 
+  * [32] Liu, J., Wang, Q., Fan, H., Wang, Y., Tang, Y., Qu, L.: Residual denoising diffusion models. arXiv preprint arXiv:2308.13712 (2023) 
+  * [33] Lu, Z., Li, J., Liu, H., Huang, C., Zhang, L., Zeng, T.: Transformer for single image super-resolution. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition Workshops (CVPRW) (2022) 
+  * [34] Lugmayr, A., Danelljan, M., Timofte, R.: Ntire 2020 challenge on real-world image super-resolution: Methods and results. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition Workshops (CVPRW) (2020) 
+  * [35] Menon, S., Damian, A., Hu, S., Ravi, N., Rudin, C.: Pulse: Self-supervised photo upsampling via latent space exploration of generative models. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) (2020) 
+  * [36] Mittal, A., Soundararajan, R., Bovik, A.C.: Making a â€œcompletely blindâ€ image quality analyzer. IEEE Signal Processing Letters (SPL) (2013) 
+  * [37] Nishiyama, A., Ikehata, S., Aizawa, K.: 360Â° single image super resolution via distortion-aware network and distorted perspective images. In: Proceedings of the IEEE International Conference on Image Processing (ICIP) (2021) 
+  * [38] Ozcinar, C., Rana, A., Smolic, A.: Super-resolution of omnidirectional images using adversarial learning. In: Proceedings of the IEEE International Workshop on Multimedia Signal Processing (MMSPW) (2019) 
+  * [39] Pan, X., Zhan, X., Dai, B., Lin, D., Loy, C.C., Luo, P.: Exploiting deep generative prior for versatile image restoration and manipulation. IEEE Transactions on Pattern Analysis and Machine Intelligence (TPAMI) (2021) 
+  * [40] Rombach, R., Blattmann, A., Lorenz, D., Esser, P., Ommer, B.: High-resolution image synthesis with latent diffusion models. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) (2022) 
+  * [41] Rout, L., Raoof, N., Daras, G., Caramanis, C., Dimakis, A., Shakkottai, S.: Solving linear inverse problems provably via posterior sampling with latent diffusion models. In: Proceedings of the Advances in Neural Information Processing Systems (NeurIPS) (2023) 
+  * [42] Saharia, C., Ho, J., Chan, W., Salimans, T., Fleet, D.J., Norouzi, M.: Image super-resolution via iterative refinement. IEEE Transactions on Pattern Analysis and Machine Intelligence (TPAMI) (2022) 
+  * [43] SchÃ¶nbein, M., Geiger, A.: Omnidirectional 3d reconstruction in augmented manhattan worlds. In: Proceedings of the IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) (2014) 
+  * [44] Song, J., Zhang, Q., Yin, H., Mardani, M., Liu, M.Y., Kautz, J., Chen, Y., Vahdat, A.: Loss-guided diffusion models for plug-and-play controllable generation. In: Proceedings of the International Conference on Machine Learning (ICML) (2023) 
+  * [45] Song, Y., Sohl-Dickstein, J., Kingma, D.P., Kumar, A., Ermon, S., Poole, B.: Score-based generative modeling through stochastic differential equations. In: Proceedings of the International Conference on Learning Representations (ICLR) (2020) 
+  * [46] Sun, X., Li, W., Zhang, Z., Ma, Q., Sheng, X., Cheng, M., Ma, H., Zhao, S., Zhang, J., Li, J., etÂ al.: Opdn: Omnidirectional position-aware deformable network for omnidirectional image super-resolution. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition Workshops (CVPRW) (2023) 
+  * [47] Sun, Y., Lu, A., Yu, L.: Weighted-to-spherically-uniform quality evaluation for omnidirectional video. IEEE Signal Processing Letters (SPL) (2017) 
+  * [48] Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A., Kaiser, L., Polosukhin, I.: Attention is all you need. In: Proceedings of the Advances in Neural Information Processing Systems (NeurIPS) (2017) 
+  * [49] Wang, J., Yue, Z., Zhou, S., Chan, K., Loy, C.: Exploiting diffusion prior for real-world image super-resolution. arXiv preprint arXiv:2305.07015 (2023) 
+  * [50] Wang, Q., Li, W., Mou, C., Cheng, X., Zhang, J.: 360dvd: Controllable panorama video generation with 360-degree video diffusion model. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) (2024) 
+  * [51] Wang, X., Xie, L., Dong, C., Shan, Y.: Real-esrgan: Training real-world blind super-resolution with pure synthetic data. In: Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) (2021) 
+  * [52] Wang, X., Yu, K., Wu, S., Gu, J., Liu, Y., Dong, C., Qiao, Y., ChangeÂ Loy, C.: Esrgan: Enhanced super-resolution generative adversarial networks. In: Proceedings of the European Conference on Computer Vision Workshops (ECCVW) (2018) 
+  * [53] Wang, Y., Yu, J., Zhang, J.: Zero-shot image restoration using denoising diffusion null-space model. In: Proceedings of the International Conference on Learning Representations (ICLR) (2022) 
+  * [54] Xia, B., Zhang, Y., Wang, S., Wang, Y., Wu, X., Tian, Y., Yang, W., VanÂ Gool, L.: Diffir: Efficient diffusion model for image restoration. In: Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) (2023) 
+  * [55] Xiao, J., Ehinger, K.A., Oliva, A., Torralba, A.: Recognizing scene viewpoint using panoramic place representation. In: Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR) (2012) 
+  * [56] Yagi, Y.: Omnidirectional sensing and its applications. IEICE Transactions on Information and Systems (TOIS) (1999) 
+  * [57] Yamazawa, K., Yagi, Y., Yachida, M.: Omnidirectional imaging with hyperboloidal projection. In: Proceedings of the IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) (1993) 
+  * [58] Yang, S., Zhou, Y., Liu, Z., Loy, C.C.: Rerender a video: Zero-shot text-guided video-to-video translation. In: Proceedings of the SIGGRAPH Asia 2023 Conference Papers (2023) 
+  * [59] Yinhuai, W., Yujie, H., Jiwen, Y., Jian, Z.: Gan prior based null-space learning for consistent super-resolution. In: Proceedings of the AAAI Conference on Artificial Intelligence (AAAI) (2023) 
+  * [60] Yoon, Y., Chung, I., Wang, L., Yoon, K.J.: Spheresr: 360deg image super-resolution with arbitrary projection via continuous spherical image representation. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) (2022) 
+  * [61] Yu, F., Wang, X., Cao, M., Li, G., Shan, Y., Dong, C.: Osrt: Omnidirectional image super-resolution with distortion-aware transformer. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) (2023) 
+  * [62] Yu, J., Zhang, X., Xu, Y., Zhang, J.: Cross: Diffusion model makes controllable, robust and secure image steganography. In: Proceedings of the Advances in Neural Information Processing Systems (NeurIPS) (2023) 
+  * [63] Yue, Z., Wang, J., Loy, C.C.: Resshift: Efficient diffusion model for image super-resolution by residual shifting. In: Advances in Neural Information Processing Systems (NeurIPS) (2023) 
+  * [64] Zhang, K., Liang, J., VanÂ Gool, L., Timofte, R.: Designing a practical degradation model for deep blind image super-resolution. In: Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) (2021) 
+  * [65] Zhang, R., Isola, P., Efros, A.A., Shechtman, E., Wang, O.: The unreasonable effectiveness of deep features as a perceptual metric. In: Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR) (2018) 
+  * [66] Zhang, W., Li, X., Shi, G., Chen, X., Qiao, Y., Zhang, X., Wu, X.M., Dong, C.: Real-world image super-resolution as multi-task learning. In: Advances in Neural Information Processing Systems (NeurIPS) (2023) 
+  * [67] Zhang, X., Zhang, Y., Xiong, R., Sun, Q., Zhang, J.: Herosnet: Hyperspectral explicable reconstruction and optimal sampling deep network for snapshot compressive imaging. In: Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR) (2022) 
+  * [68] Zhou, Y., Yu, M., Ma, H., Shao, H., Jiang, G.: Weighted-to-spherically-uniform ssim objective quality evaluation for panoramic video. In: Proceedings of the IEEE International Conference on Signal Processing (ICSP) (2018) 
+
+##  Supplementary Materials of â€œOmniSSR: Zero-shot Omnidirectional Image
+Super-Resolution using Stable Diffusion Modeâ€
+
+##  Appendix 0.A Extra Experiments
+
+###  0.A.1 Ablation Studies
+
+####  0.A.1.1 Ablation study of Î³ğ›¾\gammaitalic_Î³ on Gradient Decomposition
+(GD) correction
+
+According to the principle of GD correction, the super-resolution (SR) result in equirectangular projection (ERP) format ğ„0|tsubscriptğ„conditional0ğ‘¡\mathbf{E}_{0|t}bold_E start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT generated by StableSRÂ [49] can be further corrected to ğ„~0|t=ğ„0|t+Î³â¢ğ€â€ â¢(ğ„iâ¢nâ¢iâ¢tâˆ’ğ€ğ„0|t)subscript~ğ„conditional0ğ‘¡subscriptğ„conditional0ğ‘¡ğ›¾superscriptğ€â€ subscriptğ„ğ‘–ğ‘›ğ‘–ğ‘¡subscriptğ€ğ„conditional0ğ‘¡\tilde{\mathbf{E}}_{0|t}=\mathbf{E}_{0|t}+\gamma\mathbf{A}^{\dagger}(\mathbf{E% }_{init}-\mathbf{A}\mathbf{E}_{0|t})over~ start_ARG bold_E end_ARG start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT = bold_E start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT + italic_Î³ bold_A start_POSTSUPERSCRIPT â€ end_POSTSUPERSCRIPT ( bold_E start_POSTSUBSCRIPT italic_i italic_n italic_i italic_t end_POSTSUBSCRIPT - bold_AE start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT ), where Î³ğ›¾\gammaitalic_Î³ balances realness and fidelity. To improve the convergence of this gradient-based technique, we perform a grid search over different Î³ğ›¾\gammaitalic_Î³ values to obtain the best results, presented in Tab.Â 5. For an overall performance superiority, we choose Î³l=0.5,Î³p=1,Î³e=1formulae-sequencesubscriptğ›¾ğ‘™0.5formulae-sequencesubscriptğ›¾ğ‘1subscriptğ›¾ğ‘’1\gamma_{l}=0.5,\gamma_{p}=1,\gamma_{e}=1italic_Î³ start_POSTSUBSCRIPT italic_l end_POSTSUBSCRIPT = 0.5 , italic_Î³ start_POSTSUBSCRIPT italic_p end_POSTSUBSCRIPT = 1 , italic_Î³ start_POSTSUBSCRIPT italic_e end_POSTSUBSCRIPT = 1.
+
+![Refer to caption](x37.png) Figure 7: Visualization of different choices of Î³ğ›¾\gammaitalic_Î³. (a) Î³psubscriptğ›¾ğ‘\gamma_{p}italic_Î³ start_POSTSUBSCRIPT italic_p end_POSTSUBSCRIPT and Î³esubscriptğ›¾ğ‘’\gamma_{e}italic_Î³ start_POSTSUBSCRIPT italic_e end_POSTSUBSCRIPT fixed, while adjusting Î³lsubscriptğ›¾ğ‘™\gamma_{l}italic_Î³ start_POSTSUBSCRIPT italic_l end_POSTSUBSCRIPT; (b) Î³esubscriptğ›¾ğ‘’\gamma_{e}italic_Î³ start_POSTSUBSCRIPT italic_e end_POSTSUBSCRIPT and Î³lsubscriptğ›¾ğ‘™\gamma_{l}italic_Î³ start_POSTSUBSCRIPT italic_l end_POSTSUBSCRIPT fixed, while adjusting Î³psubscriptğ›¾ğ‘\gamma_{p}italic_Î³ start_POSTSUBSCRIPT italic_p end_POSTSUBSCRIPT; (c) Î³psubscriptğ›¾ğ‘\gamma_{p}italic_Î³ start_POSTSUBSCRIPT italic_p end_POSTSUBSCRIPT and Î³lsubscriptğ›¾ğ‘™\gamma_{l}italic_Î³ start_POSTSUBSCRIPT italic_l end_POSTSUBSCRIPT fixed, while adjusting Î³esubscriptğ›¾ğ‘’\gamma_{e}italic_Î³ start_POSTSUBSCRIPT italic_e end_POSTSUBSCRIPT. Table 5: Ablation studies of hyper-parameter Î³ğ›¾\gammaitalic_Î³ in GD correction. Î³psubscriptğ›¾ğ‘\gamma_{p}italic_Î³ start_POSTSUBSCRIPT italic_p end_POSTSUBSCRIPT denotes Î³ğ›¾\gammaitalic_Î³ in post-processing stage, Î³lsubscriptğ›¾ğ‘™\gamma_{l}italic_Î³ start_POSTSUBSCRIPT italic_l end_POSTSUBSCRIPT denotes Î³ğ›¾\gammaitalic_Î³ in post-processing stage, Î³esubscriptğ›¾ğ‘’\gamma_{e}italic_Î³ start_POSTSUBSCRIPT italic_e end_POSTSUBSCRIPT denotes Î³ğ›¾\gammaitalic_Î³ in post-processing stage. The best results are shown in Bold. Î³psubscriptğ›¾ğ‘\gamma_{p}italic_Î³ start_POSTSUBSCRIPT italic_p end_POSTSUBSCRIPT | Î³lsubscriptğ›¾ğ‘™\gamma_{l}italic_Î³ start_POSTSUBSCRIPT italic_l end_POSTSUBSCRIPT | Î³esubscriptğ›¾ğ‘’\gamma_{e}italic_Î³ start_POSTSUBSCRIPT italic_e end_POSTSUBSCRIPT |  WS-PSNRâ†‘â†‘\uparrowâ†‘ |  WS-SSIMâ†‘â†‘\uparrowâ†‘ |  FIDâ†“â†“\downarrowâ†“ |  LPIPSâ†“â†“\downarrowâ†“  
+---|---|---|---|---|---|---  
+1 | 0 | 1 | 24.33 | 0.6903 | 27.05 | 0.2925  
+1 | 0.25 | 1 | 25.64 | 0.7272 | 29.66 | 0.2912  
+1 | 0.5 | 1 | 25.77 | 0.7279 | 30.97 | 0.2977  
+1 | 0.75 | 1 | 25.74 | 0.7253 | 31.37 | 0.3029  
+1 | 1 | 1 | 25.69 | 0.7227 | 31.56 | 0.3067  
+0 | 0.5 | 1 | 25.37 | 0.7172 | 39.64 | 0.3184  
+0.25 | 0.5 | 1 | 25.53 | 0.7221 | 37.303 | 0.3090  
+0.5 | 0.5 | 1 | 25.67 | 0.7260 | 34.86 | 0.3037  
+0.75 | 0.5 | 1 | 25.75 | 0.7278 | 32.66 | 0.2960  
+1 | 0.5 | 1 | 25.77 | 0.7279 | 30.97 | 0.2977  
+1.25 | 0.5 | 1 | 25.74 | 0.7262 | 29.69 | 0.3052  
+1.5 | 0.5 | 1 | 25.66 | 0.7230 | 29.22 | 0.3169  
+1 | 0.5 | 0 | 25.07 | 0.7136 | 30.64 | 0.3121  
+1 | 0.5 | 0.25 | 25.38 | 0.7217 | 30.83 | 0.3066  
+1 | 0.5 | 0.5 | 25.56 | 0.7249 | 30.88 | 0.3037  
+1 | 0.5 | 0.75 | 25.66 | 0.7259 | 31.18 | 0.3020  
+1 | 0.5 | 1 | 25.77 | 0.7278 | 30.97 | 0.2977  
+1 | 0.5 | 1.25 | 25.71 | 0.7257 | 31.49 | 0.3010  
+  
+####  0.A.1.2 Ablation study of SR backbone
+
+We further conducted ablation studies on the selection of the SR backbone
+network to justify our choice of StableSR as the backbone and demonstrate the
+effectiveness of our proposed strategy at the same time. We selected the
+current state-of-the-art method in super-resolution work, SwinIRÂ [31], to
+compare its results with StableSRÂ [49], which is shown in Tab.Â 6.
+
+Table 6: Results of our proposed techniques on different backbones, StableSR, and SwinIR. Best results are shown in Bold. Backbone | Whether to use proposed techniques |  WS-PSNRâ†‘â†‘\uparrowâ†‘ |  WS-SSIMâ†‘â†‘\uparrowâ†‘ |  FIDâ†“â†“\downarrowâ†“ |  LPIPSâ†“â†“\downarrowâ†“  
+---|---|---|---|---|---  
+SwinIRÂ [31] | Ã—\timesÃ— | 26.11 | 0.7821 | 27.11 | 0.2390  
+SwinIRÂ [31] | âœ“âœ“\checkmarkâœ“ | 27.89 | 0.8409 | 13.33 | 0.1510  
+StableSRÂ [49] | âœ“âœ“\checkmarkâœ“ | 28.58 | 0.8540 | 13.01 | 0.1575  
+  
+Compared with SwinIR, StableSR significantly improves the fidelity and
+realness of reconstruction results. On the other hand, it also validates the
+effectiveness of our proposed Octadecaplex Tangent Information Interaction
+(OTII) and GD correction techniques on different backbones. Given its
+iterative updating and continuous correction nature, StableSR indeed has
+advantages over SwinIRâ€™s end-to-end reconstruction approach.
+
+###  0.A.2 Further Exploration of ERPâ†”â†”\leftrightarrowâ†”TP Transformation
+
+![Refer to caption](extracted/5541663/appendix/ablation_projection-
+transformation/ablation_proj-latent-gt_wo-preup/0000.png) ![Refer to
+caption](extracted/5541663/appendix/ablation_projection-
+transformation/ablation_proj-latent-gt_with-preup-4/0000.png) On latent
+feature On latent feature (without pre-upsampling) (with pre-upsampling)
+![Refer to caption](extracted/5541663/appendix/ablation_projection-
+transformation/ablation_proj-latent-noise_wo-preup/0000.png) ![Refer to
+caption](extracted/5541663/appendix/ablation_projection-
+transformation/ablation_proj-latent-noise_with-preup-4/0000.png) On the latent
+noise On the latent noise (without pre-upsampling) (with pre-upsampling)  
+---  
+Figure 8: Visualized comparison of projection transformations on latent image
+feature and latent noise. Zoom in for details.
+
+A simple question arises: can we perform ERPâ†”â†”\leftrightarrowâ†”TP444TP
+denotes tangent projection. transformation in the latent space, thus avoiding
+the need to transform intermediate results between image and latent space
+repeatedly? To answer this question, we made two attempts without Stable
+Diffusion (SD) encoder and decoder during each denoising step. GD correction
+is also not used in this section.
+
+1) Projection transformations on latent feature z0subscriptğ‘§0z_{0}italic_z
+start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT: In this experiment, we focus on the
+impact of projection transformation on image features in the latent space, so
+here we do not involve the denoising process. Therefore, we first transformed
+the ground truth ERP image ğ„0subscriptğ„0\mathbf{E}_{0}bold_E
+start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT to mğ‘šmitalic_m TP images
+{ğ±0(i)}i=1,â€¦,msubscriptsuperscriptsubscriptğ±0ğ‘–ğ‘–1â€¦ğ‘š\\{\mathbf{x}_{0}^{(i)}\\}_{i=1,...,m}{
+bold_x start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT (
+italic_i ) end_POSTSUPERSCRIPT } start_POSTSUBSCRIPT italic_i = 1 , â€¦ ,
+italic_m end_POSTSUBSCRIPT through ERPâ†’â†’\rightarrowâ†’TP. Then, we
+sequentially obtain the latent TP image features in the latent space:
+
+|  | ğ³0(i)=â„°â¢(ğ±0(i)),i=1,â€¦,m.formulae-sequencesuperscriptsubscriptğ³0ğ‘–â„°superscriptsubscriptğ±0ğ‘–ğ‘–1â€¦ğ‘š\displaystyle\mathbf{z}_{0}^{(i)}=\mathcal{E}(\mathbf{x}_{0}^{(i)}),i=1,...,m.bold_z start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT = caligraphic_E ( bold_x start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT ) , italic_i = 1 , â€¦ , italic_m . |  | (7)  
+---|---|---|---|---  
+  
+Next, we perform TPâ†’â†’\rightarrowâ†’ERPâ†’â†’\rightarrowâ†’TP on
+ğ³0(i)superscriptsubscriptğ³0ğ‘–\mathbf{z}_{0}^{(i)}bold_z start_POSTSUBSCRIPT
+0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT to
+obtain ğ³^0(i)superscriptsubscript^ğ³0ğ‘–\hat{\mathbf{z}}_{0}^{(i)}over^
+start_ARG bold_z end_ARG start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT
+start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT and decode them to TP
+image as follows:
+
+|  | ğ±^0(i)=ğ’Ÿâ¢(ğ³^0(i)),i=1,â€¦,m.formulae-sequencesuperscriptsubscript^ğ±0ğ‘–ğ’Ÿsuperscriptsubscript^ğ³0ğ‘–ğ‘–1â€¦ğ‘š\displaystyle\hat{\mathbf{x}}_{0}^{(i)}=\mathcal{D}(\hat{\mathbf{z}}_{0}^{(i)}% ),i=1,...,m.over^ start_ARG bold_x end_ARG start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT = caligraphic_D ( over^ start_ARG bold_z end_ARG start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT ) , italic_i = 1 , â€¦ , italic_m . |  | (8)  
+---|---|---|---|---  
+  
+Finally, the decoded TP image
+ğ±^0(i)superscriptsubscript^ğ±0ğ‘–\hat{\mathbf{x}}_{0}^{(i)}over^ start_ARG
+bold_x end_ARG start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT (
+italic_i ) end_POSTSUPERSCRIPT are transformed by TPâ†’â†’\rightarrowâ†’ERP to
+get ğ„^0subscript^ğ„0\hat{\mathbf{E}}_{0}over^ start_ARG bold_E end_ARG
+start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT.
+
+2) Projection transformations on latent noise
+Ïµt(i)superscriptsubscriptitalic-
+Ïµğ‘¡ğ‘–\boldsymbol{\epsilon}_{t}^{(i)}bold_italic_Ïµ start_POSTSUBSCRIPT
+italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_i )
+end_POSTSUPERSCRIPT: In this experiment, we focus on the impact of projection
+transformation on the noise Ïµt(i)superscriptsubscriptbold-italic-
+Ïµğ‘¡ğ‘–\boldsymbol{\epsilon}_{t}^{(i)}bold_italic_Ïµ start_POSTSUBSCRIPT
+italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_i )
+end_POSTSUPERSCRIPT. We transform the low-resolution ERP image to TP images
+and feed the latter into StableSR pipeline. At each sampling step, we directly
+perform TPâ†’â†’\rightarrowâ†’ERPâ†’â†’\rightarrowâ†’TP transformation on the
+predicted noise {Ïµt(i)}i=1,â€¦,msubscriptsuperscriptsubscriptbold-italic-
+Ïµğ‘¡ğ‘–ğ‘–1â€¦ğ‘š\\{\boldsymbol{\epsilon}_{t}^{(i)}\\}_{i=1,...,m}{
+bold_italic_Ïµ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT
+start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT } start_POSTSUBSCRIPT
+italic_i = 1 , â€¦ , italic_m end_POSTSUBSCRIPT to get
+{Ïµ^t(i)}i=1,â€¦,msubscriptsuperscriptsubscript^bold-italic-
+Ïµğ‘¡ğ‘–ğ‘–1â€¦ğ‘š\\{\hat{\boldsymbol{\epsilon}}_{t}^{(i)}\\}_{i=1,...,m}{
+over^ start_ARG bold_italic_Ïµ end_ARG start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT }
+start_POSTSUBSCRIPT italic_i = 1 , â€¦ , italic_m end_POSTSUBSCRIPT, and using
+Ïµ^t(i)superscriptsubscript^bold-italic-
+Ïµğ‘¡ğ‘–\hat{\boldsymbol{\epsilon}}_{t}^{(i)}over^ start_ARG bold_italic_Ïµ
+end_ARG start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT (
+italic_i ) end_POSTSUPERSCRIPT for following denoising.
+
+In the two experiments above, we also present the effects of using and not
+using pre-upsampling in the TPâ†’â†’\rightarrowâ†’ERPâ†’â†’\rightarrowâ†’TP
+transformation process, respectively. We illustrate the visual results of
+ğ„^0subscript^ğ„0\hat{\mathbf{E}}_{0}over^ start_ARG bold_E end_ARG
+start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT, using the 0000.png in image ODI-SR
+testset as an example in Fig.Â 8. When performing projection transformations
+on latent feature z0subscriptğ‘§0z_{0}italic_z start_POSTSUBSCRIPT 0
+end_POSTSUBSCRIPT, the decoded images exhibit severe blurring. Although using
+pre-upsampling in the TPâ†’â†’\rightarrowâ†’ERPâ†’â†’\rightarrowâ†’TP process
+can alleviate the blurriness to some extent and present clearer image content
+in certain areas, the overall image quality remains poor. In the experiment
+involving projection transformations on latent noise
+Ïµt(i)superscriptsubscriptitalic-
+Ïµğ‘¡ğ‘–\boldsymbol{\epsilon}_{t}^{(i)}bold_italic_Ïµ start_POSTSUBSCRIPT
+italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_i )
+end_POSTSUPERSCRIPT, it can be observed that regardless of whether pre-
+upsampling strategy is used or not, the super-resolved images suffer from
+significant damage. This may be attributed to the SD encoderâ€™s spatial
+downsampling at Ã—\timesÃ—8 scale, compressing image pixels within an
+8Ã—\timesÃ—8 patch into a single latent pixel. Projection transformations, on
+the other hand, operate at the image pixel level with fine granularity.
+Applying such fine-grained operations directly to latent pixels can greatly
+disrupt the original image structure. Therefore, projection transformations
+related to ODIs should be performed in image space rather than in the latent
+space mapped by the SD Variational Auto Encoder (VAE).
+
+###  0.A.3 Exploration of SD Encoder and Decoder
+
+During the ablation study, we observed that OmniSSR, when GD correction is
+removed while OTII is retained, demonstrates improved fidelity (e.g., WS-PSNR,
+WS-SSIM) and deteriorated realness (e.g., FID, LPIPS) compared to the original
+StableSR model. Upon examining the outputs of the ablation model under this
+configuration, significant color shift issues were identified, as depicted in
+Fig.Â 9(a).
+
+We initially suspected that this color shift stemmed from the utilization of
+the SD VAE before and after OTII in each denoising step. To validate this
+hypothesis, we conducted a visual comparison experiment using image 0006.png
+from the ODI-SR testset as an example. It can be observed that even when GD
+correction and OTII are successively removed, as illustrated in Fig.Â 9(a)(b),
+the color shift persists. It is only when we eliminate the repeated usage of
+SD VAE in each denoising step that the color at the boundary of black and
+white tiles returns to normal, as shown in Fig.Â 9(c). Ground truth reference
+can be seen in Fig.Â 9(d). This phenomenon of color shift indicates the
+potential problem caused by frequently using SD VAE.
+
+![Refer to caption](x38.png) Figure 9: Phenomenon and causes of color shift:
+By progressively removing different components of OmniSSR (a)(b)(c), we
+ultimately discovered that the color shift in the super-resolution results
+disappears again after removing the SD VAE used in the denoising step. This
+indicates the potential risk of color shift associated with frequent usage of
+SD VAE during denoising.
+
+###  0.A.4 The Global Continuity of ODIs
+
+The existing ODISR methods directly perform SR on ERP images, resulting in the
+discontinuity between the left and right sidesÂ [3]. Our proposed OTII treats
+TP images as the direct input for the network. Besides facilitating the
+transfer use of existing planar image-specific diffusion models, it also
+effectively considers the omnidirectional characteristics of ODIs. We selected
+some visualization results of OSRTÂ [61] and OmniSSR, focusing on the
+continuity near the left and right sides of the ERP. As shown in Fig.Â 10,
+OSRT exhibits poor continuity between the left and right sides of the ERP,
+while OmniSSR naturally inherits the advantage of TP images in seamlessly
+spanning different areas of the ERP.
+
+![Refer to caption](x39.png) Figure 10: Continuity of left and right part of
+SR results on OSRT and our proposed OmniSSR. It is shown that OSRT suffers
+from serious artifacts and bad continuity. All ERP images have been rotated by
+180 degrees to stitch the left and right sides. (Upper image: 0039 of ODI-SR
+test set, lower image: 0015 of SUN test set.)
+
+###  0.A.5 Time Consumption
+
+The inference runtime of different methods are compared as follows.
+Considering fair comparison, we use the default settings referred to in
+corresponding papers. The diffusion sampling steps for OmniSSR are 200, DDRMÂ
+[26] 100, and PSLDÂ [41] 1000.555We have tried to use the same sampling
+accelerate strategy in DDRM, but get bad restored results. All experiments are
+conducted on a single NVIDIA 3090Ti GPU.
+
+Table 7: Time consumption of OmniSSR and other SR methods. Method |  Runtime per ERP image (s)â†“â†“\downarrowâ†“  
+---|---  
+SwinIRÂ [31] | 0.87  
+OSRTÂ [61] | 1.44  
+DDRM | 711.95  
+PSLD | 6720.87  
+OmniSSR (Ours) | 726.19  
+  
+##  Appendix 0.B Theoretical Discussion
+
+In this section, we provide a simple theoretical discussion of our proposed GD
+correction technique, explaining why a single step of GD would also work and
+obtain better results.
+
+Take the update step in GD correction as an example, let us first re-examine
+this step:
+
+| ğ„~0|t=ğ„0|t+Î³eâ¢ğ€â€ â¢(ğ„iâ¢nâ¢iâ¢tâˆ’ğ€ğ„0|t),subscript~ğ„conditional0ğ‘¡subscriptğ„conditional0ğ‘¡subscriptğ›¾ğ‘’superscriptğ€â€ subscriptğ„ğ‘–ğ‘›ğ‘–ğ‘¡subscriptğ€ğ„conditional0ğ‘¡\tilde{\mathbf{E}}_{0|t}=\mathbf{E}_{0|t}+\gamma_{e}\mathbf{A}^{\dagger}(% \mathbf{E}_{init}-\mathbf{A}\mathbf{E}_{0|t}),over~ start_ARG bold_E end_ARG start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT = bold_E start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT + italic_Î³ start_POSTSUBSCRIPT italic_e end_POSTSUBSCRIPT bold_A start_POSTSUPERSCRIPT â€ end_POSTSUPERSCRIPT ( bold_E start_POSTSUBSCRIPT italic_i italic_n italic_i italic_t end_POSTSUBSCRIPT - bold_AE start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT ) , |  | (9)  
+---|---|---|---  
+  
+where Î³eâ¢ğ€â€ â¢(ğ„iâ¢nâ¢iâ¢tâˆ’ğ€ğ„0|t)subscriptğ›¾ğ‘’superscriptğ€â€ subscriptğ„ğ‘–ğ‘›ğ‘–ğ‘¡subscriptğ€ğ„conditional0ğ‘¡\gamma_{e}\mathbf{A}^{\dagger}(\mathbf{E}_{init}-\mathbf{A}\mathbf{E}_{0|t})italic_Î³ start_POSTSUBSCRIPT italic_e end_POSTSUBSCRIPT bold_A start_POSTSUPERSCRIPT â€ end_POSTSUPERSCRIPT ( bold_E start_POSTSUBSCRIPT italic_i italic_n italic_i italic_t end_POSTSUBSCRIPT - bold_AE start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT ) is the gradient of fidelity term â€–ğ„iâ¢nâ¢iâ¢tâˆ’ğ€ğ„0|tâ€–Fsubscriptnormsubscriptğ„ğ‘–ğ‘›ğ‘–ğ‘¡subscriptğ€ğ„conditional0ğ‘¡ğ¹||\mathbf{E}_{init}-\mathbf{A}\mathbf{E}_{0|t}||_{F}| | bold_E start_POSTSUBSCRIPT italic_i italic_n italic_i italic_t end_POSTSUBSCRIPT - bold_AE start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT | | start_POSTSUBSCRIPT italic_F end_POSTSUBSCRIPT, and Î³e=2Ã—Î±â¢Â (learning rate)subscriptğ›¾ğ‘’2ğ›¼Â (learning rate)\gamma_{e}=2\times\alpha\text{ (learning rate)}italic_Î³ start_POSTSUBSCRIPT italic_e end_POSTSUBSCRIPT = 2 Ã— italic_Î± (learning rate).
+
+An obvious and direct question is: why did we perform only a single update
+step rather than multiple steps? Through the following analysis, we will
+demonstrate that, in this context, multi-step gradient descent and single-step
+are essentially equivalent, with the number of steps being governed by the
+coefficient Î³esubscriptğ›¾ğ‘’\gamma_{e}italic_Î³ start_POSTSUBSCRIPT italic_e
+end_POSTSUBSCRIPT.
+
+Analysis Suppose we take multiple steps in GD correction and are taking step kğ‘˜kitalic_k to kâˆ’1ğ‘˜1k-1italic_k - 1. As ğ„~0|t(k)superscriptsubscript~ğ„conditional0ğ‘¡ğ‘˜\tilde{\mathbf{E}}_{0|t}^{(k)}over~ start_ARG bold_E end_ARG start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_k ) end_POSTSUPERSCRIPT can be represented via ğ„~0|t(kâˆ’1)superscriptsubscript~ğ„conditional0ğ‘¡ğ‘˜1\tilde{\mathbf{E}}_{0|t}^{(k-1)}over~ start_ARG bold_E end_ARG start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_k - 1 ) end_POSTSUPERSCRIPT in linear form, we can use ğ„~0|t(0)superscriptsubscript~ğ„conditional0ğ‘¡0\tilde{\mathbf{E}}_{0|t}^{(0)}over~ start_ARG bold_E end_ARG start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( 0 ) end_POSTSUPERSCRIPT to express ğ„~0|t(k)superscriptsubscript~ğ„conditional0ğ‘¡ğ‘˜\tilde{\mathbf{E}}_{0|t}^{(k)}over~ start_ARG bold_E end_ARG start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_k ) end_POSTSUPERSCRIPT, and ğ„~0|t(0)superscriptsubscript~ğ„conditional0ğ‘¡0\tilde{\mathbf{E}}_{0|t}^{(0)}over~ start_ARG bold_E end_ARG start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( 0 ) end_POSTSUPERSCRIPT only has linear coefficients composed of Î³esubscriptğ›¾ğ‘’\gamma_{e}italic_Î³ start_POSTSUBSCRIPT italic_e end_POSTSUBSCRIPT, ğ€ğ€\mathbf{A}bold_A and ğ€â€ superscriptğ€â€ \mathbf{A}^{\dagger}bold_A start_POSTSUPERSCRIPT â€ end_POSTSUPERSCRIPT. Thus for fixed Î³esubscriptğ›¾ğ‘’\gamma_{e}italic_Î³ start_POSTSUBSCRIPT italic_e end_POSTSUBSCRIPT, there is no difference between one step and multiple steps of GD correction. For adaptive Î³esubscriptğ›¾ğ‘’\gamma_{e}italic_Î³ start_POSTSUBSCRIPT italic_e end_POSTSUBSCRIPT, it is also obvious that ğ„~0|t(k)superscriptsubscript~ğ„conditional0ğ‘¡ğ‘˜\tilde{\mathbf{E}}_{0|t}^{(k)}over~ start_ARG bold_E end_ARG start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( italic_k ) end_POSTSUPERSCRIPT can be represented via ğ„~0|t(0)superscriptsubscript~ğ„conditional0ğ‘¡0\tilde{\mathbf{E}}_{0|t}^{(0)}over~ start_ARG bold_E end_ARG start_POSTSUBSCRIPT 0 | italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( 0 ) end_POSTSUPERSCRIPT with linear transforms and different Î³esubscriptğ›¾ğ‘’\gamma_{e}italic_Î³ start_POSTSUBSCRIPT italic_e end_POSTSUBSCRIPT. Thus for a better trade-off between performance and inference time, we turn to use one step of GD correction.

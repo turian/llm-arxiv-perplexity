@@ -1,0 +1,761 @@
+  1. 1 Introduction
+  2. 2 Background
+    1. Adversarial Examples and Adversarial Training
+    2. Diffusion Models and Classifier-free Guidance
+  3. 3 Methodology
+    1. CE Dataset Generation
+  4. 4 Experiments
+    1. CE Dataset Evaluation
+    2. Robust Model Evaluation
+    3. Limitations
+  5. 5 Conclusion
+  6. 6 Reproducibility Information
+  7. 7 CE Generation Method
+    1. Robust Model CEs
+
+HTML conversions sometimes display errors due to content that did not convert
+correctly from the source. This paper uses the following packages that are not
+yet supported by the HTML conversion tool. Feedback on these issues are not
+necessary; they are known and are being worked on.
+
+  * failed: epic
+
+Authors: achieve the best HTML results from your LaTeX submissions by
+following these best practices.
+
+License: CC BY 4.0
+
+arXiv:2404.10588v2 [cs.LG] 17 Apr 2024
+
+# Do Counterfactual Examples Complicate Adversarial Training?
+
+Eric Yeats11{}^{1}start_FLOATSUPERSCRIPT 1 end_FLOATSUPERSCRIPT â€ƒCameron
+Darwin â€ƒEduardo Ortega22{}^{2}start_FLOATSUPERSCRIPT 2 end_FLOATSUPERSCRIPT
+â€ƒFrank Liu33{}^{3}start_FLOATSUPERSCRIPT 3 end_FLOATSUPERSCRIPT â€ƒHai
+Li11{}^{1}start_FLOATSUPERSCRIPT 1 end_FLOATSUPERSCRIPT  
+11{}^{1}start_FLOATSUPERSCRIPT 1 end_FLOATSUPERSCRIPTDuke University
+â€ƒ22{}^{2}start_FLOATSUPERSCRIPT 2 end_FLOATSUPERSCRIPTArizona State
+University â€ƒ33{}^{3}start_FLOATSUPERSCRIPT 3 end_FLOATSUPERSCRIPTOld
+Dominion University  
+
+###### Abstract
+
+We leverage diffusion models to study the robustness-performance tradeoff of
+robust classifiers. Our approach introduces a simple, pretrained diffusion
+method to generate low-norm counterfactual examples (CEs): semantically
+altered data which results in different true class membership. We report that
+the confidence and accuracy of robust models on their clean training data are
+associated with the proximity of the data to their CEs. Moreover, robust
+models perform very poorly when evaluated on the CEs directly, as they become
+increasingly invariant to the low-norm, semantic changes brought by CEs. The
+results indicate a significant overlap between non-robust and semantic
+features, countering the common assumption that non-robust features are not
+interpretable.
+
+![Refer to caption](x1.png) Figure 1: Conceptual depiction of the relationship
+between accuracy of robustly trained models with proximity to counterfactual
+examples (CEs). Stronger adversarial training inevitably leads to
+misclassification of some clean training data, incurring downstream test
+performance loss. We hypothesize that adversarially trained models are forced
+to become invariant to some semantic features due to the nearby presence of
+true CEs.
+
+##  1 Introduction
+
+Leading theory by Ilyas etÂ al. [10] asserts that adversarial vulnerability
+arises from reliance of DNN classifiers on non-robust features: well-
+generalizing, yet brittle features which are not comprehensible to humans. As
+robust models must become invariant to this subset of predictive features,
+they inevitably lose performance [20]. However, humans appear to break this
+trend by simultaneously maintaining good performance and robustness on
+adversarial data [16].
+
+The existence of adversarial perturbations reflects the stark differences
+between the perception of DNNs and our own. DNNs are notoriously
+uninterpretable [17, 23], and there is a need for interpretable decision-
+making in high-stakes scenarios. One model-agnostic way to interpret
+classifier decision-making is to generate counterfactual examples (CEs):
+subtle, semantic changes to an input datum which would result in a classifier
+predicting a target class [21]. Following their definition from psychology,
+CEs for an image-label pair (x,y)ğ‘¥ğ‘¦(x,y)( italic_x , italic_y ) can be
+described by the statement â€œif yâ€²superscriptğ‘¦â€²y^{\prime}italic_y
+start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT were the true class of image
+xğ‘¥xitalic_x (instead of yğ‘¦yitalic_y), then xğ‘¥xitalic_x would look like
+xâ€²superscriptğ‘¥â€²x^{\prime}italic_x start_POSTSUPERSCRIPT â€²
+end_POSTSUPERSCRIPT.â€ While CEs can help users understand the decision-making
+of DNN classifiers, practical methods to generate CEs are problematically
+similar to those for adversarial attacks [5, 15]. Hence, methods to generate
+CEs for DNNs often require robust models in some form [2, 1].
+
+We develop new understanding of the robustness-performance tradeoff through
+our study of the semantic feature distributions learned by robust classifiers.
+Our study leverages independently generated CE datasets which we create with a
+simple, pretrained diffusion model technique. We report that robust models,
+unlike standard (non-robust) models, are more likely to lose confidence on and
+misclassify clean training data which have nearby CEs, and robust models
+become invariant to the semantic changes brought by CEs. Contrary to common
+assumptions, our findings suggest significant overlap between non-robust and
+semantically meaningful features. This conflict speaks to the complexity of
+the adversarial problem and motivates alternative approaches to robustness
+which can resolve or avert it.{NoHyper} â€ â€ Corresponding Author Email:
+eric.yeats@duke.edu
+
+##  2 Background
+
+#### Adversarial Examples and Adversarial Training
+
+Adversarial examples are minute, malicious data perturbations which alter
+classifier predictions [19]. For a classifier
+fÎ¸:ğ’³â†’ğ’´:subscriptğ‘“ğœƒâ†’ğ’³ğ’´f_{\theta}:\mathcal{X}\rightarrow\mathcal{Y}italic_f
+start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT : caligraphic_X â†’
+caligraphic_Y where
+ğ’³âˆˆâ„nğ’³superscriptâ„ğ‘›\mathcal{X}\in\mathbb{R}^{n}caligraphic_X âˆˆ
+blackboard_R start_POSTSUPERSCRIPT italic_n end_POSTSUPERSCRIPT and
+ğ’´ğ’´\mathcal{Y}caligraphic_Y is the space of categorical distributions of
+support cardinality kğ‘˜kitalic_k, y~~ğ‘¦\tilde{y}over~ start_ARG italic_y
+end_ARG-targeted adversarial examples x~~ğ‘¥\tilde{x}over~ start_ARG italic_x
+end_ARG are often computed by altering an input xğ‘¥xitalic_x to descend the
+negative log loss [6]
+â„’:Î˜Ã—ğ’³Ã—ğ’´â†’â„+:â„’â†’Î˜ğ’³ğ’´superscriptâ„\mathcal{L}:\Theta\times\mathcal{X}\times\mathcal{Y}\rightarrow\mathbb{R}^{+}caligraphic_L
+: roman_Î˜ Ã— caligraphic_X Ã— caligraphic_Y â†’ blackboard_R
+start_POSTSUPERSCRIPT + end_POSTSUPERSCRIPT:
+
+| x~=argâ¢minxâ€²âˆˆâ„¬Îµâ¢(x)â¡â„’â¢(Î¸,xâ€²,y~),~ğ‘¥subscriptargminsuperscriptğ‘¥â€²subscriptâ„¬ğœ€ğ‘¥â„’ğœƒsuperscriptğ‘¥â€²~ğ‘¦\tilde{x}=\operatorname*{arg\,min}_{x^{\prime}\in\mathcal{B}_{\varepsilon}(x)}% \mathcal{L}(\theta,x^{\prime},\tilde{y}),over~ start_ARG italic_x end_ARG = start_OPERATOR roman_arg roman_min end_OPERATOR start_POSTSUBSCRIPT italic_x start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT âˆˆ caligraphic_B start_POSTSUBSCRIPT italic_Îµ end_POSTSUBSCRIPT ( italic_x ) end_POSTSUBSCRIPT caligraphic_L ( italic_Î¸ , italic_x start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT , over~ start_ARG italic_y end_ARG ) , |  | (1)  
+---|---|---|---  
+  
+where the neighborhood
+â„¬Îµâ¢(x)subscriptâ„¬ğœ€ğ‘¥\mathcal{B}_{\varepsilon}(x)caligraphic_B
+start_POSTSUBSCRIPT italic_Îµ end_POSTSUBSCRIPT ( italic_x ) is commonly
+defined with the Lâˆsuperscriptğ¿L^{\infty}italic_L start_POSTSUPERSCRIPT âˆ
+end_POSTSUPERSCRIPT or L2superscriptğ¿2L^{2}italic_L start_POSTSUPERSCRIPT 2
+end_POSTSUPERSCRIPT norm. In this work, we focus on
+L2superscriptğ¿2L^{2}italic_L start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT
+adversarial examples. Adversarial training consists of finding the optimal
+model parameters Î¸*superscriptğœƒ\theta^{*}italic_Î¸ start_POSTSUPERSCRIPT *
+end_POSTSUPERSCRIPT for the robust objective [12]:
+
+| Î¸*=argâ¢minÎ¸â¡ğ”¼x,yâ¢maxxâ€²âˆˆâ„¬Îµâ¢(x)â¡â„’â¢(Î¸,xâ€²,y).superscriptğœƒsubscriptargminğœƒsubscriptğ”¼ğ‘¥ğ‘¦subscriptsuperscriptğ‘¥â€²subscriptâ„¬ğœ€ğ‘¥â„’ğœƒsuperscriptğ‘¥â€²ğ‘¦\theta^{*}=\operatorname*{arg\,min}_{\theta}\mathbb{E}_{x,y}\max_{x^{\prime}% \in\mathcal{B}_{\varepsilon}(x)}\mathcal{L}(\theta,x^{\prime},y).italic_Î¸ start_POSTSUPERSCRIPT * end_POSTSUPERSCRIPT = start_OPERATOR roman_arg roman_min end_OPERATOR start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT blackboard_E start_POSTSUBSCRIPT italic_x , italic_y end_POSTSUBSCRIPT roman_max start_POSTSUBSCRIPT italic_x start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT âˆˆ caligraphic_B start_POSTSUBSCRIPT italic_Îµ end_POSTSUBSCRIPT ( italic_x ) end_POSTSUBSCRIPT caligraphic_L ( italic_Î¸ , italic_x start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT , italic_y ) . |  | (2)  
+---|---|---|---  
+  
+There are other robustness methods such as gradient regularization [25, 4] and
+randomized smoothing [3], but adversarial training is the most well-known and
+successful.
+
+#### Diffusion Models and Classifier-free Guidance
+
+Diffusion models learn a sequence of functions ÏµÎ¸â¢(xt,t)subscriptitalic-
+Ïµğœƒsubscriptğ‘¥ğ‘¡ğ‘¡\epsilon_{\theta}(x_{t},t)italic_Ïµ start_POSTSUBSCRIPT
+italic_Î¸ end_POSTSUBSCRIPT ( italic_x start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT , italic_t ) which predict the noise added to data by a
+diffusion process at time tâˆˆ[0,1]ğ‘¡01t\in[0,1]italic_t âˆˆ [ 0 , 1 ] [9].
+To generate new data, ÏµÎ¸â¢(xt,t)subscriptitalic-
+Ïµğœƒsubscriptğ‘¥ğ‘¡ğ‘¡\epsilon_{\theta}(x_{t},t)italic_Ïµ start_POSTSUBSCRIPT
+italic_Î¸ end_POSTSUBSCRIPT ( italic_x start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT , italic_t ) is used to iteratively denoise samples
+xtsubscriptğ‘¥ğ‘¡x_{t}italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT
+initially drawn from a known noise prior. The noise prediction function
+ÏµÎ¸â¢(xt,t)subscriptitalic-
+Ïµğœƒsubscriptğ‘¥ğ‘¡ğ‘¡\epsilon_{\theta}(x_{t},t)italic_Ïµ start_POSTSUBSCRIPT
+italic_Î¸ end_POSTSUBSCRIPT ( italic_x start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT , italic_t ) is known to approximate the negative score at
+diffusion step tğ‘¡titalic_t [18, 24] (i.e.,
+ÏµÎ¸â¢(xt,t)â‰ˆâˆ’Ïƒtâ¢âˆ‡xlogâ¡ptâ¢(xt)subscriptitalic-
+Ïµğœƒsubscriptğ‘¥ğ‘¡ğ‘¡subscriptğœğ‘¡subscriptâˆ‡ğ‘¥subscriptğ‘ğ‘¡subscriptğ‘¥ğ‘¡\epsilon_{\theta}(x_{t},t)\approx-\sigma_{t}\nabla_{x}\log
+p_{t}(x_{t})italic_Ïµ start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT (
+italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT , italic_t ) â‰ˆ -
+italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT âˆ‡
+start_POSTSUBSCRIPT italic_x end_POSTSUBSCRIPT roman_log italic_p
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ( italic_x start_POSTSUBSCRIPT
+italic_t end_POSTSUBSCRIPT )). For class-conditional diffusion models, this
+property can be used to reproduce the effect of adding targeted classifier
+gradients [8]:
+
+| ÏµÎ¸wâ¢(xt,y,t):-(w+1)â¢ÏµÎ¸â¢(xt,y,t)âˆ’wâ¢ÏµÎ¸â¢(xt,t)â‰ˆÏµÎ¸â¢(xt,y,t)+wâ¢Ïƒtâ¢âˆ‡xâ„’â¢(Î¸t,xt,y),:-subscriptsuperscriptitalic-Ïµğ‘¤ğœƒsubscriptğ‘¥ğ‘¡ğ‘¦ğ‘¡ğ‘¤1subscriptitalic-Ïµğœƒsubscriptğ‘¥ğ‘¡ğ‘¦ğ‘¡ğ‘¤subscriptitalic-Ïµğœƒsubscriptğ‘¥ğ‘¡ğ‘¡subscriptitalic-Ïµğœƒsubscriptğ‘¥ğ‘¡ğ‘¦ğ‘¡ğ‘¤subscriptğœğ‘¡subscriptâˆ‡ğ‘¥â„’subscriptğœƒğ‘¡subscriptğ‘¥ğ‘¡ğ‘¦\epsilon^{w}_{\theta}(x_{t},y,t)\coloneq(w+1)\epsilon_{\theta}(x_{t},y,t)-w% \epsilon_{\theta}(x_{t},t)\\\ \approx\epsilon_{\theta}(x_{t},y,t)+w\sigma_{t}\nabla_{x}\mathcal{L}(\theta_{t% },x_{t},y),start_ROW start_CELL italic_Ïµ start_POSTSUPERSCRIPT italic_w end_POSTSUPERSCRIPT start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT ( italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT , italic_y , italic_t ) :- ( italic_w + 1 ) italic_Ïµ start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT ( italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT , italic_y , italic_t ) - italic_w italic_Ïµ start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT ( italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT , italic_t ) end_CELL end_ROW start_ROW start_CELL â‰ˆ italic_Ïµ start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT ( italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT , italic_y , italic_t ) + italic_w italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT âˆ‡ start_POSTSUBSCRIPT italic_x end_POSTSUBSCRIPT caligraphic_L ( italic_Î¸ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT , italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT , italic_y ) , end_CELL end_ROW |  | (3)  
+---|---|---|---  
+  
+where Î¸tsubscriptğœƒğ‘¡\theta_{t}italic_Î¸ start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT are the equivalent parameters for a time-conditional
+classifier. Coined â€œclassifier-free guidanceâ€ with weight wğ‘¤witalic_w,
+sampling with ÏµÎ¸wâ¢(xt,y,t)subscriptsuperscriptitalic-
+Ïµğ‘¤ğœƒsubscriptğ‘¥ğ‘¡ğ‘¦ğ‘¡\epsilon^{w}_{\theta}(x_{t},y,t)italic_Ïµ
+start_POSTSUPERSCRIPT italic_w end_POSTSUPERSCRIPT start_POSTSUBSCRIPT
+italic_Î¸ end_POSTSUBSCRIPT ( italic_x start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT , italic_y , italic_t ) as the noise prediction function
+generates high-quality, conditional data.
+
+##  3 Methodology
+
+#### CE Dataset Generation
+
+Our approach to CE generation for datum xğ‘¥xitalic_x is to recast it as
+sampling from a sequence of un-normalized distributions defined by the product
+of the data distribution (represented by the class-conditional diffusion
+model) with an independently diffused CE â€œneighborhoodâ€ distribution of
+scale ÏƒCâ¢Esubscriptğœğ¶ğ¸\sigma_{CE}italic_Ïƒ start_POSTSUBSCRIPT italic_C
+italic_E end_POSTSUBSCRIPT centered on
+Î¼Câ¢E=xsubscriptğœ‡ğ¶ğ¸ğ‘¥\mu_{CE}=xitalic_Î¼ start_POSTSUBSCRIPT italic_C
+italic_E end_POSTSUBSCRIPT = italic_x. The score of this distribution at each
+time tğ‘¡titalic_t is the sum of scores of the two components, so we may
+simply add the diffused neighborhood score to the diffusion model score.
+
+We present two variants of the noise prediction function corresponding to
+different choices for the neighborhood distribution: Gaussian and Boltzmann-
+inspired (see appendix).
+
+| ÏµÎ¸Gâ¢(xt,y,Î¼Câ¢E,t):-ÏµÎ¸wâ¢(xt,y,t)âˆ’Î±tâ¢Î¼Câ¢Eâˆ’xtÎ±t2â¢ÏƒCâ¢E2+Ïƒt2:-subscriptsuperscriptitalic-Ïµğºğœƒsubscriptğ‘¥ğ‘¡ğ‘¦subscriptğœ‡ğ¶ğ¸ğ‘¡subscriptsuperscriptitalic-Ïµğ‘¤ğœƒsubscriptğ‘¥ğ‘¡ğ‘¦ğ‘¡subscriptğ›¼ğ‘¡subscriptğœ‡ğ¶ğ¸subscriptğ‘¥ğ‘¡superscriptsubscriptğ›¼ğ‘¡2superscriptsubscriptğœğ¶ğ¸2superscriptsubscriptğœğ‘¡2\epsilon^{G}_{\theta}(x_{t},y,\mu_{CE},t)\coloneq\epsilon^{w}_{\theta}(x_{t},y% ,t)-\frac{\alpha_{t}\mu_{CE}-x_{t}}{\alpha_{t}^{2}\sigma_{CE}^{2}+\sigma_{t}^{% 2}}italic_Ïµ start_POSTSUPERSCRIPT italic_G end_POSTSUPERSCRIPT start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT ( italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT , italic_y , italic_Î¼ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT , italic_t ) :- italic_Ïµ start_POSTSUPERSCRIPT italic_w end_POSTSUPERSCRIPT start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT ( italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT , italic_y , italic_t ) - divide start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Î¼ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT - italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT + italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT end_ARG |  | (4)  
+---|---|---|---  
+| ÏµÎ¸Bâ¢(xt,y,Î¼Câ¢E,t):-ÏµÎ¸wâ¢(xt,y,t)âˆ’2Î±tâ¢ÏƒCâ¢Eâ¢hardtanhâ¢(Î³tâ¢(xtâˆ’Î±tâ¢Î¼Câ¢E)):-subscriptsuperscriptitalic-Ïµğµğœƒsubscriptğ‘¥ğ‘¡ğ‘¦subscriptğœ‡ğ¶ğ¸ğ‘¡subscriptsuperscriptitalic-Ïµğ‘¤ğœƒsubscriptğ‘¥ğ‘¡ğ‘¦ğ‘¡2subscriptğ›¼ğ‘¡subscriptğœğ¶ğ¸hardtanhsubscriptğ›¾ğ‘¡subscriptğ‘¥ğ‘¡subscriptğ›¼ğ‘¡subscriptğœ‡ğ¶ğ¸\epsilon^{B}_{\theta}(x_{t},y,\mu_{CE},t)\coloneq\\\ \epsilon^{w}_{\theta}(x_{t},y,t)-\frac{\sqrt{2}}{\alpha_{t}\sigma_{CE}}\text{% hardtanh}(\gamma_{t}\,(x_{t}-\alpha_{t}\mu_{CE}))start_ROW start_CELL italic_Ïµ start_POSTSUPERSCRIPT italic_B end_POSTSUPERSCRIPT start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT ( italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT , italic_y , italic_Î¼ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT , italic_t ) :- end_CELL end_ROW start_ROW start_CELL italic_Ïµ start_POSTSUPERSCRIPT italic_w end_POSTSUPERSCRIPT start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT ( italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT , italic_y , italic_t ) - divide start_ARG square-root start_ARG 2 end_ARG end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG hardtanh ( italic_Î³ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ( italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT - italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Î¼ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT ) ) end_CELL end_ROW |  | (5)  
+---|---|---|---  
+  
+where Î±tsubscriptğ›¼ğ‘¡\alpha_{t}italic_Î± start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT is a (diffusion) time-dependent scalar decreasing in
+tâˆˆ[0,1]ğ‘¡01t\in[0,1]italic_t âˆˆ [ 0 , 1 ],
+Ïƒt=1âˆ’Î±t2subscriptğœğ‘¡1superscriptsubscriptğ›¼ğ‘¡2\sigma_{t}=\sqrt{1-\alpha_{t}^{2}}italic_Ïƒ
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT = square-root start_ARG 1 -
+italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT
+2 end_POSTSUPERSCRIPT end_ARG, and Î³tsubscriptğ›¾ğ‘¡\gamma_{t}italic_Î³
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT is a time-dependent scalar
+derived from the first-order Maclaurin series of the Boltzmann-inspired
+scores, and is defined as:
+
+| Î³t:-2Î±tâ¢ÏƒCâ¢Eâˆ’2Ïƒtâ¢Ï€â¢(expâ¡(Ïƒt2Î±t2â¢ÏƒCâ¢E2)â¢erfcâ¢(ÏƒtÎ±tâ¢ÏƒCâ¢E))âˆ’1.:-subscriptğ›¾ğ‘¡2subscriptğ›¼ğ‘¡subscriptğœğ¶ğ¸2subscriptğœğ‘¡ğœ‹superscriptsuperscriptsubscriptğœğ‘¡2superscriptsubscriptğ›¼ğ‘¡2subscriptsuperscriptğœ2ğ¶ğ¸erfcsubscriptğœğ‘¡subscriptğ›¼ğ‘¡subscriptğœğ¶ğ¸1\gamma_{t}\coloneq\frac{\sqrt{2}}{\alpha_{t}\sigma_{CE}}-\frac{\sqrt{2}}{% \sigma_{t}\sqrt{\pi}}\left(\exp{\left(\frac{\sigma_{t}^{2}}{\alpha_{t}^{2}% \sigma^{2}_{CE}}\right)}\,\text{erfc}\left(\frac{\sigma_{t}}{\alpha_{t}\sigma_% {CE}}\right)\right)^{-1}.italic_Î³ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT :- divide start_ARG square-root start_ARG 2 end_ARG end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG - divide start_ARG square-root start_ARG 2 end_ARG end_ARG start_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT square-root start_ARG italic_Ï€ end_ARG end_ARG ( roman_exp ( divide start_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT italic_Ïƒ start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG ) erfc ( divide start_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG ) ) start_POSTSUPERSCRIPT - 1 end_POSTSUPERSCRIPT . |  | (6)  
+---|---|---|---  
+  
+A CE xCâ¢Esubscriptğ‘¥ğ¶ğ¸x_{CE}italic_x start_POSTSUBSCRIPT italic_C italic_E
+end_POSTSUBSCRIPT is generated for a datum xğ‘¥xitalic_x by assigning
+Î¼Câ¢Eâ†xâ†subscriptğœ‡ğ¶ğ¸ğ‘¥\mu_{CE}\leftarrow xitalic_Î¼
+start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT â† italic_x and
+sampling with ÏµÎ¸Gâ¢(â‹…)subscriptsuperscriptitalic-
+Ïµğºğœƒâ‹…\epsilon^{G}_{\theta}(\cdot)italic_Ïµ start_POSTSUPERSCRIPT italic_G
+end_POSTSUPERSCRIPT start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT ( â‹… ) or
+ÏµÎ¸Bâ¢(â‹…)subscriptsuperscriptitalic-
+Ïµğµğœƒâ‹…\epsilon^{B}_{\theta}(\cdot)italic_Ïµ start_POSTSUPERSCRIPT italic_B
+end_POSTSUPERSCRIPT start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT ( â‹… )
+with guidance towards target class yCâ¢Esubscriptğ‘¦ğ¶ğ¸y_{CE}italic_y
+start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT. Guidance
+wğ‘¤witalic_w and neighborhood scale ÏƒCâ¢Esubscriptğœğ¶ğ¸\sigma_{CE}italic_Ïƒ
+start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT are hyperparameters.
+The Boltzmann-inspired distribution has a sharper mode than the Gaussian
+distribution, encouraging xâˆ’xCâ¢Eğ‘¥subscriptğ‘¥ğ¶ğ¸x-x_{CE}italic_x -
+italic_x start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT to be lower
+norm (L2superscriptğ¿2L^{2}italic_L start_POSTSUPERSCRIPT 2
+end_POSTSUPERSCRIPT) and more sparse.
+
+![Refer to caption](extracted/5542433/figs/cifar_compare_dc_dists.png) (a)
+CIFAR10 CE Dist. (L2superscriptğ¿2L^{2}italic_L start_POSTSUPERSCRIPT 2
+end_POSTSUPERSCRIPT)
+
+![Refer to caption](extracted/5542433/figs/cifar_compare_dc_l0_sp_rates.png)
+(b) CIFAR10 CE Dist. (L0superscriptğ¿0L^{0}italic_L start_POSTSUPERSCRIPT 0
+end_POSTSUPERSCRIPT)
+
+![Refer to caption](extracted/5542433/figs/svhn_compare_dc_dists.png) (c) SVHN
+CE Dist. (L2superscriptğ¿2L^{2}italic_L start_POSTSUPERSCRIPT 2
+end_POSTSUPERSCRIPT)
+
+![Refer to caption](extracted/5542433/figs/svhn_compare_dc_l0_sp_rates.png)
+(d) SVHN CE Dist. (L0superscriptğ¿0L^{0}italic_L start_POSTSUPERSCRIPT 0
+end_POSTSUPERSCRIPT)
+
+Figure 2: CE distribution comparison. Boltzmann variant CEs produce lower-
+norm, sparser changes. Best viewed in color.
+
+##  4 Experiments
+
+![Refer to caption](x2.png) (a) CIFAR10 Îµ=0ğœ€0\varepsilon=0italic_Îµ = 0  
+r2=0.02superscriptğ‘Ÿ20.02r^{2}=0.02italic_r start_POSTSUPERSCRIPT 2
+end_POSTSUPERSCRIPT = 0.02
+
+![Refer to caption](x3.png) (b) CIFAR10 Îµ=1ğœ€1\varepsilon=1italic_Îµ = 1  
+r2=0.33superscriptğ‘Ÿ20.33r^{2}=0.33italic_r start_POSTSUPERSCRIPT 2
+end_POSTSUPERSCRIPT = 0.33
+
+![Refer to caption](x4.png) (c) CIFAR10 Îµ=1.5ğœ€1.5\varepsilon=1.5italic_Îµ =
+1.5  
+r2=0.39superscriptğ‘Ÿ20.39r^{2}=0.39italic_r start_POSTSUPERSCRIPT 2
+end_POSTSUPERSCRIPT = 0.39
+
+![Refer to caption](x5.png) (d) SVHN Îµ=0ğœ€0\varepsilon=0italic_Îµ = 0  
+r2=0.01superscriptğ‘Ÿ20.01r^{2}=0.01italic_r start_POSTSUPERSCRIPT 2
+end_POSTSUPERSCRIPT = 0.01
+
+![Refer to caption](x6.png) (e) SVHN Îµ=0.2ğœ€0.2\varepsilon=0.2italic_Îµ =
+0.2  
+r2=0.01superscriptğ‘Ÿ20.01r^{2}=0.01italic_r start_POSTSUPERSCRIPT 2
+end_POSTSUPERSCRIPT = 0.01
+
+![Refer to caption](x7.png) (f) SVHN Îµ=0.4ğœ€0.4\varepsilon=0.4italic_Îµ =
+0.4  
+r2=0.24superscriptğ‘Ÿ20.24r^{2}=0.24italic_r start_POSTSUPERSCRIPT 2
+end_POSTSUPERSCRIPT = 0.24
+
+Figure 3: Scatter plots of classifier confidence and average CE distance of
+10000 clean training samples as adversarial training norm is increased. Robust
+models are more likely to misclassify and lose confidence on data which have
+closer CEs. Best viewed in color.
+
+![Refer to caption](extracted/5542433/figs/cifar_train_ce_acc_bar.png) (a)
+CIFAR10 Accuracy
+
+![Refer to caption](extracted/5542433/figs/cifar_train_ce_sc_prob_bar.png) (b)
+CIFAR10 Prob. Source Predicted
+
+![Refer to caption](extracted/5542433/figs/svhn_train_ce_acc_bar.png) (c) SVHN
+Accuracy
+
+![Refer to caption](extracted/5542433/figs/svhn_train_ce_sc_prob_bar.png) (d)
+SVHN Prob. Source Predicted
+
+Figure 4: Classifier performance on 10000 training data and 200000 CE data
+generated from the training samples. Best viewed in color.
+
+We run experiments in the PyTorch framework [14] with the CIFAR10 [11] and
+SVHN [13] image classification benchmarks . We employ conditional score-based
+models (SBMs) [18] for all diffusion models and L2superscriptğ¿2L^{2}italic_L
+start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT PGD(8888) [12] 2Ã—2\times2
+Ã—WideResNet-40 models [26] for all robust classifiers.
+
+#### CE Dataset Evaluation
+
+In each experiment we generate 2 CEs for each class for at least 1000 samples
+from the training set, resulting in at least 20000 CEs. We compare the two CE
+generation variants with CEs generated by a robust classifier in Fig.Â 2. The
+Boltzmann variant (type BğµBitalic_B) produces CEs with lower-norm
+(L2superscriptğ¿2L^{2}italic_L start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT)
+and sparser (L0superscriptğ¿0L^{0}italic_L start_POSTSUPERSCRIPT 0
+end_POSTSUPERSCRIPT) changes than the Gaussian variant does. The Boltzmann
+variant produces CEs of norm less than or equal to the norm of CEs produced by
+the robust classifier. Standard classifiers (no adversarial training) achieve
+high accuracy on the CEs (i.e., they predict
+yCâ¢Esubscriptğ‘¦ğ¶ğ¸y_{CE}italic_y start_POSTSUBSCRIPT italic_C italic_E
+end_POSTSUBSCRIPT when provided xCâ¢Esubscriptğ‘¥ğ¶ğ¸x_{CE}italic_x
+start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT), indicating good
+semantic quality. The remaining experiments use 200000 Boltzmann variant CEs
+generated from 10000 training samples (CIFAR10 or SVHN) with
+w=15ğ‘¤15w=15italic_w = 15 and
+ÏƒCâ¢E=0.2subscriptğœğ¶ğ¸0.2\sigma_{CE}=0.2italic_Ïƒ start_POSTSUBSCRIPT
+italic_C italic_E end_POSTSUBSCRIPT = 0.2. Please see the appendix for more
+information.
+
+#### Robust Model Evaluation
+
+Our experience is that performance loss of robust models begins on the clean
+training data, incurring performance loss on clean test data downstream. We
+plot the average L2superscriptğ¿2L^{2}italic_L start_POSTSUPERSCRIPT 2
+end_POSTSUPERSCRIPT distance of clean training samples with the confidence and
+accuracy of robust models on the clean samples in Fig.Â 3. Standard models
+(Îµ=0ğœ€0\varepsilon=0italic_Îµ = 0) achieve very high clean training
+accuracy, as expected. As robust training budget Îµğœ€\varepsilonitalic_Îµ
+increases, robust models are more likely to misclassify clean training data
+which are closer to their CEs. Moreover, the confidence of robust models on
+their training data becomes correlated with the proximity of the data to their
+CEs (r2=0.39superscriptğ‘Ÿ20.39r^{2}=0.39italic_r start_POSTSUPERSCRIPT 2
+end_POSTSUPERSCRIPT = 0.39 for CIFAR10 and
+r2=0.24superscriptğ‘Ÿ20.24r^{2}=0.24italic_r start_POSTSUPERSCRIPT 2
+end_POSTSUPERSCRIPT = 0.24 for SVHN).
+
+Fig.Â 3(a) and Fig.Â 3(c) depict the accuracy of robust models on clean train
+data and on CEs generated from the train data. Same-class CEs resemble the
+original data; hence their robust accuracy trends are similar. However, robust
+models perform very poorly on different-class CEs. Fig.Â 3(b) and Fig.Â 3(d)
+depict the probability that the original label yğ‘¦yitalic_y is predicted by a
+robust model for (xCâ¢E,yCâ¢E)subscriptğ‘¥ğ¶ğ¸subscriptğ‘¦ğ¶ğ¸(x_{CE},y_{CE})(
+italic_x start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT , italic_y
+start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT ), given that the
+robust model was correct on (x,y)ğ‘¥ğ‘¦(x,y)( italic_x , italic_y ). Robust
+models are much more likely to misclassify CEs as having the source label,
+indicating that they become invariant to the low-norm, semantic changes
+brought by CEs.
+
+Fig.Â 5 depicts the L2superscriptğ¿2L^{2}italic_L start_POSTSUPERSCRIPT 2
+end_POSTSUPERSCRIPT distance distribution of Boltzmann-type CEs generated from
+the original CIFAR10 training data and Boltzmann-type CEs generated from
+robust CEs (Îµ=1ğœ€1\varepsilon=1italic_Îµ = 1, Îµ=2ğœ€2\varepsilon=2italic_Îµ
+= 2). On average, Boltzmann-type CEs are farther away from their source data
+samples when the data samples are robust model CEs (compared to using the
+original training data as the source data). Since robust model CEs are
+generated by following input gradient to maximize the confidence of a target
+class, this indicates that robust model gradients orient towards data regions
+which are farther away from CEs. Future work may investigate a link between
+the perceptually aligned gradient of robust classifiers [20] and the proximity
+of data to CEs.
+
+![Refer to caption](extracted/5542433/figs/cifar_ce_dist_from_ces.png) Figure
+5: Distance of different-class CEs generated by the Boltzmann method
+(w=15â¢ÏƒCâ¢E=0.2ğ‘¤15subscriptğœğ¶ğ¸0.2w=15\ \sigma_{CE}=0.2italic_w = 15
+italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT = 0.2) when
+the input data is the original CIFAR10 train data, CEs generated by a robust
+Îµ=1ğœ€1\varepsilon=1italic_Îµ = 1 model from the CIFAR10 train data, and CEs
+generated by a robust Îµ=2ğœ€2\varepsilon=2italic_Îµ = 2 model from the
+CIFAR10 train data. Robust model CEs tend to be in data regions farther away
+from our diffusion-generated CEs. Best viewed in color.
+
+The method presented in this work can be leveraged to convert a conditional
+diffusion model into an interpretable classifier. Using the diffusion CE
+method with a â€œclass with lowest average CE distanceâ€ decision rule
+achieves âˆ¼85%similar-toabsentpercent85\sim 85\%âˆ¼ 85 % accuracy on
+1000100010001000 input samples of the CIFAR10 test set. Critically, input data
+for classification are never provided directly to the diffusion model - the
+input data merely guides CE sampling with analytic scores.
+
+#### Limitations
+
+Our study considers one combination of classifier architecture, diffusion
+model, and adversarial attack. This study is limited to the
+L2superscriptğ¿2L^{2}italic_L start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT norm
+constraint and two image classification benchmarks. Investigation with
+additional datasets, attacks, and models is left to future work.
+
+##  5 Conclusion
+
+We present a simple, classifier-free diffusion method to generate
+counterfactual examples (CEs) which enables novel investigation of the
+performance loss of robust classifiers. Our results indicate a significant
+overlap between non-robust and semantically meaningful features, countering
+the common assumption that non-robust features are not interpretable. Hence,
+robust models must become invariant to this subset of semantic features along
+with non-semantic adversarial perturbations. Our study motivates new
+approaches to robust training which can resolve this issue.
+
+## Acknowledgements
+
+Part of this research was conducted while Eric Yeats was supported by a DOE-
+SCGSR Award at Oak Ridge National Laboratory (ORNL). Hence, this material is
+based upon work supported by the U.S. Department of Energy, Office of Science,
+Office of Workforce Development for Teachers and Scientists, Office of Science
+Graduate Student Research (SCGSR) program. The SCGSR program is administered
+by the Oak Ridge Institute for Science and Education (ORISE) for the DOE.
+ORISE is managed by ORAU under contract number DE-SC0014664. All opinions
+expressed in this paper are the authorâ€™s and do not necessarily reflect the
+policies and views of DOE, ORAU, or ORISE. This research was also supported in
+part by the U.S. Department of Energy, through the Office of Advanced
+Scientific Computing Researchâ€™s â€œData-Driven Decision Control for Complex
+Systems (DnC2S)â€ project.
+
+This research is supported in part by the U.S. National Science Foundation
+funding CNS-1822085 and U.S. Air Force Research Lab funding FA8750-21-1-1015.
+
+This research used resources of the Experimental Computing Laboratory (ExCL)
+at the Oak Ridge National Laboratory, which is supported by the Office of
+Science of the U.S. Department of Energy under Contract No. DE-AC05-00OR22725.
+
+## References
+
+  * Augustin etÂ al. [2022] Maximilian Augustin, Valentyn Boreiko, Francesco Croce, and Matthias Hein.  Diffusion visual counterfactual explanations.  _Advances in Neural Information Processing Systems_ , 35:364â€“377, 2022. 
+  * Boreiko etÂ al. [2022] Valentyn Boreiko, Maximilian Augustin, Francesco Croce, Philipp Berens, and Matthias Hein.  Sparse visual counterfactual explanations in image space.  In _DAGM German Conf. on Pattern Recognition_ , pages 133â€“148. Springer, 2022. 
+  * Cohen etÂ al. [2019] Jeremy Cohen, Elan Rosenfeld, and Zico Kolter.  Certified adversarial robustness via randomized smoothing.  In _ICML_ , pages 1310â€“1320. PMLR, 2019. 
+  * Finlay and Oberman [2021] Chris Finlay and AdamÂ M Oberman.  Scaleable input gradient regularization for adversarial robustness.  _Machine Learning with Applications_ , 3:100017, 2021. 
+  * Freiesleben [2022] Timo Freiesleben.  The intriguing relation between counterfactual explanations and adversarial examples.  _Minds and Machines_ , 32(1):77â€“109, 2022. 
+  * Goodfellow etÂ al. [2014] IanÂ J Goodfellow, Jonathon Shlens, and Christian Szegedy.  Explaining and harnessing adversarial examples.  _arXiv preprint arXiv:1412.6572_ , 2014. 
+  * Hendrycks and Gimpel [2016] Dan Hendrycks and Kevin Gimpel.  Gaussian error linear units (gelus).  _arXiv preprint arXiv:1606.08415_ , 2016. 
+  * Ho and Salimans [2022] Jonathan Ho and Tim Salimans.  Classifier-free diffusion guidance.  _arXiv preprint arXiv:2207.12598_ , 2022. 
+  * Ho etÂ al. [2020] Jonathan Ho, Ajay Jain, and Pieter Abbeel.  Denoising diffusion probabilistic models.  _Advances in neural information processing systems_ , 33:6840â€“6851, 2020. 
+  * Ilyas etÂ al. [2019] Andrew Ilyas, Shibani Santurkar, Dimitris Tsipras, Logan Engstrom, Brandon Tran, and Aleksander Madry.  Adversarial examples are not bugs, they are features.  _Advances in neural information processing systems_ , 32, 2019. 
+  * Krizhevsky etÂ al. [2009] Alex Krizhevsky, Geoffrey Hinton, etÂ al.  Learning multiple layers of features from tiny images.  2009\. 
+  * Madry etÂ al. [2017] Aleksander Madry, Aleksandar Makelov, Ludwig Schmidt, Dimitris Tsipras, and Adrian Vladu.  Towards deep learning models resistant to adversarial attacks.  _arXiv preprint arXiv:1706.06083_ , 2017. 
+  * Netzer etÂ al. [2011] Yuval Netzer, Tao Wang, Adam Coates, Alessandro Bissacco, Bo Wu, and AndrewÂ Y Ng.  Reading digits in natural images with unsupervised feature learning.  2011\. 
+  * Paszke etÂ al. [2019] Adam Paszke, Sam Gross, Francisco Massa, Adam Lerer, James Bradbury, Gregory Chanan, Trevor Killeen, Zeming Lin, Natalia Gimelshein, Luca Antiga, etÂ al.  Pytorch: An imperative style, high-performance deep learning library.  _Advances in neural information processing systems_ , 32, 2019. 
+  * Pawelczyk etÂ al. [2022] Martin Pawelczyk, Chirag Agarwal, Shalmali Joshi, Sohini Upadhyay, and Himabindu Lakkaraju.  Exploring counterfactual explanations through the lens of adversarial examples: A theoretical and empirical analysis.  In _International Conference on Artificial Intelligence and Statistics_ , pages 4574â€“4594. PMLR, 2022. 
+  * Ross and Doshi-Velez [2018] Andrew Ross and Finale Doshi-Velez.  Improving the adversarial robustness and interpretability of deep neural networks by regularizing their input gradients.  In _Proceedings of the AAAI conference on artificial intelligence_ , 2018. 
+  * Rudin [2019] Cynthia Rudin.  Stop explaining black box machine learning models for high stakes decisions and use interpretable models instead.  _Nature machine intell._ , 1(5):206â€“215, 2019. 
+  * Song etÂ al. [2020] Yang Song, Jascha Sohl-Dickstein, DiederikÂ P Kingma, Abhishek Kumar, Stefano Ermon, and Ben Poole.  Score-based generative modeling through stochastic differential equations.  _arXiv preprint arXiv:2011.13456_ , 2020. 
+  * Szegedy etÂ al. [2013] Christian Szegedy, Wojciech Zaremba, Ilya Sutskever, Joan Bruna, Dumitru Erhan, Ian Goodfellow, and Rob Fergus.  Intriguing properties of neural networks.  _arXiv preprint arXiv:1312.6199_ , 2013. 
+  * Tsipras etÂ al. [2018] Dimitris Tsipras, Shibani Santurkar, Logan Engstrom, Alexander Turner, and Aleksander Madry.  Robustness may be at odds with accuracy.  _arXiv:1805.12152_ , 2018. 
+  * Verma etÂ al. [2020] Sahil Verma, John Dickerson, and Keegan Hines.  Counterfactual explanations for machine learning: A review.  _arXiv preprint arXiv:2010.10596_ , 2, 2020. 
+  * Wu and He [2018] Yuxin Wu and Kaiming He.  Group normalization.  In _Proceedings of the European conference on computer vision (ECCV)_ , pages 3â€“19, 2018. 
+  * Yeats etÂ al. [2022] Eric Yeats, Frank Liu, David Womble, and Hai Li.  Nashae: Disentangling representations through adversarial covariance minimization.  In _European Conference on Computer Vision_ , pages 36â€“51. Springer, 2022. 
+  * Yeats etÂ al. [2023] Eric Yeats, Cameron Darwin, Frank Liu, and Hai Li.  Adversarial estimation of topological dimension with harmonic score maps.  _arXiv preprint arXiv:2312.06869_ , 2023. 
+  * Yeats etÂ al. [2021] EricÂ C Yeats, Yiran Chen, and Hai Li.  Improving gradient regularization using complex-valued neural networks.  In _International Conference on Machine Learning_ , pages 11953â€“11963. PMLR, 2021. 
+  * Zagoruyko and Komodakis [2016] Sergey Zagoruyko and Nikos Komodakis.  Wide residual networks.  _arXiv preprint arXiv:1605.07146_ , 2016. 
+
+\thetitle  
+
+Supplementary Material  
+
+##  6 Reproducibility Information
+
+L2superscriptğ¿2L^{2}italic_L start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT
+distance for the CEs is defined as
+â€–xâˆ’xCâ¢Eâ€–2subscriptnormğ‘¥subscriptğ‘¥ğ¶ğ¸2\|x-x_{CE}\|_{2}âˆ¥ italic_x
+- italic_x start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT âˆ¥
+start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT, where xğ‘¥xitalic_x is the original
+sample from which the CE xCâ¢Esubscriptğ‘¥ğ¶ğ¸x_{CE}italic_x
+start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT was generated.
+L0superscriptğ¿0L^{0}italic_L start_POSTSUPERSCRIPT 0 end_POSTSUPERSCRIPT
+distances
+(â€–xâˆ’xCâ¢Eâ€–0subscriptnormğ‘¥subscriptğ‘¥ğ¶ğ¸0\|x-x_{CE}\|_{0}âˆ¥ italic_x
+- italic_x start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT âˆ¥
+start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT) employ an element-wise threshold of
+0.020.020.020.02 for each pixel difference value, and the reported value is
+normalized (the thresholded L0superscriptğ¿0L^{0}italic_L
+start_POSTSUPERSCRIPT 0 end_POSTSUPERSCRIPT distance is divided by the
+dimension of xğ‘¥xitalic_x). CE quality is measured by the accuracy of a
+standard classifier in predicting yCâ¢Esubscriptğ‘¦ğ¶ğ¸y_{CE}italic_y
+start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT given
+xCâ¢Esubscriptğ‘¥ğ¶ğ¸x_{CE}italic_x start_POSTSUBSCRIPT italic_C italic_E
+end_POSTSUBSCRIPT (depicted in Fig.Â 6). On SVHN there appears to be sizeable
+drop from robust CE accuracy to the Boltzmann CEs. This may be due to several
+reasons. First, the Ïµ=0.4italic-Ïµ0.4\epsilon=0.4italic_Ïµ = 0.4 robust
+classifier may be making adversarial changes (rather than semantic), biasing
+its quality measure higher at that L2superscriptğ¿2L^{2}italic_L
+start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT distance. Second, diffusion models
+tend to ignore class conditioning information when their inputs are simple
+(like those of SVHN), and they operate instead as unconditional denoising
+functions. This would cause the CE generation method to fail. Visual
+inspection of the CEs for SVHN indicates that the
+Îµ=0.4ğœ€0.4\varepsilon=0.4italic_Îµ = 0.4 classifier is making some
+adversarial (non-semantic) changes, and the diffusion method fails in some
+cases. Please refer to the end of the supplementary material for visual
+depictions of CEs.
+
+![Refer to caption](extracted/5542433/figs/supp/cifar_compare_accuracy.png)
+(a) CIFAR10 Standard Accuracy
+
+![Refer to caption](extracted/5542433/figs/supp/svhn_compare_accuracy.png) (b)
+SVHN Standard Accuracy
+
+Figure 6: Comparison of the accuracy attained by standard models on the CEs.
+Best viewed in color.
+
+### Robust WideResNet Experiments
+
+2Ã—\timesÃ—WideResNet-40 models [26] are adversarially trained with PGD(8)
+[12] in L2superscriptğ¿2L^{2}italic_L start_POSTSUPERSCRIPT 2
+end_POSTSUPERSCRIPT on CIFAR10 [11] and SVHN [13] for 100 epochs and learning
+rate 1â¢eâˆ’31ğ‘’31e-31 italic_e - 3 using the Adam optimizer
+Î²=(0.9,0.999)ğ›½0.90.999\beta=(0.9,0.999)italic_Î² = ( 0.9 , 0.999 ). For
+standard models (Îµ=0ğœ€0\varepsilon=0italic_Îµ = 0), dropout with rate 0.3 is
+used. The data augmentations for CIFAR10 are random horizontal flips and
+random crops with padding 4. No augmentations are used for SVHN. The clean
+accuracies of the trained models are listed in tables (1) and (2). All
+adversarial attacks are PGD(8).
+
+We observed that robust training on SVHN would collapse for
+Îµâ‰¥0.5ğœ€0.5\varepsilon\geq 0.5italic_Îµ â‰¥ 0.5, so only
+Îµâ‰¤0.4ğœ€0.4\varepsilon\leq 0.4italic_Îµ â‰¤ 0.4 experiments are reported.
+Coincidentally, Îµâˆ¼0.5similar-toğœ€0.5\varepsilon\sim 0.5italic_Îµ âˆ¼ 0.5
+is half the distance of a large amount of different-class CEs to their
+original data on SVHN. We hypothesize that the presence of many CEs at the
+L2superscriptğ¿2L^{2}italic_L start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT
+distance 1111 may be related to this training collapse phenomenon, as an
+adversarial budget of Îµâˆ¼0.5similar-toğœ€0.5\varepsilon\sim 0.5italic_Îµ âˆ¼
+0.5 could make the source class of perturbed training data highly ambiguous.
+
+Table 1: Accuracy of CIFAR10 Models on the CIFAR10 test set  
+Îµğœ€\varepsilonitalic_Îµ | Clean Accuracy (%) | PGD(8, 0.5) Accuracy (%)  
+---|---|---  
+0 | 93.08 | 5.75  
+0.1 | 91.33 | 45.06  
+0.5 | 84.87 | 54.73  
+1.0 | 76.23 | 54.53  
+1.5 | 66.21 | 52.34  
+2.0 | 58.37 | 47.53  
+Table 2: Accuracy of SVHN Models on the SVHN test set  
+Îµğœ€\varepsilonitalic_Îµ | Clean Accuracy (%) | PGD(8, 0.2) Accuracy (%)  
+---|---|---  
+0 | 96.75 | 77.46  
+0.1 | 95.63 | 86.42  
+0.2 | 95.41 | 86.84  
+0.4 | 93.09 | 85.43  
+  
+### Diffusion Models
+
+In all experiments using diffusion models, we employ the variance-preserving
+(VP) score-based models (SBM) of Song et al. [18]. The SBM architecture
+follows a U-net structure with four symmetric stages of two ResNet blocks in
+each encoding or decoding stage. Downsampling (and upsampling, respectively)
+occurs in the innermost three stages (i.e., stages 2, 3, 4). 128 channels
+(features) are used, and the number of features used is doubled to 256 for
+stages 2, 3, and 4. Attention is applied at the center of the U-net and after
+the first downsampling stage and before the last upsampling stage. The SBMs
+use the SiLU activation function [7] and GroupNorm [22] with a group size of
+32. Training on CIFAR10 or SVHN occurs for 1 million iterations of batch size
+128 with a learning rate of 2â¢eâˆ’42ğ‘’42e-42 italic_e - 4 and Adam optimizer
+Î²=(0.9,0.999)ğ›½0.90.999\beta=(0.9,0.999)italic_Î² = ( 0.9 , 0.999 ). We use
+a learning rate warmup for 5000 iterations and gradient clipping with norm 1.
+Class conditioning is provided as a learnable embedding which is added to the
+time condition embedding. An additional learnable null embedding signifies
+that no class information is provided. During conditional SBM training, class
+conditions are dropped and replaced with this null embedding at a rate of
+30%percent3030\%30 %.
+
+##  7 CE Generation Method
+
+CEs were generated by sampling from a sequence of un-normalized distributions
+represented by the product of the data distribution (rep. by diffusion model)
+and an independently diffused neighborhood distribution. The diffusion model
+used is a variance-preserving (VP) score-based model of Song et al. [18] and
+the sampling strategy for generation used an Euler-Maruyama predictor with
+1000 discrete steps.
+
+Since the density at each step in the sequence is represented as the product
+of the diffused data distribution and an independently diffused neighborhood
+distribution, sampling amounts to adding the conditional diffusion score (and
+classifier free guidance) with the analytic neighborhood diffusion score.
+Sampling then proceeds as normal (see [18]) with the augmented score.
+
+#### Robust Model CEs
+
+For CE generation with robust models, we push data in the direction of
+targeted gradients with a step size of 0.050.050.050.05 until a targeted class
+confidence of 0.90.90.90.9 or a maximum of 200 steps is reached. At each step,
+we clip the pixels of the image to remain in [0, 1].
+
+### Boltzmann-Inspired Distribution
+
+The density of the 1D Boltzmann-inspired distribution proposed in this work is
+given by:
+
+| bâ¢(x)=12â¢ÏƒCâ¢Eâ¢expâ¡(âˆ’2â¢|xâˆ’Î¼Câ¢E|ÏƒCâ¢E),ğ‘ğ‘¥12subscriptğœğ¶ğ¸2ğ‘¥subscriptğœ‡ğ¶ğ¸subscriptğœğ¶ğ¸b(x)=\frac{1}{\sqrt{2}\,\sigma_{CE}}\exp{\left(-\frac{\sqrt{2}\,|x-\mu_{CE}|}{% \sigma_{CE}}\right)},italic_b ( italic_x ) = divide start_ARG 1 end_ARG start_ARG square-root start_ARG 2 end_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG roman_exp ( - divide start_ARG square-root start_ARG 2 end_ARG | italic_x - italic_Î¼ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT | end_ARG start_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG ) , |  | (7)  
+---|---|---|---  
+  
+where Î¼Câ¢Esubscriptğœ‡ğ¶ğ¸\mu_{CE}italic_Î¼ start_POSTSUBSCRIPT italic_C
+italic_E end_POSTSUBSCRIPT is its mean and
+ÏƒCâ¢Esubscriptğœğ¶ğ¸\sigma_{CE}italic_Ïƒ start_POSTSUBSCRIPT italic_C
+italic_E end_POSTSUBSCRIPT is its standard deviation. Scaling samples of this
+distribution with Î±t>0subscriptğ›¼ğ‘¡0\alpha_{t}>0italic_Î±
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT > 0 amounts to sampling from a
+new distribution with mean
+Î±tâ¢Î¼Câ¢Esubscriptğ›¼ğ‘¡subscriptğœ‡ğ¶ğ¸\alpha_{t}\mu_{CE}italic_Î±
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Î¼ start_POSTSUBSCRIPT
+italic_C italic_E end_POSTSUBSCRIPT and standard deviation
+Î±tâ¢ÏƒCâ¢Esubscriptğ›¼ğ‘¡subscriptğœğ¶ğ¸\alpha_{t}\sigma_{CE}italic_Î±
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT
+italic_C italic_E end_POSTSUBSCRIPT. Defining
+yt=xâˆ’Î±tâ¢Î¼Câ¢Esubscriptğ‘¦ğ‘¡ğ‘¥subscriptğ›¼ğ‘¡subscriptğœ‡ğ¶ğ¸y_{t}=x-\alpha_{t}\mu_{CE}italic_y
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT = italic_x - italic_Î±
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Î¼ start_POSTSUBSCRIPT
+italic_C italic_E end_POSTSUBSCRIPT, we convolve this distribution with a
+Gaussian distribution of mean Î¼=0ğœ‡0\mu=0italic_Î¼ = 0 and scale
+Ïƒtsubscriptğœğ‘¡\sigma_{t}italic_Ïƒ start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT to yield the (diffusion) time-dependent distribution:
+
+| btâ¢(x)=expâ¡(Ïƒt2Î±t2â¢ÏƒCâ¢E2âˆ’yt2â¢Î±tâ¢ÏƒCâ¢E)â¢erfcâ¢(ÏƒtÎ±tâ¢ÏƒCâ¢Eâˆ’y2â¢Ïƒt)2â¢2â¢Î±tâ¢ÏƒCâ¢E+expâ¡(Ïƒt2Î±t2â¢ÏƒCâ¢E2+yt2â¢Î±tâ¢ÏƒCâ¢E)â¢erfcâ¢(ÏƒtÎ±tâ¢ÏƒCâ¢E+y2â¢Ïƒt)2â¢2â¢Î±tâ¢ÏƒCâ¢E.subscriptğ‘ğ‘¡ğ‘¥superscriptsubscriptğœğ‘¡2superscriptsubscriptğ›¼ğ‘¡2superscriptsubscriptğœğ¶ğ¸2subscriptğ‘¦ğ‘¡2subscriptğ›¼ğ‘¡subscriptğœğ¶ğ¸erfcsubscriptğœğ‘¡subscriptğ›¼ğ‘¡subscriptğœğ¶ğ¸ğ‘¦2subscriptğœğ‘¡22subscriptğ›¼ğ‘¡subscriptğœğ¶ğ¸superscriptsubscriptğœğ‘¡2superscriptsubscriptğ›¼ğ‘¡2superscriptsubscriptğœğ¶ğ¸2subscriptğ‘¦ğ‘¡2subscriptğ›¼ğ‘¡subscriptğœğ¶ğ¸erfcsubscriptğœğ‘¡subscriptğ›¼ğ‘¡subscriptğœğ¶ğ¸ğ‘¦2subscriptğœğ‘¡22subscriptğ›¼ğ‘¡subscriptğœğ¶ğ¸b_{t}(x)=\\\ \frac{\exp\left(\frac{\sigma_{t}^{2}}{\alpha_{t}^{2}\sigma_{CE}^{2}}-\frac{y_{% t}}{\sqrt{2}\alpha_{t}\sigma_{CE}}\right)\text{erfc}\left(\frac{\sigma_{t}}{% \alpha_{t}\sigma_{CE}}-\frac{y}{\sqrt{2}\sigma_{t}}\right)}{2\sqrt{2}\alpha_{t% }\sigma_{CE}}\\\ +\frac{\exp\left(\frac{\sigma_{t}^{2}}{\alpha_{t}^{2}\sigma_{CE}^{2}}+\frac{y_% {t}}{\sqrt{2}\alpha_{t}\sigma_{CE}}\right)\text{erfc}\left(\frac{\sigma_{t}}{% \alpha_{t}\sigma_{CE}}+\frac{y}{\sqrt{2}\sigma_{t}}\right)}{2\sqrt{2}\alpha_{t% }\sigma_{CE}}.start_ROW start_CELL italic_b start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ( italic_x ) = end_CELL end_ROW start_ROW start_CELL divide start_ARG roman_exp ( divide start_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT end_ARG - divide start_ARG italic_y start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG start_ARG square-root start_ARG 2 end_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG ) erfc ( divide start_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG - divide start_ARG italic_y end_ARG start_ARG square-root start_ARG 2 end_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG ) end_ARG start_ARG 2 square-root start_ARG 2 end_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG end_CELL end_ROW start_ROW start_CELL + divide start_ARG roman_exp ( divide start_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT end_ARG + divide start_ARG italic_y start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG start_ARG square-root start_ARG 2 end_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG ) erfc ( divide start_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG + divide start_ARG italic_y end_ARG start_ARG square-root start_ARG 2 end_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG ) end_ARG start_ARG 2 square-root start_ARG 2 end_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG . end_CELL end_ROW |  | (8)  
+---|---|---|---  
+  
+Taking the logarithm of btâ¢(x)subscriptğ‘ğ‘¡ğ‘¥b_{t}(x)italic_b
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ( italic_x ) and
+differentiating with respect to xğ‘¥xitalic_x, we have:
+
+| âˆ‡xlogâ¡btâ¢(x)=2Î±tâ¢ÏƒCâ¢E(e2Î±tâ¢ÏƒCâ¢Eâ¢yterfc(ÏƒtÎ±tâ¢ÏƒCâ¢E+yt2â¢Ïƒt)âˆ’eâˆ’2Î±tâ¢ÏƒCâ¢Eâ¢yterfc(ÏƒtÎ±tâ¢ÏƒCâ¢Eâˆ’yt2â¢Ïƒt))/(e2Î±tâ¢ÏƒCâ¢Eâ¢yterfc(ÏƒtÎ±tâ¢ÏƒCâ¢E+yt2â¢Ïƒt)+eâˆ’2Î±tâ¢ÏƒCâ¢Eâ¢yterfc(ÏƒtÎ±tâ¢ÏƒCâ¢Eâˆ’yt2â¢Ïƒt)).subscriptâˆ‡ğ‘¥subscriptğ‘ğ‘¡ğ‘¥2subscriptğ›¼ğ‘¡subscriptğœğ¶ğ¸superscriptğ‘’2subscriptğ›¼ğ‘¡subscriptğœğ¶ğ¸subscriptğ‘¦ğ‘¡erfcsubscriptğœğ‘¡subscriptğ›¼ğ‘¡subscriptğœğ¶ğ¸subscriptğ‘¦ğ‘¡2subscriptğœğ‘¡superscriptğ‘’2subscriptğ›¼ğ‘¡subscriptğœğ¶ğ¸subscriptğ‘¦ğ‘¡erfcsubscriptğœğ‘¡subscriptğ›¼ğ‘¡subscriptğœğ¶ğ¸subscriptğ‘¦ğ‘¡2subscriptğœğ‘¡superscriptğ‘’2subscriptğ›¼ğ‘¡subscriptğœğ¶ğ¸subscriptğ‘¦ğ‘¡erfcsubscriptğœğ‘¡subscriptğ›¼ğ‘¡subscriptğœğ¶ğ¸subscriptğ‘¦ğ‘¡2subscriptğœğ‘¡superscriptğ‘’2subscriptğ›¼ğ‘¡subscriptğœğ¶ğ¸subscriptğ‘¦ğ‘¡erfcsubscriptğœğ‘¡subscriptğ›¼ğ‘¡subscriptğœğ¶ğ¸subscriptğ‘¦ğ‘¡2subscriptğœğ‘¡\nabla_{x}\log b_{t}(x)=\\\ \frac{\sqrt{2}}{\alpha_{t}\sigma_{CE}}\Bigg{(}e^{\frac{\sqrt{2}}{\alpha_{t}% \sigma_{CE}}y_{t}}\text{erfc}\left(\frac{\sigma_{t}}{\alpha_{t}\sigma_{CE}}+% \frac{y_{t}}{\sqrt{2}\sigma_{t}}\right)\\\ -e^{-\frac{\sqrt{2}}{\alpha_{t}\sigma_{CE}}y_{t}}\text{erfc}\left(\frac{\sigma% _{t}}{\alpha_{t}\sigma_{CE}}-\frac{y_{t}}{\sqrt{2}\sigma_{t}}\right)\Bigg{)}% \Bigg{/}\\\ \Bigg{(}e^{\frac{\sqrt{2}}{\alpha_{t}\sigma_{CE}}y_{t}}\text{erfc}\left(\frac{% \sigma_{t}}{\alpha_{t}\sigma_{CE}}+\frac{y_{t}}{\sqrt{2}\sigma_{t}}\right)\\\ +e^{-\frac{\sqrt{2}}{\alpha_{t}\sigma_{CE}}y_{t}}\text{erfc}\left(\frac{\sigma% _{t}}{\alpha_{t}\sigma_{CE}}-\frac{y_{t}}{\sqrt{2}\sigma_{t}}\right)\Bigg{)}.start_ROW start_CELL âˆ‡ start_POSTSUBSCRIPT italic_x end_POSTSUBSCRIPT roman_log italic_b start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ( italic_x ) = end_CELL end_ROW start_ROW start_CELL divide start_ARG square-root start_ARG 2 end_ARG end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG ( italic_e start_POSTSUPERSCRIPT divide start_ARG square-root start_ARG 2 end_ARG end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG italic_y start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_POSTSUPERSCRIPT erfc ( divide start_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG + divide start_ARG italic_y start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG start_ARG square-root start_ARG 2 end_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG ) end_CELL end_ROW start_ROW start_CELL - italic_e start_POSTSUPERSCRIPT - divide start_ARG square-root start_ARG 2 end_ARG end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG italic_y start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_POSTSUPERSCRIPT erfc ( divide start_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG - divide start_ARG italic_y start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG start_ARG square-root start_ARG 2 end_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG ) ) / end_CELL end_ROW start_ROW start_CELL ( italic_e start_POSTSUPERSCRIPT divide start_ARG square-root start_ARG 2 end_ARG end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG italic_y start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_POSTSUPERSCRIPT erfc ( divide start_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG + divide start_ARG italic_y start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG start_ARG square-root start_ARG 2 end_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG ) end_CELL end_ROW start_ROW start_CELL + italic_e start_POSTSUPERSCRIPT - divide start_ARG square-root start_ARG 2 end_ARG end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG italic_y start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_POSTSUPERSCRIPT erfc ( divide start_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG - divide start_ARG italic_y start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG start_ARG square-root start_ARG 2 end_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG ) ) . end_CELL end_ROW |  | (9)  
+---|---|---|---  
+  
+Although this expression yields the exact scores for the diffused Boltzmann-
+inspired distribution in 1D, it is numerically unstable. We note that
+âˆ‡xlogâ¡btâ¢(x)subscriptâˆ‡ğ‘¥subscriptğ‘ğ‘¡ğ‘¥\nabla_{x}\log b_{t}(x)âˆ‡
+start_POSTSUBSCRIPT italic_x end_POSTSUBSCRIPT roman_log italic_b
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ( italic_x ) is sigmoidal, and
+we elect to approximate it using the hardtanh function. One may consider the
+2Î±tâ¢ÏƒCâ¢E2subscriptğ›¼ğ‘¡subscriptğœğ¶ğ¸\frac{\sqrt{2}}{\alpha_{t}\sigma_{CE}}divide
+start_ARG square-root start_ARG 2 end_ARG end_ARG start_ARG italic_Î±
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT
+italic_C italic_E end_POSTSUBSCRIPT end_ARG expression to define the range of
+the score values, and the remainder of the expression defines a Gaussian-like
+score near the mean. Hence, we define our approximate scores as:
+
+| âˆ‡xlogâ¡btâ¢(x)â‰ˆ2Î±tâ¢ÏƒCâ¢Eâ¢hardtanhâ¢(Î³tâ¢yt),subscriptâˆ‡ğ‘¥subscriptğ‘ğ‘¡ğ‘¥2subscriptğ›¼ğ‘¡subscriptğœğ¶ğ¸hardtanhsubscriptğ›¾ğ‘¡subscriptğ‘¦ğ‘¡\nabla_{x}\log b_{t}(x)\approx\frac{\sqrt{2}}{\alpha_{t}\sigma_{CE}}\text{% hardtanh}(\gamma_{t}\,y_{t}),âˆ‡ start_POSTSUBSCRIPT italic_x end_POSTSUBSCRIPT roman_log italic_b start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ( italic_x ) â‰ˆ divide start_ARG square-root start_ARG 2 end_ARG end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG hardtanh ( italic_Î³ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_y start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ) , |  | (10)  
+---|---|---|---  
+  
+where Î³tsubscriptğ›¾ğ‘¡\gamma_{t}italic_Î³ start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT is the first term of a Maclaurin series estimate of
+âˆ‡xlogâ¡btâ¢(x)subscriptâˆ‡ğ‘¥subscriptğ‘ğ‘¡ğ‘¥\nabla_{x}\log b_{t}(x)âˆ‡
+start_POSTSUBSCRIPT italic_x end_POSTSUBSCRIPT roman_log italic_b
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ( italic_x ) and is given by:
+
+| Î³t=2Î±tâ¢ÏƒCâ¢Eâˆ’2Ïƒtâ¢Ï€â¢(expâ¡(Ïƒt2Î±t2â¢ÏƒCâ¢E2)â¢erfcâ¢(ÏƒtÎ±tâ¢ÏƒCâ¢E))âˆ’1.subscriptğ›¾ğ‘¡2subscriptğ›¼ğ‘¡subscriptğœğ¶ğ¸2subscriptğœğ‘¡ğœ‹superscriptsuperscriptsubscriptğœğ‘¡2superscriptsubscriptğ›¼ğ‘¡2subscriptsuperscriptğœ2ğ¶ğ¸erfcsubscriptğœğ‘¡subscriptğ›¼ğ‘¡subscriptğœğ¶ğ¸1\gamma_{t}=\frac{\sqrt{2}}{\alpha_{t}\sigma_{CE}}-\frac{\sqrt{2}}{\sigma_{t}% \sqrt{\pi}}\left(\exp{\left(\frac{\sigma_{t}^{2}}{\alpha_{t}^{2}\sigma^{2}_{CE% }}\right)}\,\text{erfc}\left(\frac{\sigma_{t}}{\alpha_{t}\sigma_{CE}}\right)% \right)^{-1}.italic_Î³ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT = divide start_ARG square-root start_ARG 2 end_ARG end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG - divide start_ARG square-root start_ARG 2 end_ARG end_ARG start_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT square-root start_ARG italic_Ï€ end_ARG end_ARG ( roman_exp ( divide start_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT italic_Ïƒ start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG ) erfc ( divide start_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG ) ) start_POSTSUPERSCRIPT - 1 end_POSTSUPERSCRIPT . |  | (11)  
+---|---|---|---  
+  
+With
+u=ÏƒtÎ±tâ¢ÏƒCâ¢Eğ‘¢subscriptğœğ‘¡subscriptğ›¼ğ‘¡subscriptğœğ¶ğ¸u=\frac{\sigma_{t}}{\alpha_{t}\sigma_{CE}}italic_u
+= divide start_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT
+end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT
+italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG, the
+expression
+expâ¡(âˆ’u2)erfcâ¢(u)superscriptğ‘¢2erfcğ‘¢\frac{\exp(-u^{2})}{\text{erfc}(u)}divide
+start_ARG roman_exp ( - italic_u start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT )
+end_ARG start_ARG erfc ( italic_u ) end_ARG is numerically unstable for large
+values of uğ‘¢uitalic_u. However, beyond a certain point (e.g.,
+uâ‰¥20ğ‘¢20u\geq 20italic_u â‰¥ 20), the function behaves as a linear function
+with slope Ï€ğœ‹\sqrt{\pi}square-root start_ARG italic_Ï€ end_ARG. We avoid
+the numerical instability by switching to a linear approximation at
+u=20ğ‘¢20u=20italic_u = 20.
+
+![Refer to caption](extracted/5542433/figs/supp/boltz_score_approx.png) Figure
+7: Comparison of true 1D Boltzmann-inspired scores with the proposed hardtanh
+approximation (black). The mean Î¼Câ¢Esubscriptğœ‡ğ¶ğ¸\mu_{CE}italic_Î¼
+start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT is selected to be 0.
+Best viewed in color.
+
+The exact score function
+âˆ‡xlogâ¡btâ¢(x)subscriptâˆ‡ğ‘¥subscriptğ‘ğ‘¡ğ‘¥\nabla_{x}\log b_{t}(x)âˆ‡
+start_POSTSUBSCRIPT italic_x end_POSTSUBSCRIPT roman_log italic_b
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ( italic_x ) and its
+approximation is displayed with Î±t=1subscriptğ›¼ğ‘¡1\alpha_{t}=1italic_Î±
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT = 1 for various values of
+Ïƒtsubscriptğœğ‘¡\sigma_{t}italic_Ïƒ start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT and in figure 7. In our experiments, this 1D score function
+is applied element-wise to vector inputs, providing a sparsifying effect on CE
+generation.
+
+For completeness, we include
+âˆ‡x2logâ¡btâ¢(x)subscriptsuperscriptâˆ‡2ğ‘¥subscriptğ‘ğ‘¡ğ‘¥\nabla^{2}_{x}\log
+b_{t}(x)âˆ‡ start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT start_POSTSUBSCRIPT
+italic_x end_POSTSUBSCRIPT roman_log italic_b start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT ( italic_x ), which was evaluated at
+yt=0subscriptğ‘¦ğ‘¡0y_{t}=0italic_y start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT = 0 to yield the first term of the Maclaurin series of
+âˆ‡xlogâ¡btâ¢(x)subscriptâˆ‡ğ‘¥subscriptğ‘ğ‘¡ğ‘¥\nabla_{x}\log b_{t}(x)âˆ‡
+start_POSTSUBSCRIPT italic_x end_POSTSUBSCRIPT roman_log italic_b
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ( italic_x ):
+
+| âˆ‡x2logâ¡btâ¢(x)=[2ÏƒCâ¢E2(e2Î±tâ¢ÏƒCâ¢Eâ¢yterfc(ÏƒtÎ±tâ¢ÏƒCâ¢E+yt2â¢Ïƒt)+eâˆ’2Î±tâ¢ÏƒCâ¢Eâ¢yterfc(ÏƒtÎ±tâ¢ÏƒCâ¢Eâˆ’yt2â¢Ïƒt))âˆ’4â¢eâˆ’(Ïƒt2Î±t2â¢ÏƒCâ¢E2+yt22â¢Ïƒt2)Ï€â¢Î±tâ¢ÏƒCâ¢Eâ¢Ïƒt]/[e2Î±tâ¢ÏƒCâ¢Eâ¢yterfc(ÏƒtÎ±tâ¢ÏƒCâ¢E+yt2â¢Ïƒt)+eâˆ’2Î±tâ¢ÏƒCâ¢Eâ¢yterfc(ÏƒtÎ±tâ¢ÏƒCâ¢Eâˆ’yt2â¢Ïƒt)].\nabla^{2}_{x}\log b_{t}(x)=\\\ \Bigg{[}\frac{2}{\sigma^{2}_{CE}}\Bigg{(}e^{\frac{\sqrt{2}}{\alpha_{t}\sigma_{% CE}}y_{t}}\text{erfc}\left(\frac{\sigma_{t}}{\alpha_{t}\sigma_{CE}}+\frac{y_{t% }}{\sqrt{2}\sigma_{t}}\right)\\\ +e^{-\frac{\sqrt{2}}{\alpha_{t}\sigma_{CE}}y_{t}}\text{erfc}\left(\frac{\sigma% _{t}}{\alpha_{t}\sigma_{CE}}-\frac{y_{t}}{\sqrt{2}\sigma_{t}}\right)\Bigg{)}\\\ -\frac{4\,e^{-\left(\frac{\sigma_{t}^{2}}{\alpha_{t}^{2}\sigma_{CE}^{2}}+\frac% {y_{t}^{2}}{2\sigma_{t}^{2}}\right)}}{\sqrt{\pi}\alpha_{t}\sigma_{CE}\sigma_{t% }}\Bigg{]}\quad\Bigg{/}\\\ \Bigg{[}e^{\frac{\sqrt{2}}{\alpha_{t}\sigma_{CE}}y_{t}}\text{erfc}\left(\frac{% \sigma_{t}}{\alpha_{t}\sigma_{CE}}+\frac{y_{t}}{\sqrt{2}\sigma_{t}}\right)\\\ +e^{-\frac{\sqrt{2}}{\alpha_{t}\sigma_{CE}}y_{t}}\text{erfc}\left(\frac{\sigma% _{t}}{\alpha_{t}\sigma_{CE}}-\frac{y_{t}}{\sqrt{2}\sigma_{t}}\right)\Bigg{]}.start_ROW start_CELL âˆ‡ start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT start_POSTSUBSCRIPT italic_x end_POSTSUBSCRIPT roman_log italic_b start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ( italic_x ) = end_CELL end_ROW start_ROW start_CELL [ divide start_ARG 2 end_ARG start_ARG italic_Ïƒ start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG ( italic_e start_POSTSUPERSCRIPT divide start_ARG square-root start_ARG 2 end_ARG end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG italic_y start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_POSTSUPERSCRIPT erfc ( divide start_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG + divide start_ARG italic_y start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG start_ARG square-root start_ARG 2 end_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG ) end_CELL end_ROW start_ROW start_CELL + italic_e start_POSTSUPERSCRIPT - divide start_ARG square-root start_ARG 2 end_ARG end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG italic_y start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_POSTSUPERSCRIPT erfc ( divide start_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG - divide start_ARG italic_y start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG start_ARG square-root start_ARG 2 end_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG ) ) end_CELL end_ROW start_ROW start_CELL - divide start_ARG 4 italic_e start_POSTSUPERSCRIPT - ( divide start_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT end_ARG + divide start_ARG italic_y start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT end_ARG start_ARG 2 italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT end_ARG ) end_POSTSUPERSCRIPT end_ARG start_ARG square-root start_ARG italic_Ï€ end_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG ] / end_CELL end_ROW start_ROW start_CELL [ italic_e start_POSTSUPERSCRIPT divide start_ARG square-root start_ARG 2 end_ARG end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG italic_y start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_POSTSUPERSCRIPT erfc ( divide start_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG + divide start_ARG italic_y start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG start_ARG square-root start_ARG 2 end_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG ) end_CELL end_ROW start_ROW start_CELL + italic_e start_POSTSUPERSCRIPT - divide start_ARG square-root start_ARG 2 end_ARG end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG italic_y start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_POSTSUPERSCRIPT erfc ( divide start_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG start_ARG italic_Î± start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_C italic_E end_POSTSUBSCRIPT end_ARG - divide start_ARG italic_y start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG start_ARG square-root start_ARG 2 end_ARG italic_Ïƒ start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG ) ] . end_CELL end_ROW |  | (12)  
+---|---|---|---  
+  
+![Refer to caption](extracted/5542433/figs/supp/cifar_disp_1.jpg) Figure 8:
+Boltzmann (w=15ğ‘¤15w=15italic_w = 15
+ÏƒCâ¢E=0.2subscriptğœğ¶ğ¸0.2\sigma_{CE}=0.2italic_Ïƒ start_POSTSUBSCRIPT
+italic_C italic_E end_POSTSUBSCRIPT = 0.2) CEs from the CIFAR10 training set.
+Leftmost column: original samples and class label. Other columns: CE and
+L2superscriptğ¿2L^{2}italic_L start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT
+distance to the original sample. ![Refer to
+caption](extracted/5542433/figs/supp/cifar_disp_2.jpg) Figure 9: Boltzmann
+(w=15ğ‘¤15w=15italic_w = 15
+ÏƒCâ¢E=0.2subscriptğœğ¶ğ¸0.2\sigma_{CE}=0.2italic_Ïƒ start_POSTSUBSCRIPT
+italic_C italic_E end_POSTSUBSCRIPT = 0.2) CEs from the CIFAR10 training set.
+Leftmost column: original samples and class label. Other columns: CE and
+L2superscriptğ¿2L^{2}italic_L start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT
+distance to the original sample. ![Refer to
+caption](extracted/5542433/figs/supp/cifar_disp_rob_1.jpg) Figure 10: Robust
+model (Îµ=1ğœ€1\varepsilon=1italic_Îµ = 1, confidence threshold 0.9) CEs from
+the CIFAR10 training set. Leftmost column: original samples and class label.
+Other columns: CE and L2superscriptğ¿2L^{2}italic_L start_POSTSUPERSCRIPT 2
+end_POSTSUPERSCRIPT distance to the original sample. ![Refer to
+caption](extracted/5542433/figs/supp/cifar_disp_rob_2.jpg) Figure 11: Robust
+model (Îµ=1ğœ€1\varepsilon=1italic_Îµ = 1, confidence threshold 0.9) CEs from
+the CIFAR10 training set. Leftmost column: original samples and class label.
+Other columns: CE and L2superscriptğ¿2L^{2}italic_L start_POSTSUPERSCRIPT 2
+end_POSTSUPERSCRIPT distance to the original sample. ![Refer to
+caption](extracted/5542433/figs/supp/svhn_disp_1.jpg) Figure 12: Boltzmann
+(w=15ğ‘¤15w=15italic_w = 15
+ÏƒCâ¢E=0.2subscriptğœğ¶ğ¸0.2\sigma_{CE}=0.2italic_Ïƒ start_POSTSUBSCRIPT
+italic_C italic_E end_POSTSUBSCRIPT = 0.2) CEs from the SVHN training set.
+Leftmost column: original samples and class label. Other columns: CE and
+L2superscriptğ¿2L^{2}italic_L start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT
+distance to the original sample. ![Refer to
+caption](extracted/5542433/figs/supp/svhn_disp_2.jpg) Figure 13: Boltzmann
+(w=15ğ‘¤15w=15italic_w = 15
+ÏƒCâ¢E=0.2subscriptğœğ¶ğ¸0.2\sigma_{CE}=0.2italic_Ïƒ start_POSTSUBSCRIPT
+italic_C italic_E end_POSTSUBSCRIPT = 0.2) CEs from the SVHN training set.
+Leftmost column: original samples and class label. Other columns: CE and
+L2superscriptğ¿2L^{2}italic_L start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT
+distance to the original sample. ![Refer to
+caption](extracted/5542433/figs/supp/svhn_disp_rob_1.jpg) Figure 14: Robust
+model (Îµ=0.4ğœ€0.4\varepsilon=0.4italic_Îµ = 0.4, confidence threshold 0.9)
+CEs from the SVHN training set. Leftmost column: original samples and class
+label. Other columns: CE and L2superscriptğ¿2L^{2}italic_L
+start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT distance to the original sample.
+![Refer to caption](extracted/5542433/figs/supp/svhn_disp_rob_2.jpg) Figure
+15: Robust model (Îµ=0.4ğœ€0.4\varepsilon=0.4italic_Îµ = 0.4, confidence
+threshold 0.9) CEs from the SVHN training set. Leftmost column: original
+samples and class label. Other columns: CE and L2superscriptğ¿2L^{2}italic_L
+start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT distance to the original sample.

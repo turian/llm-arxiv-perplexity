@@ -1,0 +1,1147 @@
+  1. 1 Introduction
+  2. 2 Related work
+    1. 2.1 Adversarial robustness
+    2. 2.2 Explainability
+    3. 2.3 Geometric Deep Learning
+  3. 3 Methodology
+  4. 4 Semantic features
+    1. Definition:
+    2. 4.1 Examples of semantic features
+    3. 4.2 Matching semantic features
+  5. 5 Network architecture
+    1. 5.1 Two Step Layer
+    2. 5.2 Convolutional Semantic Layer
+    3. 5.3 Affine Layer
+    4. 5.4 Logical Layer
+  6. 6 Results
+    1. 6.1 Training
+    2. 6.2 Quantitative results
+    3. 6.3 Layer inspection
+      1. 6.3.1 Two Step Layer
+      2. 6.3.2 Convolutional Semantic Layer
+      3. 6.3.3 Affine Layer
+      4. 6.3.4 Logical Layer
+    4. 6.4 Ablation study
+  7. 7 Discussion
+    1. 7.1 Defending against adversaries
+    2. 7.2 Limitations
+  8. 8 Further research
+  9. 9 Acknowledgments
+  10. A Implementation of Two Step Layer
+  11. B Learned affine features with learned poses
+  12. C Preliminary results for the entire MNIST
+
+# Towards White Box Deep Learning
+
+Maciej Satkiewicz  
+314 Foundation  
+Warsaw/Krakow  
+maciej.satkiewicz@314.foundation  
+
+###### Abstract
+
+Deep neural networks learn fragile "shortcut" features, rendering them
+difficult to interpret (black box) and vulnerable to adversarial attacks. This
+paper proposes _semantic features_ as a general architectural solution to this
+problem. The main idea is to make features locality-sensitive in the adequate
+semantic topology of the domain, thus introducing a strong regularization. The
+proof of concept network is lightweight, inherently interpretable and achieves
+almost human-level adversarial test metrics - with no adversarial training!
+These results and the general nature of the approach warrant further research
+on semantic features. The code is available at
+https://github.com/314-Foundation/white-box-nn.
+
+##  1 Introduction
+
+The main advantages of deep neural networks (DNNs) are their architectural
+simplicity and automatic feature learning. The latter is crucial for working
+with unstructured data as developers donâ€™t need to design features by hand.
+However, giving away the control over features leads to _black box_ models -
+DNNs tend to learn hardly interpretable "shortcut" correlationsÂ [17] that
+leak from train to testÂ [20], hampering alignment and out-of-distribution
+performance. In particular, this gives rise to adversarial attacksÂ [35] \-
+semantically negligible perturbations of data that arbitrarily change
+modelâ€™s predictions. Adversarial vulnerability is a widespread phenomenon
+(visionÂ [35], segmentation/detectionÂ [39], speech recognitionÂ [9], tabular
+dataÂ [10], RLÂ [19], NLPÂ [41]) and largely contributes to the general lack
+of trust in DNNs, substantially limiting their adoption in high-stakes
+applications such as healthcare, military, autonomous vehicles or
+cybersecurity. Conversely, the main advantage of hand-designed features is the
+fine-grained control over modelâ€™s performance; however, such systems quickly
+become infeasibly complex.
+
+This paper aims to address those issues by reconciling Deep Learning with
+feature engineering - with the help of _locality engineering_. Specifically,
+_semantic features_ are introduced as a general conceptual machinery for
+controlled dimensionality reduction inside a neural network layer. FigureÂ 1
+presents the core idea behind the notion and the rigorous definition is given
+in SectionÂ 4. Implementing a semantic feature predominantly involves encoding
+appropriate invariants (i.e. semantic locality) for the desired semantic
+entities, e.g. "small affine perturbations" for shapes or "adding small
+Î´âˆˆ[âˆ’Ïµ,Ïµ]ğ›¿italic-Ïµitalic-Ïµ\delta\in[-\epsilon,\epsilon]italic_Î´ âˆˆ
+[ - italic_Ïµ , italic_Ïµ ]" for numbers. Thus, semantic features capture the
+core characteristic of real-world objects: _having many possible states but
+being at exactly one state at a time_. It turns out that for the trained
+proof-of-concept (PoC) DNN such parameter-sharing strategy leads to human-
+aligned _base features_ \- which motivates calling the PoC a _white box_
+neural network, see SectionÂ 6. In particular, the resulting inherent
+interpretability of the PoC allowed for designing a strong architectural
+defense111with no form of adversarial training! against adversarial attacks,
+as discussed in SectionÂ 7. Thus, the notion of "semantic feature" and the
+adversarially robust white box PoC network are the main contributions of this
+work.
+
+![Refer to caption](extracted/2403.09863v5/media/SFmatch.drawio.png) Figure 1:
+Visualisation of _semantic feature_
+fğğ‹subscriptğ‘“ğğ‹f_{\mathbf{P}\mathbf{L}}italic_f start_POSTSUBSCRIPT
+bold_PL end_POSTSUBSCRIPT and its matching mechanism (SFmatch, see SectionÂ
+4.2). The semantic feature fğğ‹subscriptğ‘“ğğ‹f_{\mathbf{P}\mathbf{L}}italic_f
+start_POSTSUBSCRIPT bold_PL end_POSTSUBSCRIPT consists of a _base feature_
+fğ‘“fitalic_f and a set of its "small" modifications
+ğ‹â¢(pi)â¢(f)ğ‹subscriptğ‘ğ‘–ğ‘“\mathbf{L}(p_{i})(f)bold_L ( italic_p
+start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ) ( italic_f ). In this case,
+the base feature has the same dimensions as the input image and its
+modifications are 2D affine transformations.
+SFmatchâ¢(d,fğğ‹)SFmatchğ‘‘subscriptğ‘“ğğ‹\mathrm{SFmatch}(d,f_{\mathbf{P}\mathbf{L}})roman_SFmatch
+( italic_d , italic_f start_POSTSUBSCRIPT bold_PL end_POSTSUBSCRIPT ) takes
+the maximum of the scalar products
+dâ‹…ğ‹â¢(pi)â¢(f)â‹…ğ‘‘ğ‹subscriptğ‘ğ‘–ğ‘“d\cdot\mathbf{L}(p_{i})(f)italic_d
+â‹… bold_L ( italic_p start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ) (
+italic_f ) thus identifying all
+ğ‹â¢(pi)â¢(f)ğ‹subscriptğ‘ğ‘–ğ‘“\mathbf{L}(p_{i})(f)bold_L ( italic_p
+start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ) ( italic_f ). Affine
+transformations are typically parameterized by extended matrices of dimension
+2Ã—3232\times 32 Ã— 3; both the base feature and the parameters
+pisubscriptğ‘ğ‘–p_{i}italic_p start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT
+of its modifications are learned. If fğ‘“fitalic_f and its modifications are
+easily understood by humans, then the neural network layer composed of such
+features can be considered a _white box_ layer. The precise definition of
+semantic feature is found in SectionÂ 4.
+
+The paper is organised as follows. SectionÂ 2 investigates related work on
+explainability and adversarial robustness. SectionÂ 3 briefly describes the
+adopted methodology. SectionÂ 4 gives the rigorous definition of _semantic
+feature_ and argues for the generality of the notion. SectionÂ 5 builds a
+carefully motivated PoC 4-layer white box neural network for the selected
+problem. SectionÂ 6 analyses the trained model both qualitatively and
+quantitatively in terms of explainability, reliability, adversarial robustness
+and performs an ablation study. SectionÂ 7 provides a short discussion of
+advantages and limitations of the approach. The paper ends with ideas for
+further research and acknowledgments.
+
+##  2 Related work
+
+###  2.1 Adversarial robustness
+
+Existing methods of improving DNN robustness are far from ideal. Adversarial
+TrainingÂ [27] being one of the strongest _empirical_ defenses against
+attacksÂ [3] is slow, data-hungryÂ [31, 23] and results in robust
+generalisation gapÂ [29, 40] as models overfit to the train-time adversaries.
+This highlights the biggest challenge of empirical approaches, i.e. reliable
+evaluation of robustness, as more and more sophisticated attacks break the
+previously successful defensesÂ [8, 12].
+
+To address this issue the field of _certified robustness_ has emerged with the
+goal of providing theoretically certified upper bounds for adversarial errorÂ
+[24]. However the complete certification faces serious obstacles as it is NP-
+CompleteÂ [38] and therefore limited to small datasets and networks, and/or to
+probabilistic approaches. Another shortcoming is that such guarantees can only
+be given for a precisely defined _threat model_ which is usually assumed to be
+a Lpsubscriptğ¿ğ‘L_{p}italic_L start_POSTSUBSCRIPT italic_p end_POSTSUBSCRIPT-
+bounded perturbation. The methods, results and theoretical obstacles can be
+vastly different222for example SOTA certified robustness for MNIST is ~94% for
+Lâˆ,eâ¢pâ¢s=0.3subscriptğ¿ğ‘’ğ‘ğ‘ 0.3L_{\infty},eps=0.3italic_L
+start_POSTSUBSCRIPT âˆ end_POSTSUBSCRIPT , italic_e italic_p italic_s = 0.3
+and only ~73% for L2,eâ¢pâ¢s=1.58subscriptğ¿2ğ‘’ğ‘ğ‘
+1.58L_{2},eps=1.58italic_L start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT , italic_e
+italic_p italic_s = 1.58, see
+https://sokcertifiedrobustness.github.io/leaderboard/. for different
+pâˆˆ{0,1,2,â€¦,âˆ}ğ‘012â€¦p\in\\{0,1,2,\ldots,\infty\\}italic_p âˆˆ { 0 , 1 ,
+2 , â€¦ , âˆ } and often require training the model specifically towards the
+chosen Lpsubscriptğ¿ğ‘L_{p}italic_L start_POSTSUBSCRIPT italic_p
+end_POSTSUBSCRIPT-certification.
+
+###  2.2 Explainability
+
+Recent work indicates a link between adversarial robustness and inherent
+interpretability as adversarially trained models tend to enjoy Perceptually-
+Aligned Gradients (PAG) - taking gradient steps along the input to maximise
+the activation of a selected neuron in the representation space often yields
+visually aligned featuresÂ [13, 22]. There is also some evidence for the
+opposite implication that PAG implies certain form of adversarial robustnessÂ
+[15, 34]. However, SectionÂ 6.4 of this paper shows that the latter
+implication does not hold - model can be inherently interpretable but not
+robust.
+
+Susceptibility to adversarial attacks is arguably the main drawback of known
+approaches to Explainable AI (XAI). One would reasonably expect explainable
+models to rely exclusively on human-aligned features instead of spurious
+"shortcut" signalsÂ [17] and therefore be robust to adversaries. However, the
+_post-hoc_ attribution methods, which aim to explain the decisions of already-
+trained models, are fragileÂ [1] and themselves prone to attacksÂ [18]. On the
+other hand, the _inherently interpretable_ solutions such as Prototypical
+Parts [25, 11], Bag-of-FeaturesÂ [5], Self-Explaining NetworksÂ [2], SITEÂ
+[37], Recurrent AttentionÂ [14], Neurosymbolic AIÂ [33] or Capsule NetworksÂ
+[30] all employ various classic black box encoder networks and thus introduce
+the adversarial vulnerability into their cores.
+
+Overall the field of adversarially robust explanations (AdvXAI) is fairly
+unexplored; for more information on this emerging research domain see the
+recent surveyÂ [4].
+
+###  2.3 Geometric Deep Learning
+
+The idea behind semantic features resembles the framework of Geometric Deep
+LearningÂ [7] or the more recent Categorical Deep LearningÂ [16] in that
+semantic features are invariant to small deformations (local symmetries).
+However, semantic features are more practical as they focus on the local
+invariance and donâ€™t require defining a formal structure on the input space;
+instead, they learn to sample the semantic neighbourhood of a _base feature_
+(which is also learned). Thus, the only effort required from the developer is
+to implement sufficient _sampling mechanism_ , which doesnâ€™t need to be
+formal or exhaustive, e.g. small affine perturbations seem to be good enough
+for MNIST features (see SectionÂ 6.3.3), despite the fact that not every
+possible local perturbation of these features is affine. Additionally, the
+mentioned frameworks are high-level approaches that donâ€™t address explicitly
+the core issue of adversarial vulnerability.
+
+##  3 Methodology
+
+This paper focuses on the simplest relevant problem (_Minimum Viable Dataset_
+, MVD) to cut off the obfuscating details and get into the core of what makes
+neural networks fragile and uninterpretable. Despite much effort, DNNs remain
+susceptible to adversarial attacks even on MNISTÂ [32] and therefore cannot be
+considered human-aligned even for this simple dataset, see FigureÂ 2. That
+being said, the MVD for this paper is chosen to be the binary subset of MNIST
+consisting of images of "3" and "5" - as this is one of the most often
+confused pairs under adversariesÂ [36] and might be considered harder than the
+entire MNIST in terms of average adversarial accuracy. For completeness, the
+preliminary results on the full MNIST are discussed in AppendixÂ C.
+
+The paper provides both qualitative and quantitative results. The qualitative
+analysis focuses on visualising the internal distribution of weights inside
+layers and how features are matched against the input. For the quantitative
+results a strong adversarial regime is employed besides computing the standard
+clean test metrics (computing the clean metrics alone is considered a flawed
+approach for the reasons discussed earlier).
+
+![Refer to caption](extracted/2403.09863v5/media/mnist_3_5_adv.png) Figure 2:
+A typical DNN for MNIST can be arbitrarily fooled by adding semantically
+negligible noise.
+
+##  4 Semantic features
+
+In machine learning inputs are represented as tensors. Yet, the standard
+Euclidean topology in tensor space usually fails to account for small domain-
+specific variations of features. For example shifting an image by 1 pixel is
+semantically negligible but usually results in a distant output in
+L2subscriptğ¿2L_{2}italic_L start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT metric.
+
+This observation inspires the following definition:
+
+##### Definition:
+
+A _semantic feature_ fğğ‹subscriptğ‘“ğğ‹f_{\mathbf{P}\mathbf{L}}italic_f
+start_POSTSUBSCRIPT bold_PL end_POSTSUBSCRIPT of dimension sâˆˆâ„•ğ‘
+â„•s\in\mathbb{N}italic_s âˆˆ blackboard_N is a tuple
+(f,ğ,ğ‹)ğ‘“ğğ‹(f,\mathbf{P},\mathbf{L})( italic_f , bold_P , bold_L ) where:
+
+  * â€¢
+
+fğ‘“fitalic_f \- _base feature_ , fâˆˆâ„sğ‘“superscriptâ„ğ‘
+f\in\mathbb{R}^{s}italic_f âˆˆ blackboard_R start_POSTSUPERSCRIPT italic_s
+end_POSTSUPERSCRIPT,
+
+  * â€¢
+
+ğğ\mathbf{P}bold_P \- _parameter set_ ,
+ğâŠ‚â„rğsuperscriptâ„ğ‘Ÿ\mathbf{P}\subset\mathbb{R}^{r}bold_P âŠ‚ blackboard_R
+start_POSTSUPERSCRIPT italic_r end_POSTSUPERSCRIPT for some
+râˆˆâ„•ğ‘Ÿâ„•r\in\mathbb{N}italic_r âˆˆ blackboard_N
+
+  * â€¢
+
+ğ‹ğ‹\mathbf{L}bold_L \- _locality function_ :
+ğâ†’Diffâ¢(â„s)â†’ğDiffsuperscriptâ„ğ‘
+\mathbf{P}\rightarrow\textrm{Diff}(\mathbb{R}^{s})bold_P â†’ Diff (
+blackboard_R start_POSTSUPERSCRIPT italic_s end_POSTSUPERSCRIPT ) where Diff
+is the family333informally, ğ‹â¢(ğ)ğ‹ğ\mathbf{L}(\mathbf{P})bold_L ( bold_P )
+should consist of â€smallâ€ diffeomorphisms. of differentiable automorphisms
+of â„ssuperscriptâ„ğ‘ \mathbb{R}^{s}blackboard_R start_POSTSUPERSCRIPT
+italic_s end_POSTSUPERSCRIPT
+
+Additionally the feature (f,ğ,ğ‹)ğ‘“ğğ‹(f,\mathbf{P},\mathbf{L})( italic_f ,
+bold_P , bold_L ) is called _differentiable_ iff ğ‹ğ‹\mathbf{L}bold_L is
+differentiable (on some neighbourhood of ğğ\mathbf{P}bold_P).
+
+Intuitively, semantic feature consists of a base vector fğ‘“fitalic_f and a
+set of itâ€™s "small" variations
+fp=ğ‹â¢(p)â¢(f)subscriptğ‘“ğ‘ğ‹ğ‘ğ‘“f_{p}=\mathbf{L}(p)(f)italic_f
+start_POSTSUBSCRIPT italic_p end_POSTSUBSCRIPT = bold_L ( italic_p ) (
+italic_f ) for all pâˆˆğğ‘ğp\in\mathbf{P}italic_p âˆˆ bold_P; these variations
+may be called _poses_ afterÂ [30]. Thus
+(f,ğ,ğ‹)ğ‘“ğğ‹(f,\mathbf{P},\mathbf{L})( italic_f , bold_P , bold_L ) is
+_locality-sensitive_ in the adequate topology capturing semantics of the
+domain. The differentiability of ğ‹â¢(p)ğ‹ğ‘\mathbf{L}(p)bold_L ( italic_p )
+and of ğ‹ğ‹\mathbf{L}bold_L itself allow for gradient updates of fğ‘“fitalic_f
+and ğğ\mathbf{P}bold_P respectively. The intention is to learn both
+fğ‘“fitalic_f and ğğ\mathbf{P}bold_P while defining ğ‹ğ‹\mathbf{L}bold_L
+explicitly as an inductive bias444by the â€no free lunchâ€ theorem a general
+theory of learning systems has to adequately account for the inductive bias.
+for the given modality.
+
+###  4.1 Examples of semantic features
+
+To better understand the definition consider the following examples of
+semantic features:
+
+  1. 1.
+
+real-valued fğğ‹subscriptğ‘“ğğ‹f_{\mathbf{P}\mathbf{L}}italic_f
+start_POSTSUBSCRIPT bold_PL end_POSTSUBSCRIPT
+
+     * â€¢
+
+fâˆˆâ„ğ‘“â„f\in\mathbb{R}italic_f âˆˆ blackboard_R
+
+     * â€¢
+
+ğğ\mathbf{P}bold_P \- a real interval
+[pmâ¢iâ¢n,pmâ¢aâ¢x]subscriptğ‘ğ‘šğ‘–ğ‘›subscriptğ‘ğ‘šğ‘ğ‘¥[p_{min},p_{max}][
+italic_p start_POSTSUBSCRIPT italic_m italic_i italic_n end_POSTSUBSCRIPT ,
+italic_p start_POSTSUBSCRIPT italic_m italic_a italic_x end_POSTSUBSCRIPT ]
+for
+pmâ¢iâ¢n<=0<=pmâ¢aâ¢xsubscriptğ‘ğ‘šğ‘–ğ‘›0subscriptğ‘ğ‘šğ‘ğ‘¥p_{min}<=0<=p_{max}italic_p
+start_POSTSUBSCRIPT italic_m italic_i italic_n end_POSTSUBSCRIPT < = 0 < =
+italic_p start_POSTSUBSCRIPT italic_m italic_a italic_x end_POSTSUBSCRIPT
+
+     * â€¢
+
+ğ‹ğ‹\mathbf{L}bold_L \- function that maps a real number pğ‘pitalic_p to the
+function gâ†¦g+pmaps-toğ‘”ğ‘”ğ‘g\mapsto g+pitalic_g â†¦ italic_g + italic_p
+for gâˆˆâ„ğ‘”â„g\in\mathbb{R}italic_g âˆˆ blackboard_R
+
+  2. 2.
+
+convolutional fğğ‹subscriptğ‘“ğğ‹f_{\mathbf{P}\mathbf{L}}italic_f
+start_POSTSUBSCRIPT bold_PL end_POSTSUBSCRIPT
+
+     * â€¢
+
+fğ‘“fitalic_f \- square 2D convolutional kernel of size
+(coâ¢uâ¢t,ciâ¢n,k,k)subscriptğ‘ğ‘œğ‘¢ğ‘¡subscriptğ‘ğ‘–ğ‘›ğ‘˜ğ‘˜(c_{out},c_{in},k,k)(
+italic_c start_POSTSUBSCRIPT italic_o italic_u italic_t end_POSTSUBSCRIPT ,
+italic_c start_POSTSUBSCRIPT italic_i italic_n end_POSTSUBSCRIPT , italic_k ,
+italic_k )
+
+     * â€¢
+
+ğğ\mathbf{P}bold_P \- set of 2Ã—2222\times 22 Ã— 2 rotation matrices
+
+     * â€¢
+
+ğ‹ğ‹\mathbf{L}bold_L \- function that maps a rotation matrix to the respective
+rotation of a 2D kernel555can be made differentiable as inÂ [28, 21].
+
+  3. 3.
+
+affine fğğ‹subscriptğ‘“ğğ‹f_{\mathbf{P}\mathbf{L}}italic_f start_POSTSUBSCRIPT
+bold_PL end_POSTSUBSCRIPT
+
+     * â€¢
+
+fğ‘“fitalic_f \- vector representing a small 2D spatial feature (e.g. image
+patch containing a short line)
+
+     * â€¢
+
+ğğ\mathbf{P}bold_P \- set of 2Ã—3232\times 32 Ã— 3 invertible augmented
+matrices666preferably close to the identity matrix.
+
+     * â€¢
+
+ğ‹ğ‹\mathbf{L}bold_L \- function that maps a 2Ã—3232\times 32 Ã— 3 matrix to
+the respective 2D affine transformation of images5
+
+  4. 4.
+
+xor fğğ‹subscriptğ‘“ğğ‹f_{\mathbf{P}\mathbf{L}}italic_f start_POSTSUBSCRIPT
+bold_PL end_POSTSUBSCRIPT
+
+     * â€¢
+
+fğ‘“fitalic_f \- single-entry vector of dimension
+nâˆˆâ„•ğ‘›â„•n\in\mathbb{N}italic_n âˆˆ blackboard_N
+
+     * â€¢
+
+ğâŠ‚{0,1,â€¦,nâˆ’1}ğ01â€¦ğ‘›1\mathbf{P}\subset\\{0,1,\ldots,n-1\\}bold_P âŠ‚ {
+0 , 1 , â€¦ , italic_n - 1 }
+
+     * â€¢
+
+ğ‹ğ‹\mathbf{L}bold_L \- function that maps a natural number pğ‘pitalic_p to
+the function that rolls elements of
+gâˆˆâ„nğ‘”superscriptâ„ğ‘›g\in\mathbb{R}^{n}italic_g âˆˆ blackboard_R
+start_POSTSUPERSCRIPT italic_n end_POSTSUPERSCRIPT by pğ‘pitalic_p coordinates
+to the right
+
+  5. 5.
+
+logical fğğ‹subscriptğ‘“ğğ‹f_{\mathbf{P}\mathbf{L}}italic_f
+start_POSTSUBSCRIPT bold_PL end_POSTSUBSCRIPT
+
+     * â€¢
+
+fğ‘“fitalic_f \- concatenation of kğ‘˜kitalic_k single-entry vectors and some
+dense vectors in-between
+
+     * â€¢
+
+ğâŠ‚{0,1,â€¦,n0âˆ’1}Ã—â€¦Ã—{0,1,â€¦,nkâˆ’1âˆ’1}ğ01â€¦subscriptğ‘›01â€¦01â€¦subscriptğ‘›ğ‘˜11\mathbf{P}\subset\\{0,1,\ldots,n_{0}-1\\}\times\ldots\times\\{0,1,\ldots,n_{k-1}-1\\}bold_P
+âŠ‚ { 0 , 1 , â€¦ , italic_n start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT - 1 } Ã—
+â€¦ Ã— { 0 , 1 , â€¦ , italic_n start_POSTSUBSCRIPT italic_k - 1
+end_POSTSUBSCRIPT - 1 }
+
+     * â€¢
+
+ğ‹ğ‹\mathbf{L}bold_L \- function that maps pâˆˆğğ‘ğp\in\mathbf{P}italic_p âˆˆ
+bold_P to the respective rolls of single-entry vectors (leaving the dense
+vectors intact)
+
+###  4.2 Matching semantic features
+
+The role of semantic features is to be matched against the input to uncover
+the general structure of the data. Suppose that we have already defined a
+function _match_ : (â„c,â„s)â†’â„â†’superscriptâ„ğ‘superscriptâ„ğ‘
+â„(\mathbb{R}^{c},\mathbb{R}^{s})\rightarrow\mathbb{R}( blackboard_R
+start_POSTSUPERSCRIPT italic_c end_POSTSUPERSCRIPT , blackboard_R
+start_POSTSUPERSCRIPT italic_s end_POSTSUPERSCRIPT ) â†’ blackboard_R that
+measures an extent to which datapoint
+dâˆˆâ„cğ‘‘superscriptâ„ğ‘d\in\mathbb{R}^{c}italic_d âˆˆ blackboard_R
+start_POSTSUPERSCRIPT italic_c end_POSTSUPERSCRIPT contains a feature
+gâˆˆâ„sğ‘”superscriptâ„ğ‘ g\in\mathbb{R}^{s}italic_g âˆˆ blackboard_R
+start_POSTSUPERSCRIPT italic_s end_POSTSUPERSCRIPT. Now letâ€™s define
+
+| SFmatchâ¢(d,(f,ğ,ğ‹))=maxpâˆˆğâ¡matchâ¢(d,ğ‹â¢(p)â¢(f))SFmatchğ‘‘ğ‘“ğğ‹subscriptğ‘ğmatchğ‘‘ğ‹ğ‘ğ‘“\mathrm{SFmatch}(d,(f,\mathbf{P},\mathbf{L}))=\max_{p\in\mathbf{P}}\mathrm{% match}(d,\mathbf{L}(p)(f))roman_SFmatch ( italic_d , ( italic_f , bold_P , bold_L ) ) = roman_max start_POSTSUBSCRIPT italic_p âˆˆ bold_P end_POSTSUBSCRIPT roman_match ( italic_d , bold_L ( italic_p ) ( italic_f ) ) |  | (1)  
+---|---|---|---  
+  
+If ğ‹ğ‹\mathbf{L}bold_L captures domain topology adequately then we may think
+of matching fğğ‹subscriptğ‘“ğğ‹f_{\mathbf{P}\mathbf{L}}italic_f
+start_POSTSUBSCRIPT bold_PL end_POSTSUBSCRIPT as a form of local inhibition
+along
+ğ‹ğâ¢(f)={Lâ¢(p)â¢(f),pâˆˆP}subscriptğ‹ğğ‘“ğ¿ğ‘ğ‘“ğ‘ğ‘ƒ\mathbf{L}_{\mathbf{P}}(f)=\\{L(p)(f),p\in
+P\\}bold_L start_POSTSUBSCRIPT bold_P end_POSTSUBSCRIPT ( italic_f ) = {
+italic_L ( italic_p ) ( italic_f ) , italic_p âˆˆ italic_P } and in this sense
+semantic feature defines a XOR gate over
+ğ‹ğâ¢(f)subscriptğ‹ğğ‘“\mathbf{L}_{\mathbf{P}}(f)bold_L start_POSTSUBSCRIPT
+bold_P end_POSTSUBSCRIPT ( italic_f ). On the other hand, every
+fpâˆˆğ‹ğâ¢(f)subscriptğ‘“ğ‘subscriptğ‹ğğ‘“f_{p}\in\mathbf{L}_{\mathbf{P}}(f)italic_f
+start_POSTSUBSCRIPT italic_p end_POSTSUBSCRIPT âˆˆ bold_L start_POSTSUBSCRIPT
+bold_P end_POSTSUBSCRIPT ( italic_f ) can be viewed as a conjunction (AND
+gate) of its non-zero coordinates777i.e. fpsubscriptğ‘“ğ‘f_{p}italic_f
+start_POSTSUBSCRIPT italic_p end_POSTSUBSCRIPT is a conjunction of lower-level
+features.. Thus, semantic features turn out to be a natural way of expressing
+logical claims about the classical world - in the language that can be used by
+neural networks. This is particularly apparent in the context of logical
+semantic features, which can express logical sentences explicitly, e.g.
+sentence (Aâˆ¨B)âˆ§Â¬Câˆ§Â¬Dğ´ğµğ¶ğ·(A\vee B)\wedge\neg C\wedge\neg D(
+italic_A âˆ¨ italic_B ) âˆ§ Â¬ italic_C âˆ§ Â¬ italic_D can be expressed by a
+logical fğğ‹subscriptğ‘“ğğ‹f_{\mathbf{P}\mathbf{L}}italic_f
+start_POSTSUBSCRIPT bold_PL end_POSTSUBSCRIPT where:
+
+  * â€¢
+
+f=[1,0,âˆ’1,âˆ’1]ğ‘“1011f=[1,0,-1,-1]italic_f = [ 1 , 0 , - 1 , - 1 ]; Â Â Â Â
+Â Â Â Â Â ğ={0,1}ğ01\mathbf{P}=\\{0,1\\}bold_P = { 0 , 1 }; Â Â Â Â Â Â Â Â Â
+ğ‹â¢(0)â¢(f)=[1,0,âˆ’1,âˆ’1]ğ‹0ğ‘“1011\mathbf{L}(0)(f)=[1,0,-1,-1]bold_L ( 0 )
+( italic_f ) = [ 1 , 0 , - 1 , - 1 ] and
+ğ‹â¢(1)â¢(f)=[0,1,âˆ’1,âˆ’1]ğ‹1ğ‘“0111\mathbf{L}(1)(f)=[0,1,-1,-1]bold_L ( 1 )
+( italic_f ) = [ 0 , 1 , - 1 , - 1 ].
+
+It remains to characterise the _match_ function. Usually it can be defined as
+the scalar product dâ‹…eâ¢mâ¢bâ¢(g)â‹…ğ‘‘ğ‘’ğ‘šğ‘ğ‘”d\cdot emb(g)italic_d â‹…
+italic_e italic_m italic_b ( italic_g ) where
+eâ¢mâ¢b:â„sâ†’â„c:ğ‘’ğ‘šğ‘â†’superscriptâ„ğ‘
+superscriptâ„ğ‘emb:\mathbb{R}^{s}\rightarrow\mathbb{R}^{c}italic_e italic_m
+italic_b : blackboard_R start_POSTSUPERSCRIPT italic_s end_POSTSUPERSCRIPT â†’
+blackboard_R start_POSTSUPERSCRIPT italic_c end_POSTSUPERSCRIPT is some
+natural embedding of the feature space to the input space. In particular for
+our previous examples lets set the following:
+
+  * â€¢
+
+for real-valued fğğ‹subscriptğ‘“ğğ‹f_{\mathbf{P}\mathbf{L}}italic_f
+start_POSTSUBSCRIPT bold_PL end_POSTSUBSCRIPT:
+match(d,g)=int(d==g)\mathrm{match}(d,g)=\mathrm{int}(d==g)roman_match (
+italic_d , italic_g ) = roman_int ( italic_d = = italic_g ) where
+d,gâˆˆâ„ğ‘‘ğ‘”â„d,g\in\mathbb{R}italic_d , italic_g âˆˆ blackboard_R
+
+  * â€¢
+
+for convolutional888an alternative definition would treat every gisuperscriptğ‘”ğ‘–g^{i}italic_g start_POSTSUPERSCRIPT italic_i end_POSTSUPERSCRIPT as a separate semantic feature; we stick to the _max_ option for simplicity. fğğ‹subscriptğ‘“ğğ‹f_{\mathbf{P}\mathbf{L}}italic_f start_POSTSUBSCRIPT bold_PL end_POSTSUBSCRIPT: matchâ¢(d,g)=max0<=i<coâ¢uâ¢tâ¡(dâˆ—giâ€–giâ€–2)matchğ‘‘ğ‘”subscript0ğ‘–subscriptğ‘ğ‘œğ‘¢ğ‘¡ğ‘‘superscriptğ‘”ğ‘–subscriptnormsuperscriptğ‘”ğ‘–2\mathrm{match}(d,g)=\max_{0<=i<c_{out}}(d*\frac{g^{i}}{||g^{i}||_{2}})roman_match ( italic_d , italic_g ) = roman_max start_POSTSUBSCRIPT 0 < = italic_i < italic_c start_POSTSUBSCRIPT italic_o italic_u italic_t end_POSTSUBSCRIPT end_POSTSUBSCRIPT ( italic_d âˆ— divide start_ARG italic_g start_POSTSUPERSCRIPT italic_i end_POSTSUPERSCRIPT end_ARG start_ARG | | italic_g start_POSTSUPERSCRIPT italic_i end_POSTSUPERSCRIPT | | start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT end_ARG ) where gğ‘”gitalic_g is a 2D convolutional kernel of shape (coâ¢uâ¢t,ciâ¢n,k,k)subscriptğ‘ğ‘œğ‘¢ğ‘¡subscriptğ‘ğ‘–ğ‘›ğ‘˜ğ‘˜(c_{out},c_{in},k,k)( italic_c start_POSTSUBSCRIPT italic_o italic_u italic_t end_POSTSUBSCRIPT , italic_c start_POSTSUBSCRIPT italic_i italic_n end_POSTSUBSCRIPT , italic_k , italic_k ), gisuperscriptğ‘”ğ‘–g^{i}italic_g start_POSTSUPERSCRIPT italic_i end_POSTSUPERSCRIPT is the iğ‘–iitalic_i-th convolutional filter of gğ‘”gitalic_g, dğ‘‘ditalic_d is an image patch of shape (ciâ¢n,k,k)subscriptğ‘ğ‘–ğ‘›ğ‘˜ğ‘˜(c_{in},k,k)( italic_c start_POSTSUBSCRIPT italic_i italic_n end_POSTSUBSCRIPT , italic_k , italic_k )
+
+  * â€¢
+
+for affine fğğ‹subscriptğ‘“ğğ‹f_{\mathbf{P}\mathbf{L}}italic_f start_POSTSUBSCRIPT bold_PL end_POSTSUBSCRIPT: matchâ¢(d,g)=dâ‹…gâ€–gâ€–2matchğ‘‘ğ‘”â‹…ğ‘‘ğ‘”subscriptnormğ‘”2\mathrm{match}(d,g)=d\cdot\frac{g}{||g||_{2}}roman_match ( italic_d , italic_g ) = italic_d â‹… divide start_ARG italic_g end_ARG start_ARG | | italic_g | | start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT end_ARG where gğ‘”gitalic_g is a 2D image of shape (ciâ¢n,k,k)subscriptğ‘ğ‘–ğ‘›ğ‘˜ğ‘˜(c_{in},k,k)( italic_c start_POSTSUBSCRIPT italic_i italic_n end_POSTSUBSCRIPT , italic_k , italic_k ) and dğ‘‘ditalic_d is a 2D image patch of the same shape (treated as vectors in â„csuperscriptâ„ğ‘\mathbb{R}^{c}blackboard_R start_POSTSUPERSCRIPT italic_c end_POSTSUPERSCRIPT)
+
+  * â€¢
+
+for logical fğğ‹subscriptğ‘“ğğ‹f_{\mathbf{P}\mathbf{L}}italic_f
+start_POSTSUBSCRIPT bold_PL end_POSTSUBSCRIPT:
+matchâ¢(d,g)=dâ‹…gmatchğ‘‘ğ‘”â‹…ğ‘‘ğ‘”\mathrm{match}(d,g)=d\cdot groman_match
+( italic_d , italic_g ) = italic_d â‹… italic_g for
+g,dâˆˆâ„cğ‘”ğ‘‘superscriptâ„ğ‘g,d\in\mathbb{R}^{c}italic_g , italic_d âˆˆ
+blackboard_R start_POSTSUPERSCRIPT italic_c end_POSTSUPERSCRIPT
+
+The occasional L2subscriptğ¿2L_{2}italic_L start_POSTSUBSCRIPT 2
+end_POSTSUBSCRIPT normalization in the above examples is to avoid favouring
+norm-expanding ğ‹â¢(p)ğ‹ğ‘\mathbf{L}(p)bold_L ( italic_p ).
+
+##  5 Network architecture
+
+In this section we will use semantic features to build a PoC white box neural
+network model that classifies MNIST images of "3" and "5" in a transparent and
+adversarially robust way. We will build the network layer by layer arguing
+carefully for every design choice. Note that the network construction is not
+an abstract process and must reflect the core characteristics of the chosen
+dataset. There is no free lunch, if we want to capture the semantics of the
+dataset we need to encode it in the architecture - more or less explicitly.
+The framework of semantic features allows to do this in a pretty natural way.
+Note that a single neural network layer will consist of many parallel semantic
+features of the same kind.
+
+The network consists of the following 4 layers stacked sequentially. For
+simplicity we donâ€™t add bias to any of those layers. Te resulting model has
+around 5555K parameters. The architecture is visualized in the FigureÂ 3.
+
+![Refer to caption](extracted/2403.09863v5/media/architecture.drawio.png)
+Figure 3: Architecture of the PoC white box neural network. The first two
+layers consist of semantic features that operate per-pixel - the first layer
+takes into account only the pixelâ€™s value, while the second examines its
+5Ã—5555\times 55 Ã— 5 neighborhood to determine if the pixel lays on a "bright
+line". The first two layers retain the shape of the input image. The third
+layer comprises of 8 affine
+fğğ‹subscriptğ‘“ğğ‹f_{\mathbf{P}\mathbf{L}}italic_f start_POSTSUBSCRIPT
+bold_PL end_POSTSUBSCRIPT as visualized in FigureÂ 1. The final layer consists
+of two logical fğğ‹subscriptğ‘“ğğ‹f_{\mathbf{P}\mathbf{L}}italic_f
+start_POSTSUBSCRIPT bold_PL end_POSTSUBSCRIPT: intuitively, the first one
+checks whether at least one affine
+fğğ‹subscriptğ‘“ğğ‹f_{\mathbf{P}\mathbf{L}}italic_f start_POSTSUBSCRIPT
+bold_PL end_POSTSUBSCRIPT corresponding to "3" is active and none of the
+affine fğğ‹subscriptğ‘“ğğ‹f_{\mathbf{P}\mathbf{L}}italic_f start_POSTSUBSCRIPT
+bold_PL end_POSTSUBSCRIPT corresponding to "5" are active; the second logical
+fğğ‹subscriptğ‘“ğğ‹f_{\mathbf{P}\mathbf{L}}italic_f start_POSTSUBSCRIPT
+bold_PL end_POSTSUBSCRIPT works in the opposite way. SectionÂ 5 describes the
+architecture in more detail.
+
+###  5.1 Two Step Layer
+
+MNIST datapoint is a 28Ã—28282828\times 2828 Ã— 28 grayscale image. Its basic
+building block is a pixel xâˆˆ[0,1]ğ‘¥01x\in[0,1]italic_x âˆˆ [ 0 , 1 ].
+Despite being allowed to assume any value between 00 and 1111 it is actually
+(semantically) a ternary object - itâ€™s either ON, OFF or MEH999the MEH state
+is an undecided state in-between.. Therefore the semantic space should squash
+the [0,1]01[0,1][ 0 , 1 ] interval into those 3 values.
+
+A real-valued fğğ‹subscriptğ‘“ğğ‹f_{\mathbf{P}\mathbf{L}}italic_f
+start_POSTSUBSCRIPT bold_PL end_POSTSUBSCRIPT with _match_ and
+ğ‹ğ‹\mathbf{L}bold_L defined as in the previous section identifies numbers in
+certain interval around fğ‘“fitalic_f. This means that a layer consisting of
+multiple real-valued fğğ‹subscriptğ‘“ğğ‹f_{\mathbf{P}\mathbf{L}}italic_f
+start_POSTSUBSCRIPT bold_PL end_POSTSUBSCRIPT, provided that the relevant
+intervals donâ€™t overlap, can be represented as a single locally-constant
+real-valued function. This allows us to simplify the implementation of such
+layer and instead of learning the constrained parameters of multiple
+fğğ‹subscriptğ‘“ğğ‹f_{\mathbf{P}\mathbf{L}}italic_f start_POSTSUBSCRIPT
+bold_PL end_POSTSUBSCRIPT we can learn a single parameterised real-valued
+function that serves as an entire layer. In order to group pixel intensities
+into 3 abstract values we can draw inspiration from the
+softsignâ¢(x)=x1+xsoftsignğ‘¥ğ‘¥1ğ‘¥\mathrm{softsign}(x)=\frac{x}{1+x}roman_softsign
+( italic_x ) = divide start_ARG italic_x end_ARG start_ARG 1 + italic_x
+end_ARG function or rather from itâ€™s parameterised version
+softsignâ¢(x,t,s)=xâˆ’ts+xsoftsignğ‘¥ğ‘¡ğ‘ ğ‘¥ğ‘¡ğ‘
+ğ‘¥\mathrm{softsign}(x,t,s)=\frac{x-t}{s+x}roman_softsign ( italic_x ,
+italic_t , italic_s ) = divide start_ARG italic_x - italic_t end_ARG start_ARG
+italic_s + italic_x end_ARG and â€œglueâ€ two of such step functions together
+to obtain (Parameterised) Two Step function shown in FigureÂ 5. The exact
+implementation of the Two Step function is provided in AppendixÂ A. We
+initialize the layer setting init_scales_div=10.
+
+###  5.2 Convolutional Semantic Layer
+
+A pixel-wise function is not enough to classify pixel as ON or OFF - the
+semantics of our MVD require a pixel to exist in a sufficiently bright region
+to be considered as ON. Therefore the next layer will consist of a single
+convolutional semantic feature (f,ğ,ğ‹)ğ‘“ğğ‹(f,\mathbf{P},\mathbf{L})(
+italic_f , bold_P , bold_L ):
+
+  * â€¢
+
+fğ‘“fitalic_f \- 2D kernel of shape (2,1,5,5)2155(2,1,5,5)( 2 , 1 , 5 , 5 )
+(concatenation of (g0,g1)superscriptğ‘”0superscriptğ‘”1(g^{0},g^{1})( italic_g
+start_POSTSUPERSCRIPT 0 end_POSTSUPERSCRIPT , italic_g start_POSTSUPERSCRIPT 1
+end_POSTSUPERSCRIPT ), both of shape (1,1,5,5)1155(1,1,5,5)( 1 , 1 , 5 , 5 ))
+
+  * â€¢
+
+ğğ\mathbf{P}bold_P \- fixed set of kğ‘˜kitalic_k distinct rotations by a
+multiple of the 360âˆ˜ksuperscript360ğ‘˜\frac{360^{\circ}}{k}divide start_ARG
+360 start_POSTSUPERSCRIPT âˆ˜ end_POSTSUPERSCRIPT end_ARG start_ARG italic_k
+end_ARG angle, for k=32ğ‘˜32k=32italic_k = 32
+
+  * â€¢
+
+ğ‹ğ‹\mathbf{L}bold_L \- as defined earlier
+
+The layer performs
+SFmatchâ¢(dâ¢(x,y),fğğ‹)SFmatchğ‘‘ğ‘¥ğ‘¦subscriptğ‘“ğğ‹\mathrm{SFmatch}(d(x,y),f_{\mathbf{P}\mathbf{L}})roman_SFmatch
+( italic_d ( italic_x , italic_y ) , italic_f start_POSTSUBSCRIPT bold_PL
+end_POSTSUBSCRIPT ) with every pixel (x,y)ğ‘¥ğ‘¦(x,y)( italic_x , italic_y )
+of image dğ‘‘ditalic_d. This means that it matches the two rotated filters
+g0superscriptğ‘”0g^{0}italic_g start_POSTSUPERSCRIPT 0 end_POSTSUPERSCRIPT and
+g1superscriptğ‘”1g^{1}italic_g start_POSTSUPERSCRIPT 1 end_POSTSUPERSCRIPT
+with the 5Ã—5555\times 55 Ã— 5 neighbourhood of (x,y)ğ‘¥ğ‘¦(x,y)( italic_x ,
+italic_y ) and takes the maximum across all the matches101010a single number,
+not a pair of numbers, as in the chosen definition of match for convolutional
+fğğ‹subscriptğ‘“ğğ‹f_{\mathbf{P}\mathbf{L}}italic_f start_POSTSUBSCRIPT
+bold_PL end_POSTSUBSCRIPT.. Intuitively, this layer checks if pixels have
+adequately structured neighbourhoods.
+
+The layer is followed by ReLU activation. We initialize
+g0superscriptğ‘”0g^{0}italic_g start_POSTSUPERSCRIPT 0 end_POSTSUPERSCRIPT and
+g1superscriptğ‘”1g^{1}italic_g start_POSTSUPERSCRIPT 1 end_POSTSUPERSCRIPT
+each as the identity kernel of shape (1,1,5,5)1155(1,1,5,5)( 1 , 1 , 5 , 5 )
+plus Gaussian noise âˆ¼ğ’©â¢(0,0.1)similar-
+toabsentğ’©00.1\sim\mathcal{N}(0,0.1)âˆ¼ caligraphic_N ( 0 , 0.1 ).
+
+###  5.3 Affine Layer
+
+The basic semantic building blocks of MNIST digits are fragments of various
+lines together with their rough locations in the image (same line at the top
+and the bottom often has different semantics). In short they are shapes at
+locations. The semantic identity of shape is not affected by small111111close
+to the identity augmented matrix. affine transformations. The next shape-
+extracting layer will therefore consist of 8 affine semantic features
+(f,ğ,ğ‹)ğ‘“ğğ‹(f,\mathbf{P},\mathbf{L})( italic_f , bold_P , bold_L ) defined
+as follows:
+
+  * â€¢
+
+fğ‘“fitalic_f \- 2D image patch of shape (1,20,20)12020(1,20,20)( 1 , 20 , 20
+)
+
+  * â€¢
+
+ğğ\mathbf{P}bold_P \- set of 32 affine 2Ã—3232\times 32 Ã— 3 augmented
+matrices
+
+  * â€¢
+
+ğ‹ğ‹\mathbf{L}bold_L \- as defined earlier
+
+For simplicity every fğğ‹subscriptğ‘“ğğ‹f_{\mathbf{P}\mathbf{L}}italic_f
+start_POSTSUBSCRIPT bold_PL end_POSTSUBSCRIPT in this layer is zero-padded
+evenly on every side and identified with the resulting 28Ã—28282828\times 2828
+Ã— 28 image. Intuitively, this matches the image against a localized shape in
+a way that is robust to small affine perturbations of the shape.
+
+The layer is followed by ReLU activation. We initialize affine matrices as
+2Ã—2222\times 22 Ã— 2 identity matrix plus Gaussian noise
+âˆ¼ğ’©â¢(0,0.01)similar-toabsentğ’©00.01\sim\mathcal{N}(0,0.01)âˆ¼
+caligraphic_N ( 0 , 0.01 ) concatenated with 1Ã—2121\times 21 Ã— 2 matrix
+filled with Gaussian noise âˆ¼ğ’©â¢(0,1)similar-
+toabsentğ’©01\sim\mathcal{N}(0,1)âˆ¼ caligraphic_N ( 0 , 1 ).
+
+###  5.4 Logical Layer
+
+After Affine Layer has extracted predictive shapes it remains to encode
+logical claims such as "number 3 is A or B and not C and not D" etc. Since the
+previous layer is learnable, we can enforce a preferable structure on the
+input neurons to the Logical Layer. This layer will consist of 2 logical
+fğğ‹subscriptğ‘“ğğ‹f_{\mathbf{P}\mathbf{L}}italic_f start_POSTSUBSCRIPT
+bold_PL end_POSTSUBSCRIPT (one for every label) defined as follows:
+
+  * â€¢
+
+fğ‘“fitalic_f \- vector of dimension 8
+
+  * â€¢
+
+ğ={0,1,2,3}ğ0123\mathbf{P}=\\{0,1,2,3\\}bold_P = { 0 , 1 , 2 , 3 }
+
+  * â€¢
+
+ğ‹ğ‹\mathbf{L}bold_L \- as defined earlier
+
+We initialize
+f0=[410,0,0,0,âˆ’110,âˆ’110,âˆ’110,âˆ’110]superscriptğ‘“0410000110110110110f^{0}=[\frac{4}{10},0,0,0,-\frac{1}{10},-\frac{1}{10},-\frac{1}{10},-\frac{1}{%
+10}]italic_f start_POSTSUPERSCRIPT 0 end_POSTSUPERSCRIPT = [ divide start_ARG
+4 end_ARG start_ARG 10 end_ARG , 0 , 0 , 0 , - divide start_ARG 1 end_ARG
+start_ARG 10 end_ARG , - divide start_ARG 1 end_ARG start_ARG 10 end_ARG , -
+divide start_ARG 1 end_ARG start_ARG 10 end_ARG , - divide start_ARG 1 end_ARG
+start_ARG 10 end_ARG ] and
+f1=[âˆ’110,âˆ’110,âˆ’110,âˆ’110,410,0,0,0,]f^{1}=[-\frac{1}{10},-\frac{1}{10},-\frac{1}{10},-\frac{1}{10},\frac{4}{10},0,%
+0,0,]italic_f start_POSTSUPERSCRIPT 1 end_POSTSUPERSCRIPT = [ - divide
+start_ARG 1 end_ARG start_ARG 10 end_ARG , - divide start_ARG 1 end_ARG
+start_ARG 10 end_ARG , - divide start_ARG 1 end_ARG start_ARG 10 end_ARG , -
+divide start_ARG 1 end_ARG start_ARG 10 end_ARG , divide start_ARG 4 end_ARG
+start_ARG 10 end_ARG , 0 , 0 , 0 , ]. The exact initialization values are less
+important then their sign and relative magnitude, however they should not be
+too large as we will train the network using CrossEntropyLoss.
+
+##  6 Results
+
+###  6.1 Training
+
+The model was trained to optimize the CrossEntropyLoss for 15 epochs with Adam
+optimizer, learning rate 3â¢eâˆ’33ğ‘’33e{-3}3 italic_e - 3, weight decay
+3â¢eâˆ’63ğ‘’63e{-6}3 italic_e - 6. The only augmentation was Gaussian noise
+âˆ¼ğ’©â¢(0.05,0.25)similar-toabsentğ’©0.050.25\sim\mathcal{N}(0.05,0.25)âˆ¼
+caligraphic_N ( 0.05 , 0.25 ) applied with 0.70.70.70.7 probability121212mean
+is slightly positive because of the sparsity of data - subtracting pixel value
+is on average more harmful than adding it.. Those parameters were chosen "by
+hand" after few rounds of experimentation. The results seem pretty robust to
+the selection of hyperparameters as long as they are within reasonable bounds.
+Training a single epoch on a single CPU takes around 9s.
+
+Reliability curve
+
+![Refer to caption](extracted/2403.09863v5/media/reliability_curve.png)
+
+Learning curve
+
+![Refer to caption](extracted/2403.09863v5/media/learning_curve.png)
+
+Figure 4: (left) Reliability test-time curve (see SectionÂ 6.2 for details).
+(right) Learning curve. Both test and validation metrics presented here are
+computed under the classic 40-step PGD Attack.
+
+###  6.2 Quantitative results
+
+The model achieves ~92% adversarial test accuracy under AutoAttackÂ [12] (with
+the default parameters: norm=â€™infâ€™, eps=0.3, step_size=0.1). The results
+are almost identical for the much faster 40-step PGD Attack with the same
+parameters. Adversarial samples are usually misclassified with low confidence
+and therefore the _reliability curve_ is computed for the PGD-attacked test
+images, i.e. a precision-recall curve where the positive class is defined as
+the set of correctly classified samples (this means that the precision for
+100% recall is exactly equal to the accuracy). It turns out that for 80%
+adversarial recall model achieves human-level 98% adversarial precision
+(FigureÂ 4). This means that in practice human intervention would be required
+only for the easily detected ~20% of adversarial samples to achieve human-
+level reliability of the entire system (and most real-life samples are not
+adversarial).
+
+The clean test accuracy is ~99.5%.
+
+###  6.3 Layer inspection
+
+####  6.3.1 Two Step Layer
+
+FigureÂ 5 shows the initial and learned shapes of the Two Step function. The
+function smoothly thresholds input at 0.3650.3650.3650.365 and then at
+0.5560.5560.5560.556 which means that the interval [0,0.365]00.365[0,0.365][ 0
+, 0.365 ] is treated as OFF, [0.365,0.556]0.3650.556[0.365,0.556][ 0.365 ,
+0.556 ] as MEH and [0.556,1]0.5561[0.556,1][ 0.556 , 1 ] as ON. Bear in mind
+that this is not the final decision regarding the pixel state - itâ€™s just
+the input to the next layer.
+
+![Refer to caption](extracted/2403.09863v5/media/TwoStep.png) Figure 5: Two
+Step layer - initial and learned. The visible smooth thresholding essentially
+means that the layer has learned the permissible perturbations (i.e.
+intervals) of _real_ semantic features corresponding to the state of being OFF
+(number -1) and ON (number 1).
+
+####  6.3.2 Convolutional Semantic Layer
+
+Quick inspection of the FigureÂ 6 shows that the Convolutional Semantic Layer
+has indeed learned meaningful filters that check if the central pixel lays
+inside an adequately structured region.
+
+![Refer to caption](extracted/2403.09863v5/media/conv.png) Figure 6: Learned
+convolutional kernels in 32 predefined poses. Convolutional Semantic Layer
+acts pixel-wise and matches (convolves) these rotated kernels against the
+5Ã—5555\times 55 Ã— 5 neighbourhood of a given pixel, returning the maximum
+matching value. Intuitively, this corresponds to the degree of pixel laying on
+a "bright line".
+
+####  6.3.3 Affine Layer
+
+FigureÂ 7 shows the learned affine base features. AppendixÂ B shows the 8
+learned affine features in all of the 32 learned feature-specific poses.
+Itâ€™s hard to imagine substantially more meaningful features.
+
+![Refer to caption](extracted/2403.09863v5/media/affine.png) Figure 7: Learned
+affine base features. The weight-sharing strategy imposed by the affine
+_locality function_ results in easily interpretable features.
+
+####  6.3.4 Logical Layer
+
+The two learned logical base features are as follows:
+
+  * â€¢
+
+f0=[1.0700,0.0000,0.0000,0.0000,âˆ’0.7800,âˆ’0.7100,âˆ’0.8000,âˆ’0.8100]superscriptğ‘“01.07000.00000.00000.00000.78000.71000.80000.8100f^{0}=[1.0700,0.0000,0.0000,0.0000,-0.7800,-0.7100,-0.8000,-0.8100]italic_f
+start_POSTSUPERSCRIPT 0 end_POSTSUPERSCRIPT = [ 1.0700 , 0.0000 , 0.0000 ,
+0.0000 , - 0.7800 , - 0.7100 , - 0.8000 , - 0.8100 ]
+
+  * â€¢
+
+f1=[âˆ’0.8100,âˆ’0.7600,âˆ’0.8600,âˆ’0.8000,1.0500,0.0000,0.0000,0.0000]superscriptğ‘“10.81000.76000.86000.80001.05000.00000.00000.0000f^{1}=[-0.8100,-0.7600,-0.8600,-0.8000,1.0500,0.0000,0.0000,0.0000]italic_f
+start_POSTSUPERSCRIPT 1 end_POSTSUPERSCRIPT = [ - 0.8100 , - 0.7600 , - 0.8600
+, - 0.8000 , 1.0500 , 0.0000 , 0.0000 , 0.0000 ]
+
+This is exactly as expected -
+fğğ‹0superscriptsubscriptğ‘“ğğ‹0f_{\mathbf{P}\mathbf{L}}^{0}italic_f
+start_POSTSUBSCRIPT bold_PL end_POSTSUBSCRIPT start_POSTSUPERSCRIPT 0
+end_POSTSUPERSCRIPT defines number "3" as an entity having large SFmatch with
+any of the first 4 affine semantic features and small SFmatch with all of the
+remaining 4 affine semantic features. For
+fğğ‹1superscriptsubscriptğ‘“ğğ‹1f_{\mathbf{P}\mathbf{L}}^{1}italic_f
+start_POSTSUBSCRIPT bold_PL end_POSTSUBSCRIPT start_POSTSUPERSCRIPT 1
+end_POSTSUPERSCRIPT its the other way round.
+
+![Refer to caption](extracted/2403.09863v5/media/boundary.png) Figure 8:
+Minimally perturbated images under Boundary AttackÂ [6] to change modelâ€™s
+predictions - for sample test images. The perturbations are often meaningful
+to humans and introduce semantic ambiguity. Note that by definition of the
+Boundary Attack the model is extremely unconfident on those samples (model
+confidence at ~50%) and in practice the perturbations required to fool the
+entire system would have to be much larger. ![Refer to
+caption](extracted/2403.09863v5/media/layer_vis.png) Figure 9: Visualization
+of test data as "seen" by the first 3 layers. The consecutive rows and labels
+denote respectively: adversarial input and predicted class probabilities;
+output of Two Step Layer; output of Convolutional Semantic Layer; top pose of
+affine features predicting label "3" (with the match value above); same for
+label "5". The last two rows are overlaid with the middle row to make it
+easier to see what has been matched. Note that there are 3 misclassified
+examples (first, 8th and last) and for every one of them itâ€™s easy to
+understand why the model made the mistake: for the first one the model
+recognizes the middle part of "3" as the top part of "5"; the "5" in the 8th
+image has specific curve at the top which resembles the top part of "3"; the
+"3" in the last example has very thin top part which gets removed by the first
+2 layers thus creating an ambiguity.
+
+###  6.4 Ablation study
+
+Most of the heavy lifting regarding pixel-intensity alignment is done by the
+Two Step Layer which lifts adversarial robustness from 0% to ~86%. The
+Convolutional Semantic Layer stabilizes the training and boosts adversarial
+robustness by further ~6%pt.
+
+Interestingly the number of affine semantic features can be reduced from 8 to
+2 with the cost of just ~2%pt adversarial accuracy. Logical Layer can be
+replaced by a simple linear probe, however it needs a proper initialization to
+avoid the risk of dead neurons (which is high because of the exceedingly small
+amount of neurons).
+
+The Gaussian noise augmentation is vital for the model to experience pixel
+intensity variations during training (boosts adversarial robustness by
+~62%pt).
+
+Despite being primarily designed to withstand the
+Lâˆsubscriptğ¿L_{\infty}italic_L start_POSTSUBSCRIPT âˆ end_POSTSUBSCRIPT
+attack the model has considerable robustness against the standard
+L2subscriptğ¿2L_{2}italic_L start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT AutoPGD
+attack (eps=1.5, eps_step=0.1) with ~89% adversarial accuracy.
+
+##  7 Discussion
+
+Weâ€™ve built a white box neural network that is naturally robust, reliable
+and inherently interpretable. Thanks to the notion of semantic features the
+construction of the model was as straightforward as writing a fully
+explainable procedural program and so are the inner workings of the network.
+
+###  7.1 Defending against adversaries
+
+Affine Layer is the core component of the model and the main reason for its
+interpretability. However if applied directly to the input it is easily fooled
+by attacks. Its white box nature makes it easy to understand where this
+vulnerability comes from and to fix it: quick inspection of the mismatched
+poses as in the FigureÂ 9 reveals that it is predominantly due to the large
+attack budget of 0.30.30.30.3 per pixel (which is 30%percent3030\%30 % of the
+entire allowed pixel intensity range) combined with the large linear regions
+of the function computed by this layer (due to small amount of poses per
+feature). Human eye appears to ignore such considerate changes in pixel
+intensities which means that the naive linear representation of pixel
+brightness is not semantically adequate. This is exactly how (and why) the
+first two layers of the model were designed - to fix the inherent
+vulnerability of otherwise perfectly interpretable affine features. These
+layers are themselves compatible with the framework of semantic features which
+is an early indication of a large potential of the notion.
+
+###  7.2 Limitations
+
+Semantic features require _locality engineering_ as they rely on the adequate
+domain-specific definition of the _locality function_. Therefore, they wonâ€™t
+be applicable in contexts where such locality is hard to define. On the other
+hand, it opens up interesting areas for research.
+
+The Logical Layer has been developed as an attempt to formalize the idea of
+how the generic hidden layer activation pattern should look like; however, it
+might turn out to be prone to the "no free lunch" theorem (e.g. on MNIST the
+properly-initialized linear probe seems to be sufficient).
+
+Despite the generality of the notion and the ideas given in SectionÂ 8 there
+is a risk that the white box qualities of semantic features will be difficult
+to achieve for harder datasets. The preliminary results on CIFAR10 seem
+promising but also reveal the need for careful engineering of the locality
+function, see SectionÂ 8.
+
+##  8 Further research
+
+Notice the analogy between affine semantic features and the SIFTÂ [26]
+algorithm - the learnable pose sampling may be interpreted as finding
+Keypoints and their Descriptors, while the initial 2 layers of the PoC network
+essentially perform input normalization. This might be a helpful analogy for
+designing more advanced semantic features that sample across varying scales,
+sharpness or illumination levels.
+
+There might be a concern that adding more layers to the network would reduce
+its interpretability. However, the role of additional layers would be to widen
+the receptive field of the network. The Affine Layer defined earlier matches
+_shapes-at-locations_ of center-aligned objects. Adding additional layer would
+involve a sliding window approach (or Keypoint Detection similar to that in
+SIFT) to match center-aligned objects inside the window and integrate this
+with the approximate global location of the window; then the "Global" Affine
+Layer would match _objects-at-locations_ forming a scene (a higher-level
+object). This would in fact be similar to applying Affine Layer to the
+"zoomed-out" input.
+
+The ablations in SectionÂ 6.4 suggest that adversarial vulnerability of DNNs
+might be mostly due to the fragility of the initial layers. Therefore, another
+direction forward would be to re-examine the known approaches to XAI and try
+to "bug fix" their encoder networks in similar fashion.
+
+Other ideas for further work on semantic features include:
+
+  * â€¢
+
+use semantic features in self-supervised setting to obtain interpretable
+dimensionality reduction
+
+  * â€¢
+
+study non-affine perturbations of spatial features, e.g. projective
+perturbations
+
+  * â€¢
+
+find adequate semantic topology for color space
+
+  * â€¢
+
+semantic features for sound (inspiration for semantic invariants could be
+drawn from the music theory)
+
+  * â€¢
+
+semantic features for text, e.g. semantic invariants of permutations of
+words/sentences capturing _thoughts_
+
+  * â€¢
+
+study more complex logical semantic features in more elaborate scenarios
+
+  * â€¢
+
+figure out a way to make logical semantic features differentiable, i.e. make
+ğğ\mathbf{P}bold_P learnable
+
+##  9 Acknowledgments
+
+This is work has been done as an independent self-funded research.
+
+However it needs to be noted that I had the opportunity to do preliminary
+investigation on adversarial robustness as a half-time activity during my
+employment at MIM Solutions. Special thanks go to Piotr Sankowski, who
+introduced me to the issue of adversarial vulnerability of neural networks,
+and both to Piotr Sankowski and Piotr Wygocki who - as my former employers -
+decided to trust me with that research as a half-time part of my contract. It
+was precisely thanks to this opportunity that I developed a strong intuition
+that modern neural network architectures are inherently flawed and need to be
+fundamentally re-examined.
+
+I thank Piotr WodziÅ„ski, Adam Szummer, Tomasz Steifer, Dmytro Mishkin,
+Andrzej Pacuk, Bartosz ZieliÅ„ski, Hubert Baniecki and members of the reddit
+community for the great feedback on the initial versions of this paper.
+
+## References
+
+  * [1] Julius Adebayo, Justin Gilmer, Michael Muelly, Ian Goodfellow, Moritz Hardt, and Been Kim.  Sanity checks for saliency maps, 2020.  arXiv:1810.03292. 
+  * [2] David Alvarez-Melis and TommiÂ S. Jaakkola.  Towards robust interpretability with self-explaining neural networks, 2018.  arXiv:1806.07538. 
+  * [3] Anish Athalye, Nicholas Carlini, and David Wagner.  Obfuscated gradients give a false sense of security: Circumventing defenses to adversarial examples, 2018.  arXiv:1802.00420. 
+  * [4] Hubert Baniecki and Przemyslaw Biecek.  Adversarial attacks and defenses in explainable artificial intelligence: A survey.  Information Fusion, 107:102303, July 2024.  URL: http://dx.doi.org/10.1016/j.inffus.2024.102303, doi:10.1016/j.inffus.2024.102303. 
+  * [5] Wieland Brendel and Matthias Bethge.  Approximating cnns with bag-of-local-features models works surprisingly well on imagenet, 2019.  arXiv:1904.00760. 
+  * [6] Wieland Brendel, Jonas Rauber, and Matthias Bethge.  Decision-based adversarial attacks: Reliable attacks against black-box machine learning models, 2018.  arXiv:1712.04248. 
+  * [7] MichaelÂ M. Bronstein, Joan Bruna, Taco Cohen, and Petar VeliÄkoviÄ‡.  Geometric deep learning: Grids, groups, graphs, geodesics, and gauges, 2021.  arXiv:2104.13478. 
+  * [8] Nicholas Carlini, Anish Athalye, Nicolas Papernot, Wieland Brendel, Jonas Rauber, Dimitris Tsipras, Ian Goodfellow, Aleksander Madry, and Alexey Kurakin.  On evaluating adversarial robustness, 2019.  arXiv:1902.06705. 
+  * [9] Nicholas Carlini and David Wagner.  Audio adversarial examples: Targeted attacks on speech-to-text, 2018.  arXiv:1801.01944. 
+  * [10] Francesco Cartella, Orlando Anunciacao, Yuki Funabiki, Daisuke Yamaguchi, Toru Akishita, and Olivier Elshocht.  Adversarial attacks for tabular data: Application to fraud detection and imbalanced data, 2021.  arXiv:2101.08030. 
+  * [11] Chaofan Chen, Oscar Li, Chaofan Tao, AlinaÂ Jade Barnett, Jonathan Su, and Cynthia Rudin.  This looks like that: Deep learning for interpretable image recognition, 2019.  arXiv:1806.10574. 
+  * [12] Francesco Croce and Matthias Hein.  Reliable evaluation of adversarial robustness with an ensemble of diverse parameter-free attacks, 2020.  arXiv:2003.01690. 
+  * [13] Logan Engstrom, Andrew Ilyas, Shibani Santurkar, Dimitris Tsipras, Brandon Tran, and Aleksander Madry.  Adversarial robustness as a prior for learned representations, 2019.  arXiv:1906.00945. 
+  * [14] Jianlong Fu, Heliang Zheng, and Tao Mei.  Look closer to see better: Recurrent attention convolutional neural network for fine-grained image recognition.  In 2017 IEEE Conference on Computer Vision and Pattern Recognition (CVPR), pages 4476â€“4484, 2017.  doi:10.1109/CVPR.2017.476. 
+  * [15] Roy Ganz, Bahjat Kawar, and Michael Elad.  Do perceptually aligned gradients imply adversarial robustness?, 2023.  arXiv:2207.11378. 
+  * [16] Bruno GavranoviÄ‡, Paul Lessard, Andrew Dudzik, Tamara von Glehn, JoÃ£o G.Â M. AraÃºjo, and Petar VeliÄkoviÄ‡.  Categorical deep learning: An algebraic theory of architectures, 2024.  arXiv:2402.15332. 
+  * [17] Robert Geirhos, JÃ¶rn-Henrik Jacobsen, Claudio Michaelis, Richard Zemel, Wieland Brendel, Matthias Bethge, and FelixÂ A. Wichmann.  Shortcut learning in deep neural networks.  Nature Machine Intelligence, 2(11):665â€“673, November 2020.  URL: http://dx.doi.org/10.1038/s42256-020-00257-z, doi:10.1038/s42256-020-00257-z. 
+  * [18] Amirata Ghorbani, Abubakar Abid, and James Zou.  Interpretation of neural networks is fragile, 2018.  arXiv:1710.10547. 
+  * [19] Adam Gleave, Michael Dennis, Cody Wild, Neel Kant, Sergey Levine, and Stuart Russell.  Adversarial policies: Attacking deep reinforcement learning, 2021.  arXiv:1905.10615. 
+  * [20] Andrew Ilyas, Shibani Santurkar, Dimitris Tsipras, Logan Engstrom, Brandon Tran, and Aleksander Madry.  Adversarial examples are not bugs, they are features, 2019.  arXiv:1905.02175. 
+  * [21] Max Jaderberg, Karen Simonyan, Andrew Zisserman, and Koray Kavukcuoglu.  Spatial transformer networks, 2016.  arXiv:1506.02025. 
+  * [22] Simran Kaur, Jeremy Cohen, and ZacharyÂ C. Lipton.  Are perceptually-aligned gradients a general property of robust classifiers?, 2019.  arXiv:1910.08640. 
+  * [23] Binghui Li, Jikai Jin, Han Zhong, JohnÂ E. Hopcroft, and Liwei Wang.  Why robust generalization in deep learning is difficult: Perspective of expressive power, 2022.  arXiv:2205.13863. 
+  * [24] Linyi Li, Tao Xie, and BoÂ Li.  Sok: Certified robustness for deep neural networks, 2023.  arXiv:2009.04131. 
+  * [25] Oscar Li, Hao Liu, Chaofan Chen, and Cynthia Rudin.  Deep learning for case-based reasoning through prototypes: A neural network that explains its predictions, 2017.  arXiv:1710.04806. 
+  * [26] DavidÂ G. Lowe.  Object recognition from local scale-invariant features, 1999.  URL: https://www.cs.ubc.ca/~lowe/papers/iccv99.pdf/, doi:10.1109/ICCV.1999.790410. 
+  * [27] Aleksander Madry, Aleksandar Makelov, Ludwig Schmidt, Dimitris Tsipras, and Adrian Vladu.  Towards deep learning models resistant to adversarial attacks, 2019.  arXiv:1706.06083. 
+  * [28] E.Â Riba, D.Â Mishkin, D.Â Ponsa, E.Â Rublee, and G.Â Bradski.  Kornia: an open source differentiable computer vision library for pytorch.  In Winter Conference on Applications of Computer Vision, 2020.  URL: https://arxiv.org/pdf/1910.02190.pdf. 
+  * [29] Leslie Rice, Eric Wong, and J.Â Zico Kolter.  Overfitting in adversarially robust deep learning, 2020.  arXiv:2002.11569. 
+  * [30] Sara Sabour, Nicholas Frosst, and GeoffreyÂ E Hinton.  Dynamic routing between capsules, 2017.  arXiv:1710.09829. 
+  * [31] Ludwig Schmidt, Shibani Santurkar, Dimitris Tsipras, Kunal Talwar, and Aleksander MÄ…dry.  Adversarially robust generalization requires more data, 2018.  arXiv:1804.11285. 
+  * [32] Lukas Schott, Jonas Rauber, Matthias Bethge, and Wieland Brendel.  Towards the first adversarially robust neural network model on mnist, 2018.  arXiv:1805.09190. 
+  * [33] Amit Sheth, Kaushik Roy, and Manas Gaur.  Neurosymbolic ai â€“ why, what, and how, 2023.  arXiv:2305.00813. 
+  * [34] Suraj Srinivas, Sebastian Bordt, and Hima Lakkaraju.  Which models have perceptually-aligned gradients? an explanation via off-manifold robustness, 2024.  arXiv:2305.19101. 
+  * [35] Christian Szegedy, Wojciech Zaremba, Ilya Sutskever, Joan Bruna, Dumitru Erhan, Ian Goodfellow, and Rob Fergus.  Intriguing properties of neural networks, 2014.  arXiv:1312.6199. 
+  * [36] QiÂ Tian, Kun Kuang, Kelu Jiang, Fei Wu, and Yisen Wang.  Analysis and applications of class-wise robustness in adversarial training, 2021.  arXiv:2105.14240. 
+  * [37] Yipei Wang and Xiaoqian Wang.  Self-interpretable model with transformationequivariant interpretation, 2021.  arXiv:2111.04927. 
+  * [38] Tsui-Wei Weng, Huan Zhang, Hongge Chen, Zhao Song, Cho-Jui Hsieh, Duane Boning, InderjitÂ S. Dhillon, and Luca Daniel.  Towards fast computation of certified robustness for relu networks, 2018.  arXiv:1804.09699. 
+  * [39] Cihang Xie, Jianyu Wang, Zhishuai Zhang, Yuyin Zhou, Lingxi Xie, and Alan Yuille.  Adversarial examples for semantic segmentation and object detection, 2017.  arXiv:1703.08603. 
+  * [40] Chaojian Yu, BoÂ Han, LiÂ Shen, Jun Yu, Chen Gong, Mingming Gong, and Tongliang Liu.  Understanding robust overfitting of adversarial training and beyond, 2022.  arXiv:2206.08675. 
+  * [41] Andy Zou, Zifan Wang, Nicholas Carlini, Milad Nasr, J.Â Zico Kolter, and Matt Fredrikson.  Universal and transferable adversarial attacks on aligned language models, 2023.  arXiv:2307.15043. 
+
+##  Appendix A Implementation of Two Step Layer
+
+â¬‡
+
+class TwoStepFunction(Module):
+
+"""Simplifiedâ£real-valuedâ£SFLayerâ£forâ£inputsâ£inâ£[0,â£1]"""
+
+def init_weights(self):
+
+self.a0 = nn.Parameter(torch.tensor(0.5))
+
+self.a1 = nn.Parameter(torch.tensor(0.5))
+
+self.t0 = nn.Parameter(torch.tensor(0.25))
+
+self.t1 = nn.Parameter(torch.tensor(0.75))
+
+self.scales = nn.Parameter(
+
+(torch.ones((4,)) / self.init_scales_div)
+
+)
+
+def softsign(self, x, threshold, scale, internal):
+
+a = self.a1 if threshold > 0 else self.a0
+
+x = x - threshold
+
+x = x / (scale + x.abs())
+
+if internal:
+
+shift = threshold
+
+shift = shift / (scale + shift.abs())
+
+x = x + shift
+
+x = a * x / shift.abs()
+
+return x
+
+div = x.abs().max() / (1 - a)
+
+x = x / div
+
+x = x + threshold.sgn() * a
+
+return x
+
+def transform(self, x):
+
+return 2 * x - 1
+
+def forward(self, x):
+
+x = self.transform(x)
+
+t0, t1 = self.transform(self.t0), self.transform(self.t1)
+
+params = [
+
+(t0, self.scales[0], False),
+
+(t0, self.scales[1], True),
+
+(t1, self.scales[2], True),
+
+(t1, self.scales[3], False),
+
+]
+
+xs = [self.softsign(x, *p) for p in params]
+
+masks = [
+
+(x < t0).float(),
+
+(t0 <= x).float() * (x < 0.0).float(),
+
+(0.0 <= x).float() * (x < t1).float(),
+
+(t1 <= x).float(),
+
+]
+
+x = sum(m * xx for (m, xx) in zip(masks, xs))
+
+return x
+
+##  Appendix B Learned affine features with learned poses
+
+![\[Uncaptioned image\]](extracted/2403.09863v5/media/affine_poses.png)
+
+##  Appendix C Preliminary results for the entire MNIST
+
+Letâ€™s review the results for a straightforward adaptation of previously
+defined model for the full MNIST:
+
+  * â€¢
+
+Affine Layer is expanded to 50 affine semantic features;
+
+  * â€¢
+
+Logical Layer is replaced by a linear probe with 10 output classes;
+
+  * â€¢
+
+Size of affine features is reduced to 14Ã—14141414\times 1414 Ã— 14 patches;
+
+  * â€¢
+
+Affine _base_ features are equipped with learnable (x,y)ğ‘¥ğ‘¦(x,y)( italic_x
+, italic_y ) per-feature location;
+
+Such model has ~20K parameters, achieves ~98% standard and ~80% adversarial
+accuracy (AutoAttack) and can still be considered _white box_ as shown in the
+following figures:
+
+![Refer to caption](extracted/2403.09863v5/media/full_affine.png) Figure 10:
+Affine base features learned on full MNIST. Due to the learnable feature-
+specific (x,y)ğ‘¥ğ‘¦(x,y)( italic_x , italic_y )-location these can be
+considered _shapes-at-locations_. ![Refer to
+caption](extracted/2403.09863v5/media/positive_probe.png) Figure 11: Masked
+positive weights of linear probe - per output class (here the dark-blue
+squares are zeros). There are only few dark red neurons per class which means
+that the digit representation can be considered sparse. ![Refer to
+caption](extracted/2403.09863v5/media/numbers.png) Figure 12: Sum of base
+affine features weighted by positive weights of linear probe - per output
+class. The similarity to actual digits means that the model decomposes the
+digits into human-aligned _shapes-at-locations_.

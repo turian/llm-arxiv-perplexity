@@ -1,0 +1,770 @@
+  1. 1 Introduction
+  2. 2 Related Work
+    1. 2.1 Contrastive Methods for Audio
+    2. 2.2 Compositional Waveform Music Generation
+  3. 3 Method
+    1. 3.1 Stem-Level Contrastive Learning
+    2. 3.2 COCOLA Score
+    3. 3.3 CompoNet
+  4. 4 Experimental Setup
+    1. 4.1 Datasets
+    2. 4.2 Model Implementation
+    3. 4.3 Training Details
+  5. 5 Experiments
+    1. 5.1 Coherent Sub-Mix Classification
+    2. 5.2 Accompaniment Generation Evaluation
+  6. 6 Conclusion
+  7. 7 Acknowledgments
+
+# COCOLA: Coherence-Oriented Contrastive Learning of Musical Audio
+Representations
+
+###### Abstract
+
+We present COCOLA (Coherence-Oriented Contrastive Learning for Audio), a
+contrastive learning method for musical audio representations that captures
+the harmonic and rhythmic coherence between samples. Our method operates at
+the level of stems (or their combinations) composing music tracks and allows
+the objective evaluation of compositional models for music in the task of
+accompaniment generation. We also introduce a new baseline for compositional
+music generation called CompoNet, based on ControlNet, generalizing the tasks
+of MSDM, and quantify it against the latter using COCOLA. We release all
+models trained on public datasets containing separate stems (MUSDB18-HQ,
+MoisesDB, Slakh2100, and CocoChorales).
+
+##  1 Introduction
+
+Recently, there have been significant advances in music generation in the
+continuous domain [1, 2, 3, 4, 5], thanks to the impressive development of
+generative models [6, 7, 8]. In addition to producing high-quality tracks of
+increasing length [5], these models offer precise semantic control through
+textual conditioning [9, 10]. However, they are limited as tools for musical
+composition, since they output a final mix containing all stems. To overcome
+this, a new range of compositional generative models is emerging [11, 12, 13],
+where (i) the generative tasks are defined at the stem level and (ii) their
+usage is iterative/interactive. The most important application of these models
+is accompaniment generation, where, given multiple conditioning sources
+(combined or not), the model is asked to output a new set (or a mixture) of
+coherent stems. Although previous models could generate accompaniments [14,
+15], they could not be used iteratively (acting sequentially on the modelâ€™s
+outputs) in a composition process.
+
+A significant problem with this line of research is the lack of an objective
+metric for quantifying the coherence of the generated outputs w.r.t. the
+inputs. For example, [11] proposes the sub-FAD metric as a multi-stem
+generalization of the FAD [16] protocol proposed in [15]. However, this metric
+is not optimal for assessing coherence, as it focuses on global quality
+instead of the level of harmony and rhythm shared by constituent stems.
+
+![Refer to caption]()
+
+FigureÂ 1: Illustration of COCOLA score. COCOLA is a contrastive model able to
+estimate the coherence between instrumental tracks and generated
+accompaniments.
+
+To this end, we propose a novel contrastive model called COCOLA (Coherence-
+Oriented Contrastive Learning for Audio), which can evaluate the coherence
+between conditioning tracks and generated accompaniments (Figure 1). The model
+is trained by maximizing the agreement between disjoint sub-components of an
+audio window (sub-mixtures of stems) and minimizing it on sub-components
+belonging to different windows. With the model, we define a COCOLA score as
+the similarity between conditioning tracks and accompaniments in the embedding
+space.
+
+Additionally, given the scarcity of open-source compositional music models (to
+our knowledge, only MSDM is available publicly [11]), we introduce and
+release111https://github.com/gladia-research-group/cocola an improved latent
+diffusion model called CompoNet, based on ControlNet [17], which generalizes
+the tasks of previous compositional models. We benchmark CompoNet against MSDM
+with the COCOLA score and FAD [16] on accompaniment generation, showcasing
+better performance.
+
+After discussing related work in Section 2, we introduce COCOLA and CompoNet
+in Section 3. We describe the experimental setup in Section 4 and present the
+results in Section 5. We conclude the article in Section 6.
+
+![Refer to caption]()
+
+  
+FigureÂ 2: The COCOLA training procedure (single stem case). We first randomly
+crop windows of size Lğ¿Litalic_L from a batch of Kğ¾Kitalic_K tracks
+(depicted on the left). As a second step, we randomly select two distinct
+stems in each window. For example, in the first window we select
+ğ±11subscriptsuperscriptğ±11\mathbf{x}^{1}_{1}bold_x start_POSTSUPERSCRIPT 1
+end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT (Guitar) and
+ğ±31subscriptsuperscriptğ±13\mathbf{x}^{1}_{3}bold_x start_POSTSUPERSCRIPT 1
+end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 3 end_POSTSUBSCRIPT (Drums). Thus, we
+embed all selected stems with the COCOLA encoder
+fÎ¸subscriptğ‘“ğœƒf_{\theta}italic_f start_POSTSUBSCRIPT italic_Î¸
+end_POSTSUBSCRIPT, obtaining latent representations. For example, we obtain
+ğ¡11subscriptsuperscriptğ¡11\mathbf{h}^{1}_{1}bold_h start_POSTSUPERSCRIPT 1
+end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT and
+ğ¡21subscriptsuperscriptğ¡12\mathbf{h}^{1}_{2}bold_h start_POSTSUPERSCRIPT 1
+end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT from the first
+window. Finally, we compute the contrastive loss (Eq. (3)) considering
+embedings belonging to the same window as positive pairs and combinations of
+embeddings between different windows as negative pairs.
+
+##  2 Related Work
+
+###  2.1 Contrastive Methods for Audio
+
+Contrastive learning [18, 19] can be formulated both as a supervised or self-
+supervised problem.
+
+Supervised contrastive learning methods are typically cross-modal, requiring
+labeled information alongside audio data. In early works, the labeled
+information was in the form of simple tags, while the loss used to align
+embeddings of audio segments and tags was the triplet loss [20]. Within the
+same data setting,[21] used the contrastive loss of SimCLR [22]. With the
+advent of the transformer architecture [23], using complex sentences instead
+of simple tags became feasible. MuLaP [24] is the first model to train a
+common representation between audio and sentences in the musical domain. In
+such work, the audio and text are processed by a joint transformer encoder,
+conveying information about the two modalities through cross-attention layers.
+Although it is not a contrastive model per se, an audio-text matching loss
+uses negative examples to encourage the model to focus on aligned pairs. More
+recent works [25, 26, 9, 27], consider separate textual and audio encoders,
+which makes it possible to use the two branches independently at inference
+time.
+
+Self-supervised representation learning methods [28, 29, 30, 31] build
+embedding spaces targeting structural information extracted from the audio
+data itself. In [32], the authors build positive examples for a triplet loss
+by augmenting with Gaussian noise, time and frequency translations, and
+sampling with time proximity. They also consider example mixing. While we
+compare coherent mixes in our method (Section 3.1), in [32], positive pairs
+are not coherence-related (e.g., mixing siren and dog sounds). As in the
+supervised case, following [22], multi-class cross-entropy losses are employed
+[33, 34, 35]. In COLA [33], the authors train an embedding model with
+contrastive loss using the simple criterion of sampling positive pairs only
+from the same audio track (still employing Gaussian noise), outperforming a
+fully supervised baseline in a plethora of tasks. [36] pairs mixtures with
+sources extracted via source separation.
+
+The proposed COCOLA method shares aspects of both supervised and self-
+supervised approaches. Given that stems are pre-separated, we cannot consider
+the method purely self-supervised. At the same time, we process such data with
+a uni-modal encoder, as is the case of self-supervised methods.
+
+###  2.2 Compositional Waveform Music Generation
+
+Compositional music generation in the waveform domain (as opposed to symbolic
+domains such as MIDI or sheet music [37]) was introduced by [11], proposing
+the Multi-Source Diffusion Model (MSDM). Such a model captures the joint
+distribution of a fixed set of sources (e.g., Bass, Drums, Guitar, and Piano)
+using a (score-based) diffusion model [38, 39, 7, 6, 40]. At inference time,
+it is possible to perform unconditional generation of all sources,
+accompaniment generation of a subset given the complement, and source
+separation.
+
+Following this initial work, AUDIT [41] proposes a diffusion model conditioned
+by a T5 Encoder [10], trained with instructions that allow the addition,
+removal (drop), and replacement of sources in an input audio mixture. This
+model operates on general audio signals with weak dependencies between the
+sources (e.g., environmental sounds). While MSDM is an unconditional
+generative model that processes single sources in parallel, AUDIT is a
+conditional generative model that processes mixtures sequentially.
+
+InstructME [12] introduces AUDIT in the musical setting of MSDM, where sources
+are highly interdependent. Besides conditioning on chords, the fundamental
+difference lies in how the audio input is provided to the model: while in
+AUDIT, the input and output are two channels of the tensor that the diffusion
+model processes (the input is inpainted at inference time, similarly to how
+accompaniment generation is performed in MSDM), in InstructME, the input is
+processed by a convolutional network that follows the structure of the
+diffusion model U-Net [42] encoder. The features processed by the latter are
+aggregated with the features of the U-Net encoder (authors do not specify if
+they sum or inject the features).
+
+StemGen [13] generates a single accompaniment source, given an instrument tag
+and an input audio mixture, via a masked music language model [4].
+
+Another line of research focuses on inference-only methods for compositional
+music tasks, given pre-trained generative models. Based on generative source
+separation via Bayesian inference [43, 44, 45], Generalized Multi-Source
+Diffusion Inference (GMSDI) [46] performs the tasks of MSDM, requiring models
+trained only with mixtures and text, by separating sources while generating
+them.
+
+Our proposed CompoNet baseline (Section 3.3) is a sequential conditional model
+that, unlike previous models, can perform all compositional music generation
+tasks (Figure 3). Differently than InstructME, the model is conditioned via a
+ControlNet adapter [17], which enables fine-tuning of diffusion models pre-
+trained with a large quantity of mixtures. Table 1 summarizes a comparison
+between CompoNet and current music compositional models.
+
+##  3 Method
+
+###  3.1 Stem-Level Contrastive Learning
+
+In our setting, we have access to a dataset
+D={ğ±Â¯k}k=1,â€¦,KÂ¯ğ·subscriptsuperscriptÂ¯ğ±ğ‘˜ğ‘˜1â€¦Â¯ğ¾D=\\{\bar{\mathbf{x}}^{k}\\}_{k=1,\dots,\bar{K}}italic_D
+= { overÂ¯ start_ARG bold_x end_ARG start_POSTSUPERSCRIPT italic_k
+end_POSTSUPERSCRIPT } start_POSTSUBSCRIPT italic_k = 1 , â€¦ , overÂ¯
+start_ARG italic_K end_ARG end_POSTSUBSCRIPT containing KÂ¯Â¯ğ¾\bar{K}overÂ¯
+start_ARG italic_K end_ARG musical tracks
+ğ±Â¯ksuperscriptÂ¯ğ±ğ‘˜\bar{\mathbf{x}}^{k}overÂ¯ start_ARG bold_x end_ARG
+start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT, each separated into a
+variable number Nğ‘Nitalic_N of individual stems
+ğ±Â¯nksubscriptsuperscriptÂ¯ğ±ğ‘˜ğ‘›\bar{\mathbf{x}}^{k}_{n}overÂ¯ start_ARG
+bold_x end_ARG start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT
+start_POSTSUBSCRIPT italic_n end_POSTSUBSCRIPT, i.e.,
+ğ±Â¯k={ğ±Â¯nk}n=1,â€¦,NsuperscriptÂ¯ğ±ğ‘˜subscriptsubscriptsuperscriptÂ¯ğ±ğ‘˜ğ‘›ğ‘›1â€¦ğ‘\bar{\mathbf{x}}^{k}=\\{\bar{\mathbf{x}}^{k}_{n}\\}_{n=1,\dots,N}overÂ¯
+start_ARG bold_x end_ARG start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT =
+{ overÂ¯ start_ARG bold_x end_ARG start_POSTSUPERSCRIPT italic_k
+end_POSTSUPERSCRIPT start_POSTSUBSCRIPT italic_n end_POSTSUBSCRIPT }
+start_POSTSUBSCRIPT italic_n = 1 , â€¦ , italic_N end_POSTSUBSCRIPT. As a
+first step, we sample a batch of K<KÂ¯ğ¾Â¯ğ¾K<\bar{K}italic_K < overÂ¯
+start_ARG italic_K end_ARG tracks
+{ğ±Â¯k}k=1,â€¦,KsubscriptsuperscriptÂ¯ğ±ğ‘˜ğ‘˜1â€¦ğ¾\\{\bar{\mathbf{x}}^{k}\\}_{k=1,\dots,K}{
+overÂ¯ start_ARG bold_x end_ARG start_POSTSUPERSCRIPT italic_k
+end_POSTSUPERSCRIPT } start_POSTSUBSCRIPT italic_k = 1 , â€¦ , italic_K
+end_POSTSUBSCRIPT from Dğ·Ditalic_D, with possible repetitions. Following, we
+slice a window ğ±ksuperscriptğ±ğ‘˜\mathbf{x}^{k}bold_x start_POSTSUPERSCRIPT
+italic_k end_POSTSUPERSCRIPT of size Lğ¿Litalic_L for each track
+ğ±Â¯ksuperscriptÂ¯ğ±ğ‘˜\bar{\mathbf{x}}^{k}overÂ¯ start_ARG bold_x end_ARG
+start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT in the batch (all stems in
+a window share the same length), such that no window contained in the same
+track overlaps for more than a ratio rğ‘Ÿritalic_r, obtaining a new batch
+{ğ±k}k=1,â€¦,Ksubscriptsuperscriptğ±ğ‘˜ğ‘˜1â€¦ğ¾\\{\mathbf{x}^{k}\\}_{k=1,\dots,K}{
+bold_x start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT }
+start_POSTSUBSCRIPT italic_k = 1 , â€¦ , italic_K end_POSTSUBSCRIPT.
+Afterward, we select, for each kğ‘˜kitalic_k, two disjoint non-empty stem
+subsets
+X1k,X2ksuperscriptsubscriptğ‘‹1ğ‘˜superscriptsubscriptğ‘‹2ğ‘˜X_{1}^{k},X_{2}^{k}italic_X
+start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_k
+end_POSTSUPERSCRIPT , italic_X start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT
+start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT of
+ğ±ksuperscriptğ±ğ‘˜\mathbf{x}^{k}bold_x start_POSTSUPERSCRIPT italic_k
+end_POSTSUPERSCRIPT. We define the sub-mixes
+ğ¦1ksubscriptsuperscriptğ¦ğ‘˜1\mathbf{m}^{k}_{1}bold_m start_POSTSUPERSCRIPT
+italic_k end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT and
+ğ¦2ksubscriptsuperscriptğ¦ğ‘˜2\mathbf{m}^{k}_{2}bold_m start_POSTSUPERSCRIPT
+italic_k end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT by
+summing the stems in
+X1k,X2ksuperscriptsubscriptğ‘‹1ğ‘˜superscriptsubscriptğ‘‹2ğ‘˜X_{1}^{k},X_{2}^{k}italic_X
+start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_k
+end_POSTSUPERSCRIPT , italic_X start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT
+start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT:
+
+| ğ¦1k=âˆ‘ğ±nkâˆˆX1kğ±nk,ğ¦2k=âˆ‘ğ±nkâˆˆX2kğ±nkformulae-sequencesubscriptsuperscriptğ¦ğ‘˜1subscriptsuperscriptsubscriptğ±ğ‘›ğ‘˜superscriptsubscriptğ‘‹1ğ‘˜subscriptsuperscriptğ±ğ‘˜ğ‘›subscriptsuperscriptğ¦ğ‘˜2subscriptsuperscriptsubscriptğ±ğ‘›ğ‘˜superscriptsubscriptğ‘‹2ğ‘˜subscriptsuperscriptğ±ğ‘˜ğ‘›\mathbf{m}^{k}_{1}=\sum_{\mathbf{x}_{n}^{k}\in X_{1}^{k}}\mathbf{x}^{k}_{n},% \qquad\mathbf{m}^{k}_{2}=\sum_{\mathbf{x}_{n}^{k}\in X_{2}^{k}}\mathbf{x}^{k}_% {n}bold_m start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT = âˆ‘ start_POSTSUBSCRIPT bold_x start_POSTSUBSCRIPT italic_n end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT âˆˆ italic_X start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT end_POSTSUBSCRIPT bold_x start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT start_POSTSUBSCRIPT italic_n end_POSTSUBSCRIPT , bold_m start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT = âˆ‘ start_POSTSUBSCRIPT bold_x start_POSTSUBSCRIPT italic_n end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT âˆˆ italic_X start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT end_POSTSUBSCRIPT bold_x start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT start_POSTSUBSCRIPT italic_n end_POSTSUBSCRIPT |  | (1)  
+---|---|---|---  
+  
+When
+X1k,X2ksuperscriptsubscriptğ‘‹1ğ‘˜superscriptsubscriptğ‘‹2ğ‘˜X_{1}^{k},X_{2}^{k}italic_X
+start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_k
+end_POSTSUPERSCRIPT , italic_X start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT
+start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT are singletons, the sub-
+mixes are simply two stems in the window (single stem case). We work with sub-
+mixes because current compositional music generation methods [13] operate over
+them, including our proposed CompoNet (see Section 3.3). Like in COLA[33], we
+use a convolutional audio-only encoder222In our notation, we incorporate into
+fÎ¸subscriptğ‘“ğœƒf_{\theta}italic_f start_POSTSUBSCRIPT italic_Î¸
+end_POSTSUBSCRIPT any domain transform preceding or following the
+convolutional network operations, like the (pre) mel-filterbank map and the
+(post) projection head gğ‘”gitalic_g in COLA.
+fÎ¸:â„Lâ†’â„d:subscriptğ‘“ğœƒâ†’superscriptâ„ğ¿superscriptâ„ğ‘‘f_{\theta}:\mathbb{R}^{L}\to\mathbb{R}^{d}italic_f
+start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT : blackboard_R
+start_POSTSUPERSCRIPT italic_L end_POSTSUPERSCRIPT â†’ blackboard_R
+start_POSTSUPERSCRIPT italic_d end_POSTSUPERSCRIPT, mapping
+ğ¦1ksubscriptsuperscriptğ¦ğ‘˜1\mathbf{m}^{k}_{1}bold_m start_POSTSUPERSCRIPT
+italic_k end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT and
+ğ¦2ksubscriptsuperscriptğ¦ğ‘˜2\mathbf{m}^{k}_{2}bold_m start_POSTSUPERSCRIPT
+italic_k end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT to lower-
+dimensional embedding vectors
+ğ¡1k=fÎ¸â¢(ğ¦1k)subscriptsuperscriptğ¡ğ‘˜1subscriptğ‘“ğœƒsubscriptsuperscriptğ¦ğ‘˜1\mathbf{h}^{k}_{1}=f_{\theta}(\mathbf{m}^{k}_{1})bold_h
+start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 1
+end_POSTSUBSCRIPT = italic_f start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT (
+bold_m start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT start_POSTSUBSCRIPT
+1 end_POSTSUBSCRIPT ) and
+ğ¡2k=fÎ¸â¢(ğ¦2k)subscriptsuperscriptğ¡ğ‘˜2subscriptğ‘“ğœƒsubscriptsuperscriptğ¦ğ‘˜2\mathbf{h}^{k}_{2}=f_{\theta}(\mathbf{m}^{k}_{2})bold_h
+start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 2
+end_POSTSUBSCRIPT = italic_f start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT (
+bold_m start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT start_POSTSUBSCRIPT
+2 end_POSTSUBSCRIPT ), with dğ‘‘ditalic_d the embedding dimension.
+
+The COCOLA training procedure maximizes the agreement between pairs
+ğ¡1k,ğ¡2ksubscriptsuperscriptğ¡ğ‘˜1subscriptsuperscriptğ¡ğ‘˜2\mathbf{h}^{k}_{1},\mathbf{h}^{k}_{2}bold_h
+start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 1
+end_POSTSUBSCRIPT , bold_h start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT
+start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT of sub-mixes embeddings in the same
+window. It decreases it for pairs
+ğ¡1k,ğ¡2jsubscriptsuperscriptğ¡ğ‘˜1subscriptsuperscriptğ¡ğ‘—2\mathbf{h}^{k}_{1},\mathbf{h}^{j}_{2}bold_h
+start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 1
+end_POSTSUBSCRIPT , bold_h start_POSTSUPERSCRIPT italic_j end_POSTSUPERSCRIPT
+start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT (jâ‰ kğ‘—ğ‘˜j\neq kitalic_j â‰
+italic_k) of sub-mixes embeddings in different windows. As in COLA, we use a
+bilinear similarity metric:
+
+| simâ¢(ğ¡1k,ğ¡2j)=(ğ¡1k)Tâ¢ğ–ğ¡2j,simsubscriptsuperscriptğ¡ğ‘˜1subscriptsuperscriptğ¡ğ‘—2superscriptsubscriptsuperscriptğ¡ğ‘˜1ğ‘‡subscriptsuperscriptğ–ğ¡ğ‘—2\text{sim}(\mathbf{h}^{k}_{1},\mathbf{h}^{j}_{2})=(\mathbf{h}^{k}_{1})^{T}% \mathbf{W}\mathbf{h}^{j}_{2}\,,sim ( bold_h start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT , bold_h start_POSTSUPERSCRIPT italic_j end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT ) = ( bold_h start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT ) start_POSTSUPERSCRIPT italic_T end_POSTSUPERSCRIPT bold_Wh start_POSTSUPERSCRIPT italic_j end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT , |  | (2)  
+---|---|---|---  
+  
+where ğ–ğ–\mathbf{W}bold_W is a learnable matrix. The loss we optimize is the
+multi-class cross entropy:
+
+| â„’=âˆ’âˆ‘k=1Klogâ¡expâ¡(simâ¢(ğ¡1k,ğ¡2k))âˆ‘j=1Kexpâ¡(simâ¢(ğ¡1k,ğ¡2j)).â„’subscriptsuperscriptğ¾ğ‘˜1simsubscriptsuperscriptğ¡ğ‘˜1subscriptsuperscriptğ¡ğ‘˜2subscriptsuperscriptğ¾ğ‘—1simsubscriptsuperscriptğ¡ğ‘˜1subscriptsuperscriptğ¡ğ‘—2\mathcal{L}=-\sum^{K}_{k=1}\log\frac{\exp(\text{sim}(\mathbf{h}^{k}_{1},% \mathbf{h}^{k}_{2}))}{\sum^{K}_{j=1}\exp(\text{sim}(\mathbf{h}^{k}_{1},\mathbf% {h}^{j}_{2}))}\,.caligraphic_L = - âˆ‘ start_POSTSUPERSCRIPT italic_K end_POSTSUPERSCRIPT start_POSTSUBSCRIPT italic_k = 1 end_POSTSUBSCRIPT roman_log divide start_ARG roman_exp ( sim ( bold_h start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT , bold_h start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT ) ) end_ARG start_ARG âˆ‘ start_POSTSUPERSCRIPT italic_K end_POSTSUPERSCRIPT start_POSTSUBSCRIPT italic_j = 1 end_POSTSUBSCRIPT roman_exp ( sim ( bold_h start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT , bold_h start_POSTSUPERSCRIPT italic_j end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT ) ) end_ARG . |  | (3)  
+---|---|---|---  
+  
+We depict the training procedure of COCOLA in Figure 2 for the single stem
+case.
+
+![Refer to caption]()
+
+FigureÂ 3: Inter-stem compositional generation tasks. Yğ‘ŒYitalic_Y and
+Xğ‘‹Xitalic_X represent the input and output stem sub-sets, respectively.
+
+In the COLA training procedure, the positive pairs are (fully mixed) windows
+belonging to the same track. In COCOLA, they are sub-mixes belonging to the
+same window. As such, we allow for negative pairs belonging to the same track
+but in different windows. The rğ‘Ÿritalic_r ratio has to be chosen well to
+avoid strong overlaps between windows in the same track. In that case, we
+could potentially consider (nearly) coherent sub-mixes as negative pairs.
+
+Model | Task | Methodology | Input | Output | Coherence |  |   
+---|---|---|---|---|---|---|---  
+UG | AG | SS | EA | ER |  |   
+MSDM [11] | âœ“ | âœ“(MS) | âœ“(MS) | âœ— | âœ— | Training / Supervised | Multi / Source | Multi / Source | âœ“ |  |   
+GMSDI [46] | âœ“ | âœ“(MS) | âœ“(MS) | âœ— | âœ— | Inference / Weakly Supervised | Multi / Sub-mix | Multi / Sub-mix | âœ“ |  |   
+StemGen [13] | âœ“ | âœ“(1S) | âœ— | âœ— | âœ— | Training / Supervised | Single / Sub-mix | Single / Source | âœ“ |  |   
+Audit [41] | âœ“ | âœ— | âœ“(Remove 1S) | âœ“(1S) | âœ“(1S) | Training / Supervised | Single / Sub-mix | Single / Sub-mix | âœ— |  |   
+InstructME [12] | âœ“ | âœ— | âœ“(Extract 1S; Remove 1S) | âœ“(1S) | âœ“(1S) | Training / Supervised | Single / Sub-mix | Single / Sub-mix | âœ“ |  |   
+\hdashlineCompoNet | âœ“ | âœ“(MS) | âœ“(MS) | âœ“(MS) | âœ“(MS) | Training / Supervised / Fine-tuning | Single / Sub-mix | Single / Sub-mix | âœ“ |  |   
+  
+Table 1: Compositional audio models comparison. The various tasks are
+illustrated in Figure 3. 1S vs MS: the task operates on one vs multiple
+sources at a time. Multi vs Single on Input / Output: the model accepts
+multiple vs single inputs / outputs. Source vs Sub-mix on Input / Output: the
+model processes single sources or sub-mixes as inputs / outputs.
+
+###  3.2 COCOLA Score
+
+Equipped with the encoder fÎ¸subscriptğ‘“ğœƒf_{\theta}italic_f
+start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT, we can quantify the coherence
+of the accompaniments generated by a generative model
+pÏ•â¢(ğ±âˆ£ğ²)subscriptğ‘italic-Ï•conditionalğ±ğ²p_{\phi}(\mathbf{x}\mid\mathbf{y})italic_p
+start_POSTSUBSCRIPT italic_Ï• end_POSTSUBSCRIPT ( bold_x âˆ£ bold_y ), where
+ğ²ğ²\mathbf{y}bold_y is the conditioning variable (the input) and
+ğ±ğ±\mathbf{x}bold_x is the modeled variable (the output). The modelâ€™s
+variables can be either a set of stems or sub-mixes. Given the input
+ğ²ğ²\mathbf{y}bold_y, the model pÏ•subscriptğ‘italic-Ï•p_{\phi}italic_p
+start_POSTSUBSCRIPT italic_Ï• end_POSTSUBSCRIPT generates an output
+ğ±~âˆ¼pÏ•â¢(ğ±âˆ£ğ²)similar-
+to~ğ±subscriptğ‘italic-Ï•conditionalğ±ğ²\tilde{\mathbf{x}}\sim
+p_{\phi}(\mathbf{x}\mid\mathbf{y})over~ start_ARG bold_x end_ARG âˆ¼ italic_p
+start_POSTSUBSCRIPT italic_Ï• end_POSTSUBSCRIPT ( bold_x âˆ£ bold_y ). We can
+compute the coherence between ğ²ğ²\mathbf{y}bold_y and
+ğ±~~ğ±\tilde{\mathbf{x}}over~ start_ARG bold_x end_ARG by first embedding the
+two vectors
+ğ¡ğ²=fÎ¸â¢(ğ²)subscriptğ¡ğ²subscriptğ‘“ğœƒğ²\mathbf{h}_{\mathbf{y}}=f_{\theta}(\mathbf{y})bold_h
+start_POSTSUBSCRIPT bold_y end_POSTSUBSCRIPT = italic_f start_POSTSUBSCRIPT
+italic_Î¸ end_POSTSUBSCRIPT ( bold_y ) and
+ğ¡ğ±~=fÎ¸â¢(ğ±~)subscriptğ¡~ğ±subscriptğ‘“ğœƒ~ğ±\mathbf{h}_{\tilde{\mathbf{x}}}=f_{\theta}(\tilde{\mathbf{x}})bold_h
+start_POSTSUBSCRIPT over~ start_ARG bold_x end_ARG end_POSTSUBSCRIPT =
+italic_f start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT ( over~ start_ARG
+bold_x end_ARG ) (summing the stems beforehand if considering a set of stems).
+We define the COCOLA score (CCS) between ğ±ğ±\mathbf{x}bold_x and
+ğ²~~ğ²\tilde{\mathbf{y}}over~ start_ARG bold_y end_ARG as:
+
+| CCSâ¢(ğ²,ğ±~)=simâ¢(ğ¡ğ²,ğ¡ğ±~),CCSğ²~ğ±simsubscriptğ¡ğ²subscriptğ¡~ğ±\text{CCS}(\mathbf{y},\tilde{\mathbf{x}})=\text{sim}(\mathbf{h}_{\mathbf{y}},% \mathbf{h}_{\tilde{\mathbf{x}}})\,,CCS ( bold_y , over~ start_ARG bold_x end_ARG ) = sim ( bold_h start_POSTSUBSCRIPT bold_y end_POSTSUBSCRIPT , bold_h start_POSTSUBSCRIPT over~ start_ARG bold_x end_ARG end_POSTSUBSCRIPT ) , |  | (4)  
+---|---|---|---  
+  
+the similarity (Eq. (2)) between their embeddings. The described procedure is
+depicted in Figure 1.
+
+###  3.3 CompoNet
+
+In order to showcase the utility of the COCOLA score as a metric for measuring
+the coherence of generated accompaniments, we propose an improved
+compositional model for music called CompoNet and compare it with the MSDM
+baseline in Section 5.
+
+CompoNet first pre-trains a latent diffusion model ÏµÏ•subscriptitalic-
+Ïµitalic-Ï•\epsilon_{\phi}italic_Ïµ start_POSTSUBSCRIPT italic_Ï•
+end_POSTSUBSCRIPT, based on U-Net architecture [42] conditioned via cross-
+attention layers [23], on a large dataset of tuples
+(ğ¦,ğœ)ğ¦ğœ(\mathbf{m},\mathbf{c})( bold_m , bold_c ) comprising audio
+mixtures ğ¦ğ¦\mathbf{m}bold_m and relative textual descriptions
+ğœğœ\mathbf{c}bold_c. The mixtures ğ¦ğ¦\mathbf{m}bold_m are mapped to latent
+vectors
+ğ³=EVAEâ¢(ğ¦)ğ³superscriptğ¸VAEğ¦\mathbf{z}=E^{\text{VAE}}(\mathbf{m})bold_z =
+italic_E start_POSTSUPERSCRIPT VAE end_POSTSUPERSCRIPT ( bold_m ) using a pre-
+trained VAE encoder [47], while the text descriptions are mapped to a
+continuous sequence
+ğ¬=ETXTâ¢(ğœ)ğ¬superscriptğ¸TXTğœ\mathbf{s}=E^{\text{TXT}}(\mathbf{c})bold_s =
+italic_E start_POSTSUPERSCRIPT TXT end_POSTSUPERSCRIPT ( bold_c ) using a text
+encoder (e.g., [10]). Following the DDPM formulation [7], the model is trained
+to reverse the forward Gaussian noising process given by:
+
+| ğ³t=Î±Â¯tâ¢ğ³+1âˆ’Î±Â¯tâ¢Ïµ,Ïµâˆ¼ğ’©â¢(ğŸ,ğˆ),formulae-sequencesubscriptğ³ğ‘¡subscriptÂ¯ğ›¼ğ‘¡ğ³1subscriptÂ¯ğ›¼ğ‘¡bold-italic-Ïµsimilar-tobold-italic-Ïµğ’©0ğˆ\mathbf{z}_{t}=\sqrt{\bar{\alpha}_{t}}\mathbf{z}+\sqrt{1-\bar{\alpha}_{t}}% \boldsymbol{\epsilon},\quad\boldsymbol{\epsilon}\sim\mathcal{N}(\mathbf{0},% \mathbf{I})\,,bold_z start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT = square-root start_ARG overÂ¯ start_ARG italic_Î± end_ARG start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG bold_z + square-root start_ARG 1 - overÂ¯ start_ARG italic_Î± end_ARG start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT end_ARG bold_italic_Ïµ , bold_italic_Ïµ âˆ¼ caligraphic_N ( bold_0 , bold_I ) , |  | (5)  
+---|---|---|---  
+  
+where tâˆˆ[0,T]ğ‘¡0ğ‘‡t\in[0,T]italic_t âˆˆ [ 0 , italic_T ] is a time index
+(with Tğ‘‡Titalic_T the maximum time step),
+Î±Â¯tsubscriptÂ¯ğ›¼ğ‘¡\bar{\alpha}_{t}overÂ¯ start_ARG italic_Î± end_ARG
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT is defined by integrating a
+noise schedule [7], and Ïµbold-italic-Ïµ\boldsymbol{\epsilon}bold_italic_Ïµ is
+sampled from the standard Gaussian distribution. The model is trained with
+denoising score matching [39]:
+
+| minÏ•â¡ğ”¼ğ³,Ïµ,ğ¬,tâ¢[â€–Ïµâˆ’ÏµÏ•â¢(ğ³t,ğ¬,t)â€–22],subscriptitalic-Ï•subscriptğ”¼ğ³bold-italic-Ïµğ¬ğ‘¡delimited-[]subscriptsuperscriptnormbold-italic-Ïµsubscriptitalic-Ïµitalic-Ï•subscriptğ³ğ‘¡ğ¬ğ‘¡22\min_{\phi}\mathbb{E}_{\mathbf{z},\boldsymbol{\epsilon},\mathbf{s},t}\left[\|% \boldsymbol{\epsilon}-\epsilon_{\phi}(\mathbf{z}_{t},\mathbf{s},t)\|^{2}_{2}% \right]\,,roman_min start_POSTSUBSCRIPT italic_Ï• end_POSTSUBSCRIPT blackboard_E start_POSTSUBSCRIPT bold_z , bold_italic_Ïµ , bold_s , italic_t end_POSTSUBSCRIPT [ âˆ¥ bold_italic_Ïµ - italic_Ïµ start_POSTSUBSCRIPT italic_Ï• end_POSTSUBSCRIPT ( bold_z start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT , bold_s , italic_t ) âˆ¥ start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT ] , |  | (6)  
+---|---|---|---  
+  
+with ğ³tsubscriptğ³ğ‘¡\mathbf{z}_{t}bold_z start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT obtained via Eq. (5).
+
+In a second phase, we fine-tune a ControlNet [17] adapter
+CÏˆsubscriptğ¶ğœ“C_{\psi}italic_C start_POSTSUBSCRIPT italic_Ïˆ
+end_POSTSUBSCRIPT for tackling all compositional musical tasks (Figure 3) with
+a single model. The U-Net ÏµÏ•subscriptitalic-
+Ïµitalic-Ï•\epsilon_{\phi}italic_Ïµ start_POSTSUBSCRIPT italic_Ï•
+end_POSTSUBSCRIPT comprises an encoder, bottleneck, decoder structure
+ÏµÏ•=DÏ•Dâˆ˜BÏ•Bâˆ˜EÏ•Esubscriptitalic-
+Ïµitalic-Ï•subscriptğ·subscriptitalic-Ï•ğ·subscriptğµsubscriptitalic-Ï•ğµsubscriptğ¸subscriptitalic-Ï•ğ¸\epsilon_{\phi}=D_{\phi_{D}}\circ
+B_{\phi_{B}}\circ E_{\phi_{E}}italic_Ïµ start_POSTSUBSCRIPT italic_Ï•
+end_POSTSUBSCRIPT = italic_D start_POSTSUBSCRIPT italic_Ï• start_POSTSUBSCRIPT
+italic_D end_POSTSUBSCRIPT end_POSTSUBSCRIPT âˆ˜ italic_B start_POSTSUBSCRIPT
+italic_Ï• start_POSTSUBSCRIPT italic_B end_POSTSUBSCRIPT end_POSTSUBSCRIPT âˆ˜
+italic_E start_POSTSUBSCRIPT italic_Ï• start_POSTSUBSCRIPT italic_E
+end_POSTSUBSCRIPT end_POSTSUBSCRIPT. The ControlNet adapter is defined as
+CÏˆâ¢(ğ³t,ğ¬,t,ğ°)=EÏ•Eâ¢(ğ³t+convinâ¢(ğ°),ğ¬,t)subscriptğ¶ğœ“subscriptğ³ğ‘¡ğ¬ğ‘¡ğ°subscriptğ¸subscriptitalic-Ï•ğ¸subscriptğ³ğ‘¡subscriptconvinğ°ğ¬ğ‘¡C_{\psi}(\mathbf{z}_{t},\mathbf{s},t,\mathbf{w})=E_{\phi_{E}}(\mathbf{z}_{t}+%
+\text{conv}_{\text{in}}(\mathbf{w}),\mathbf{s},t)italic_C start_POSTSUBSCRIPT
+italic_Ïˆ end_POSTSUBSCRIPT ( bold_z start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT , bold_s , italic_t , bold_w ) = italic_E
+start_POSTSUBSCRIPT italic_Ï• start_POSTSUBSCRIPT italic_E end_POSTSUBSCRIPT
+end_POSTSUBSCRIPT ( bold_z start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT +
+conv start_POSTSUBSCRIPT in end_POSTSUBSCRIPT ( bold_w ) , bold_s , italic_t
+), where convinsubscriptconvin\text{conv}_{\text{in}}conv start_POSTSUBSCRIPT
+in end_POSTSUBSCRIPT is a zero-initialized convolutional layer, and
+ğ°ğ°\mathbf{w}bold_w is a latent (VAE) embedding of an external audio input.
+The ControlNet adapter outputs the set of processed features
+{CÏˆiâ¢(ğ³t,ğ¬,t,ğ°)}i=1,â€¦,Isubscriptsubscriptsuperscriptğ¶ğ‘–ğœ“subscriptğ³ğ‘¡ğ¬ğ‘¡ğ°ğ‘–1â€¦ğ¼\\{C^{i}_{\psi}(\mathbf{z}_{t},\mathbf{s},t,\mathbf{w})\\}_{i=1,\dots,I}{
+italic_C start_POSTSUPERSCRIPT italic_i end_POSTSUPERSCRIPT
+start_POSTSUBSCRIPT italic_Ïˆ end_POSTSUBSCRIPT ( bold_z start_POSTSUBSCRIPT
+italic_t end_POSTSUBSCRIPT , bold_s , italic_t , bold_w ) }
+start_POSTSUBSCRIPT italic_i = 1 , â€¦ , italic_I end_POSTSUBSCRIPT for each
+layer of EÏ•Esubscriptğ¸subscriptitalic-Ï•ğ¸E_{\phi_{E}}italic_E
+start_POSTSUBSCRIPT italic_Ï• start_POSTSUBSCRIPT italic_E end_POSTSUBSCRIPT
+end_POSTSUBSCRIPT, with Iğ¼Iitalic_I the total number of layers. The full
+ControlNet conditional architecture is defined as
+ÏµÏ•,Ïˆ=DÏ•Dâˆ˜BÏ•Bâˆ˜EÏ•E,Ïˆsubscriptitalic-
+Ïµitalic-Ï•ğœ“subscriptğ·subscriptitalic-Ï•ğ·subscriptğµsubscriptitalic-Ï•ğµsubscriptğ¸subscriptitalic-Ï•ğ¸ğœ“\epsilon_{\phi,\psi}=D_{\phi_{D}}\circ
+B_{\phi_{B}}\circ E_{\phi_{E},\psi}italic_Ïµ start_POSTSUBSCRIPT italic_Ï• ,
+italic_Ïˆ end_POSTSUBSCRIPT = italic_D start_POSTSUBSCRIPT italic_Ï•
+start_POSTSUBSCRIPT italic_D end_POSTSUBSCRIPT end_POSTSUBSCRIPT âˆ˜ italic_B
+start_POSTSUBSCRIPT italic_Ï• start_POSTSUBSCRIPT italic_B end_POSTSUBSCRIPT
+end_POSTSUBSCRIPT âˆ˜ italic_E start_POSTSUBSCRIPT italic_Ï•
+start_POSTSUBSCRIPT italic_E end_POSTSUBSCRIPT , italic_Ïˆ end_POSTSUBSCRIPT
+with EÏ•E,Ïˆsubscriptğ¸subscriptitalic-Ï•ğ¸ğœ“E_{\phi_{E},\psi}italic_E
+start_POSTSUBSCRIPT italic_Ï• start_POSTSUBSCRIPT italic_E end_POSTSUBSCRIPT ,
+italic_Ïˆ end_POSTSUBSCRIPT combining the encoder and ControlNet adapter
+features at each layer iğ‘–iitalic_i with zero-initialized convolutional
+layers convisubscriptconvğ‘–\text{conv}_{i}conv start_POSTSUBSCRIPT italic_i
+end_POSTSUBSCRIPT:
+
+|  EÏ•E,Ïˆiâ¢(ğ³t,ğ¬,t,ğ°)=EÏ•Eiâ¢(ğ³t,ğ¬,t)+conviâ¢(CÏˆiâ¢(ğ³t,ğ¬,t,ğ°)).subscriptsuperscriptğ¸ğ‘–subscriptitalic-Ï•ğ¸ğœ“subscriptğ³ğ‘¡ğ¬ğ‘¡ğ°subscriptsuperscriptğ¸ğ‘–subscriptitalic-Ï•ğ¸subscriptğ³ğ‘¡ğ¬ğ‘¡subscriptconvğ‘–subscriptsuperscriptğ¶ğ‘–ğœ“subscriptğ³ğ‘¡ğ¬ğ‘¡ğ°E^{i}_{\phi_{E},\psi}(\mathbf{z}_{t},\mathbf{s},t,\mathbf{w})=E^{i}_{\phi_{E}}% (\mathbf{z}_{t},\mathbf{s},t)+\text{conv}_{i}(C^{i}_{\psi}(\mathbf{z}_{t},% \mathbf{s},t,\mathbf{w}))\,.italic_E start_POSTSUPERSCRIPT italic_i end_POSTSUPERSCRIPT start_POSTSUBSCRIPT italic_Ï• start_POSTSUBSCRIPT italic_E end_POSTSUBSCRIPT , italic_Ïˆ end_POSTSUBSCRIPT ( bold_z start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT , bold_s , italic_t , bold_w ) = italic_E start_POSTSUPERSCRIPT italic_i end_POSTSUPERSCRIPT start_POSTSUBSCRIPT italic_Ï• start_POSTSUBSCRIPT italic_E end_POSTSUBSCRIPT end_POSTSUBSCRIPT ( bold_z start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT , bold_s , italic_t ) + conv start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ( italic_C start_POSTSUPERSCRIPT italic_i end_POSTSUPERSCRIPT start_POSTSUBSCRIPT italic_Ïˆ end_POSTSUBSCRIPT ( bold_z start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT , bold_s , italic_t , bold_w ) ) . |   
+---|---|---  
+  
+While we have described the general ControlNet architecture, we still have to describe how we train it in CompoNet, namely, the roles of the ğ³,ğ°ğ³ğ°\mathbf{z},\mathbf{w}bold_z , bold_w and ğ¬ğ¬\mathbf{s}bold_s variables. Iterating over a dataset containing tuples (ğ±,ğ­)ğ±ğ­(\mathbf{x},\mathbf{t})( bold_x , bold_t ) with multi-stem tracks ğ±={ğ±n}n=1,â€¦,Nğ±subscriptsubscriptğ±ğ‘›ğ‘›1â€¦ğ‘\mathbf{x}=\\{\mathbf{x}_{n}\\}_{n=1,\dots,N}bold_x = { bold_x start_POSTSUBSCRIPT italic_n end_POSTSUBSCRIPT } start_POSTSUBSCRIPT italic_n = 1 , â€¦ , italic_N end_POSTSUBSCRIPT and tag descriptions ğ­={ğ­n}n=1,â€¦,Nğ­subscriptsubscriptğ­ğ‘›ğ‘›1â€¦ğ‘\mathbf{t}=\\{\mathbf{t}_{n}\\}_{n=1,\dots,N}bold_t = { bold_t start_POSTSUBSCRIPT italic_n end_POSTSUBSCRIPT } start_POSTSUBSCRIPT italic_n = 1 , â€¦ , italic_N end_POSTSUBSCRIPT for each stem, we sample from ğ±ğ±\mathbf{x}bold_x two arbitrary subsets of stems Y,XâŠ†ğ±ğ‘Œğ‘‹ğ±Y,X\subseteq\mathbf{x}italic_Y , italic_X âŠ† bold_x, with |X|>0ğ‘‹0|X|>0| italic_X | > 0. Yğ‘ŒYitalic_Y contains input stems while Xğ‘‹Xitalic_X contains output stems. The topological relationships between such subsets define all possible compositional tasks, as depicted in Figure 3. While previous models partially solve some tasks (see Table 1), ours is the first to solve all of them simultaneously. We proceed like in Eq. (1) and mix the sources in Yğ‘ŒYitalic_Y and Xğ‘‹Xitalic_X, obtaining ğ¦Ysubscriptğ¦ğ‘Œ\mathbf{m}_{Y}bold_m start_POSTSUBSCRIPT italic_Y end_POSTSUBSCRIPT and ğ¦Xsubscriptğ¦ğ‘‹\mathbf{m}_{X}bold_m start_POSTSUBSCRIPT italic_X end_POSTSUBSCRIPT, respectively. Afterward, we encode them in the VAE latent space, defining ğ³=EVAEâ¢(ğ¦X)ğ³superscriptğ¸VAEsubscriptğ¦ğ‘‹\mathbf{z}=E^{\text{VAE}}(\mathbf{m}_{X})bold_z = italic_E start_POSTSUPERSCRIPT VAE end_POSTSUPERSCRIPT ( bold_m start_POSTSUBSCRIPT italic_X end_POSTSUBSCRIPT ) and ğ°=EVAEâ¢(ğ¦Y)ğ°superscriptğ¸VAEsubscriptğ¦ğ‘Œ\mathbf{w}=E^{\text{VAE}}(\mathbf{m}_{Y})bold_w = italic_E start_POSTSUPERSCRIPT VAE end_POSTSUPERSCRIPT ( bold_m start_POSTSUBSCRIPT italic_Y end_POSTSUBSCRIPT ). We define the following prompt ğ¬ğ¬\mathbf{s}bold_s:
+
+| ğ¬=ETXTâ¢(ğ­Y1,â€¦,ğ­Y|Y|,ğš‚ğ™´ğ™¿,ğ­X1,â€¦,ğ­X|X|),ğ¬superscriptğ¸TXTsubscriptğ­subscriptğ‘Œ1â€¦subscriptğ­subscriptğ‘Œğ‘Œğš‚ğ™´ğ™¿subscriptğ­subscriptğ‘‹1â€¦subscriptğ­subscriptğ‘‹ğ‘‹\mathbf{s}=E^{\text{TXT}}(\mathbf{t}_{Y_{1}},\dots,\mathbf{t}_{Y_{|Y|}},\verb|% SEP|,\ \mathbf{t}_{X_{1}},\dots,\mathbf{t}_{X_{|X|}})\,,bold_s = italic_E start_POSTSUPERSCRIPT TXT end_POSTSUPERSCRIPT ( bold_t start_POSTSUBSCRIPT italic_Y start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT end_POSTSUBSCRIPT , â€¦ , bold_t start_POSTSUBSCRIPT italic_Y start_POSTSUBSCRIPT | italic_Y | end_POSTSUBSCRIPT end_POSTSUBSCRIPT , typewriter_SEP , bold_t start_POSTSUBSCRIPT italic_X start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT end_POSTSUBSCRIPT , â€¦ , bold_t start_POSTSUBSCRIPT italic_X start_POSTSUBSCRIPT | italic_X | end_POSTSUBSCRIPT end_POSTSUBSCRIPT ) , |  | (7)  
+---|---|---|---  
+  
+specifying input and output mixture tags separated by a special token `SEP`.
+
+Having specified the required inputs and outputs, we train
+ÏµÏ•,Ïˆsubscriptitalic-Ïµitalic-Ï•ğœ“\epsilon_{\phi,\psi}italic_Ïµ
+start_POSTSUBSCRIPT italic_Ï• , italic_Ïˆ end_POSTSUBSCRIPT via Eq. (6),
+optimizing only the Ïˆğœ“\psiitalic_Ïˆ weights. The ğ¬ğ¬\mathbf{s}bold_s
+prompt instructs the model which task to perform based on the specified stem
+tags. The user knows such information during the composition process in a
+generative DAW [48]. While we only test CompoNet on accompaniment generation
+against MSDM using COCOLA, we want the models to share similar abilities for a
+fair comparison.
+
+##  4 Experimental Setup
+
+| Test Dataset  
+---|---  
+Train Dataset | MUSDB18-HQ | MoisesDB | Slakh2100 | CocoChorales  
+MoisesDB [49] | 52.56 | 53.01 | 51.22 | 60.32  
+Slakh2100 [50] | 53.06 | 53.58 | 53.78 | 59.35  
+CocoChorales [51] | 70.10 | 61.48 | 67.50 | 99.78  
+All | 90.43 | 93.06 | 90.06 | 99.89  
+  
+Table 2:  Classification accuracy tests (%) with COCOLA models using
+K=2ğ¾2K=2italic_K = 2 sub-mixture test pairs (higher is better). MUSDB18-HQ is
+used as a hold-out test dataset.
+
+###  4.1 Datasets
+
+In our experiments, we use four different stem-separated public datasets for
+training COCOLA and fine-tuning CompoNet. The datasets are MUSDB18-HQ [52],
+MoisesDB [49], Slakh2100 [50] and CocoChorales [51].
+
+MUSDB18-HQ [52] is the uncompressed version (in WAV format) of the MUSDB18
+dataset, initially introduced in [53]. This dataset is a standard for
+evaluating music source separation systems. It comprises 150 tracks â€“ 100
+for training and 50 for testing â€“ totaling approximately 10 hours of
+professional-quality audio. Each track is divided into four stems: Bass,
+Drums, Vocals, and Other, with â€œOtherâ€ covering any components not
+classified under the first three categories.
+
+MoisesDB [49] features 240 music tracks across diverse genres and artists,
+accumulating more than 14 hours of music. Unlike MUSDB18-HQ, MoisesDB is a
+genuine multi-track dataset, offering a two-tier taxonomy of 11 distinct
+stems. Each stem in this dataset includes more detailed type annotations
+(e.g., Guitar might be labeled as Acoustic Guitar or Electric Guitar). Not
+having pre-computed splits, we set a custom 0.8 (train) / 0.1 (validation) /
+0.1 (test) split.
+
+Slakh2100 [50] is synthesized from the Lakh MIDI Dataset v0.1 [54] employing
+high-quality sample-based virtual instruments. It features 2100 tracks
+organized into 1500 tracks for training, 375 for validation, and 225 for
+testing, together amounting to 145h of audio. The tracks are annotated into 34
+stem categories. While such a dataset contains an order of magnitude more data
+than MUSDB18-HQ and MoisesDB, it does not share the same level of realism as
+the latter, being the tracks synthesized from MIDI.
+
+CocoChorales [51] is a chorale audio music dataset created through a synthesis
+process like Slakh2100. However, it comprises a substantially vaster
+collection of 240000 tracks, extending over 1411 hours of audio data. It is
+produced by generating symbolic notes via a Coconet model, performing their
+synthesis with MIDI-DDSP [55]. This dataset is richly annotated, featuring
+details on performance attributes and synthesis parameters. CocoChorales
+includes a diverse range of 13 instruments spanning Strings, Brass, Woodwind,
+and Random ensembles. In our experiments we use the tiny version, comprising
+4000 tracks.
+
+###  4.2 Model Implementation
+
+To implement the COCOLA encoder fÎ¸subscriptğ‘“ğœƒf_{\theta}italic_f
+start_POSTSUBSCRIPT italic_Î¸ end_POSTSUBSCRIPT, we follow [33] and employ the
+EfficientNet-B0 [56] convolutional architecture followed by a linear
+projection layer, operating on the mel-filterbank audio representation. The
+embedding dimension is 512. With respect to the original baseline, we add a
+0.10.10.10.1 dropout on the EfficientNet layers.
+
+For CompoNet, we employ the AudioLDM2 [57, 58] architecture. Since the authors
+pre-train the model on a large array of datasets [59, 60, 61, 62, 63, 64, 65,
+66], we skip the pre-training phase in Section 3.2 and directly fine-tune a
+ControlNet adapter based on the `AudioLDM 2-Large`
+checkpoint333https://huggingface.co/cvssp/audioldm2-large. During fine-tuning,
+we directly pass the conditioning prompt in Eq. 7 to the text-embedding
+mechanism of AudioLDM2 (based on CLAP [9, 27], T5 [10], and GPT2 [67]),
+conditioning both the U-Net and the ControlNet adapter.
+
+100100100100200200200200300300300300400400400400500500500500600600600600700700700700800800800800000.20.20.20.20.40.40.40.40.60.60.60.60.80.80.80.81111Training stepTrain accuracyCosine similarityBilinear similarity FigureÂ 4: Cosine vs bilinear similarity during training. Training is performed with â€œCOCOLA Allâ€. The accuracy metric is defined in Eq. (8). We adopt the bilinear similarity in Eq. (2), given its improved performance. Method |  | FAD â†“â†“\downarrowâ†“  
+---  
+CLAP  
+| FAD â†“â†“\downarrowâ†“  
+---  
+EnCodec  
+| FAD â†“â†“\downarrowâ†“  
+---  
+VGGish  
+| COCOLA score â†‘â†‘\uparrowâ†‘  
+---  
+All  
+| COCOLA score â†‘â†‘\uparrowâ†‘  
+---  
+CocoChorales  
+Slakh2100  
+MSDM [11] | 0.23 | 92.81 | 2.01 | 3.31 | 0.72  
+CompoNet | 0.30 | 106.23 | 3.20 | 13.50 | 8.32  
+Random | 0.064 | 51.44 | 0.16 | 0.069 | 1.06  
+\hdashlineGround Truth | - | - | - | 16.57 | 14.31  
+MUSDB18-HQ  
+MSDM [11] | 0.29 | 148.09 | 2.36 | 11.61 | 3.37  
+CompoNet | 0.37 | 130.04 | 2.14 | 11.94 | 7.21  
+Random | 0.11 | 100.25 | 0.35 | 4.40 | 3.47  
+\hdashlineGround Truth | - | - | - | 16.25 | 12.45  
+Table 3: Comparison between MSDM and CompoNet.
+
+###  4.3 Training Details
+
+All COCOLA models are trained on an NVIDIA RTX 4070 Super with 12GB of VRAM.
+Each training batch contains 32 audio chunks of 5s (16kHz). We set the maximum
+window overlap ratio r=50%ğ‘Ÿpercent50r=50\%italic_r = 50 % and train with the
+Adam optimizer [68] with a 10âˆ’3superscript10310^{-3}10 start_POSTSUPERSCRIPT
+- 3 end_POSTSUPERSCRIPT learning rate. We add Gaussian noise to positive
+samples as a data augmentation method, with
+Ïƒ=10âˆ’3ğœsuperscript103\sigma=10^{-3}italic_Ïƒ = 10 start_POSTSUPERSCRIPT -
+3 end_POSTSUPERSCRIPT. We tried training with cosine similarity [22] but we
+reported (Figure 4) lower performance, corroborating [33].
+
+CompoNet models are also fine-tuned on NVIDIA GPUs (RTX 4080 16GB on
+MUSDB18-HQ; A10G, 24GB on Slakh2100). The training batches have size 2
+(MUSDB18-HQ) and 5 (Slakh2100) and contain windows of 10.24s (16kHz). We train
+with Adam [68] with a 10âˆ’4superscript10410^{-4}10 start_POSTSUPERSCRIPT - 4
+end_POSTSUPERSCRIPT learning rate. We do not use the empty prompt for
+classifier-free guidance [69] during fine-tuning.
+
+##  5 Experiments
+
+We employ four COCOLA encoder models in our experiments : â€œCOCOLA
+MoisesDBâ€, â€œCOCOLA Slakh2100â€, â€œCOCOLA CocoChoralesâ€ and â€œCOCOLA
+Allâ€. The first three are trained on the homonym datasets, while the last one
+is trained on all three combined. For the â€œCOCOLA CocoChoralesâ€ we use all
+ensables while on â€œCOCOLA Allâ€ we use only the Random ensamble for a more
+balanced partitioning, with respect to the other datasets. MUSDB18-HQ, being
+the smallest dataset, is used as a held-out test dataset for studying
+generalization.
+
+###  5.1 Coherent Sub-Mix Classification
+
+We cross-test the performance of all COCOLA models, performing classification
+of coherent pairs on the test split of our datasets. More specifically, given
+an encoder fÎ¸subscriptğ‘“ğœƒf_{\theta}italic_f start_POSTSUBSCRIPT italic_Î¸
+end_POSTSUBSCRIPT, we iterate a test set, collecting at each step a batch of
+Kğ¾Kitalic_K windows
+ğ±1,â€¦,ğ±Ksuperscriptğ±1â€¦superscriptğ±ğ¾\mathbf{x}^{1},\dots,\mathbf{x}^{K}bold_x
+start_POSTSUPERSCRIPT 1 end_POSTSUPERSCRIPT , â€¦ , bold_x
+start_POSTSUPERSCRIPT italic_K end_POSTSUPERSCRIPT. Following the steps in
+Section 3.1 we compute all similarities
+simâ¢(ğ¡1k,ğ¡2j)simsubscriptsuperscriptğ¡ğ‘˜1subscriptsuperscriptğ¡ğ‘—2\text{sim}(\mathbf{h}^{k}_{1},\mathbf{h}^{j}_{2})sim
+( bold_h start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT
+start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT , bold_h start_POSTSUPERSCRIPT
+italic_j end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT ) for
+k,jâˆˆ[K]ğ‘˜ğ‘—delimited-[]ğ¾k,j\in[K]italic_k , italic_j âˆˆ [ italic_K ]. We
+define the accuracy over a batch as:
+
+| 1Kâ¢âˆ‘k=1KğŸ™â¢(k=argâ¢maxjâˆˆ[K]â¡simâ¢(ğ¡1k,ğ¡2j)),1ğ¾superscriptsubscriptğ‘˜1ğ¾1ğ‘˜subscriptargmaxğ‘—delimited-[]ğ¾simsubscriptsuperscriptğ¡ğ‘˜1subscriptsuperscriptğ¡ğ‘—2\frac{1}{K}\sum_{k=1}^{K}\mathds{1}\biggl{(}k=\operatorname*{arg\,max}_{j\in[K% ]}\text{sim}(\mathbf{h}^{k}_{1},\mathbf{h}^{j}_{2})\biggr{)}\,,divide start_ARG 1 end_ARG start_ARG italic_K end_ARG âˆ‘ start_POSTSUBSCRIPT italic_k = 1 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_K end_POSTSUPERSCRIPT blackboard_1 ( italic_k = start_OPERATOR roman_arg roman_max end_OPERATOR start_POSTSUBSCRIPT italic_j âˆˆ [ italic_K ] end_POSTSUBSCRIPT sim ( bold_h start_POSTSUPERSCRIPT italic_k end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT , bold_h start_POSTSUPERSCRIPT italic_j end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT ) ) , |  | (8)  
+---|---|---|---  
+  
+where ğŸ™1\mathds{1}blackboard_1 is the indicator function. We obtain the
+final accuracy averaging over all batches in the dataset. For our evaluation
+we use K=2ğ¾2K=2italic_K = 2 and depict in Table 2 the results across all
+combinations of models and test datasets. While both â€œCOCOLA MoisesDBâ€ and
+â€œCOCOLA Slakh2100â€ perform only slightly better than a random choice,
+â€œCOCOLA CocoChoralesâ€ features improved performance. Finally, combining the
+three dataset, we obtain an accuracy of over 90% on all datasets, showcasing
+generalization with 90.43% on the held-out MUSDB18-HQ.
+
+###  5.2 Accompaniment Generation Evaluation
+
+For the accompaniment generation evaluation, we compare the MSDM model [11]
+with the proposed CompoNet (Section 3.3). We train CompoNet on MUSDB18-HQ and
+Slakh2100 (restricted to Bass, Drums, Guitar and Piano stems at test time). We
+also consider a Random baseline, where, for a given input, we output a random
+sub-mix from a different test track. We generate 200 chunks for both datasets
+and models, conditioning on random stem subsets of test tracks and querying a
+subset of the complementary. The chunks are âˆ¼similar-to\simâˆ¼6s / 10.24s
+long on MUSDB18-HQ / Slakh2100. Given that MSDM tends to generate silence, we
+sample 12 candidate tracks for each generated track, selecting the one with
+the highest L2superscriptğ¿2L^{2}italic_L start_POSTSUPERSCRIPT 2
+end_POSTSUPERSCRIPT norm. We compare the COCOLA score in Eq. (4) with the FAD
+[16, 70] metric (interpreted as a sub-FAD [15, 11]) computed with CLAP [9],
+EnCodec [71], and VGGish [72] backbones.
+
+We showcase the results in Table 3. With the FAD metrics, the model assigns
+the best score to the Random baseline. This behavior can be explained by
+considering that the Random outputs are real data, and the FAD evaluates well
+the perceptual quality. At the same time, it fails to assess the coherence
+between the tracks, and tends to score MSDM better. With the â€œCOCOLA Allâ€
+score, Random is the lowest, while CompoNet scores best. CompoNet has the
+highest value on â€œCOCOLA CocoChoralesâ€ which, however, scores MSDM lower
+than Random. We remember that â€œCOCOLA Allâ€ achieves a higher accuracy in
+Table 2, resulting in more reliability. On Ground Truth, we compute upper-
+bounds of the COCOLA score using real positive pairs. CompoNet better
+approaches these bounds.
+
+##  6 Conclusion
+
+In this paper we proposed COCOLA, a contrastive encoder for recognizing the
+coherence between musical stems. At the same time, we have introduced
+CompoNet, a novel compositional model for music based on ControlNet that can
+solve a wide range of tasks simultaneously. Finally, we have evaluated
+CompoNet using COCOLA, proposing a new way of assessing accompaniment
+generation.
+
+We plan to improve the quality of COCOLA by training on additional stem-level
+datasets [73] or using data obtained by pre-separating [15] larger realistic
+music datasets [74]. In future work, we would also like to explore inference-
+side methods that can guide the diffusion process using COCOLA as a likelihood
+function, offering an alternative (or additional) loss for the GMSDI method
+[46].
+
+##  7 Acknowledgments
+
+The authors were partially supported by the ERC grant no. 802554 (SPECGEO),
+PRIN 2020 project no. 2020TA3K9N (LEGO.AI), PRIN 2022 project no. 2022AL45R2
+(EYE-FI.AI, CUP H53D2300350-0001), PNRR MUR project no. PE0000013-FAIR, and
+AWS Cloud Credit for Research program.
+
+## References
+
+  * [1] A.Â Agostinelli, T.Â I. Denk, Z.Â Borsos, J.Â Engel, M.Â Verzetti, A.Â Caillon, Q.Â Huang, A.Â Jansen, A.Â Roberts, M.Â Tagliasacchi _etÂ al._ , â€œMusiclm: Generating music from text,â€ _arXiv preprint arXiv:2301.11325_ , 2023. 
+  * [2] J.Â Copet, F.Â Kreuk, I.Â Gat, T.Â Remez, D.Â Kant, G.Â Synnaeve, Y.Â Adi, and A.Â DÃ©fossez, â€œSimple and controllable music generation,â€ _Advances in Neural Information Processing Systems_ , vol.Â 36, 2024. 
+  * [3] F.Â Schneider, Z.Â Jin, and B.Â SchÃ¶lkopf, â€œMoÃ»sai: Text-to-music generation with long-context latent diffusion,â€ _arXiv preprint arXiv:2301.11757_ , 2023. 
+  * [4] H.Â F. Garcia, P.Â Seetharaman, R.Â Kumar, and B.Â Pardo, â€œVampnet: Music generation via masked acoustic token modeling,â€ _arXiv preprint arXiv:2307.04686_ , 2023. 
+  * [5] Z.Â Evans, C.Â Carr, J.Â Taylor, S.Â H. Hawley, and J.Â Pons, â€œFast timing-conditioned latent audio diffusion,â€ _arXiv preprint arXiv:2402.04825_ , 2024. 
+  * [6] Y.Â Song, J.Â Sohl-Dickstein, D.Â P. Kingma, A.Â Kumar, S.Â Ermon, and B.Â Poole, â€œScore-based generative modeling through stochastic differential equations,â€ in _International Conference on Learning Representations_ , 2021. [Online]. Available: https://openreview.net/forum?id=PxTIG12RRHS
+  * [7] J.Â Ho, A.Â Jain, and P.Â Abbeel, â€œDenoising diffusion probabilistic models,â€ in _Proceedings of the 34th International Conference on Neural Information Processing Systems_ , 2020, pp. 6840â€“6851. 
+  * [8] OpenAI, â€œGpt-4 technical report,â€ 2023. 
+  * [9] B.Â Elizalde, S.Â Deshmukh, M.Â AlÂ Ismail, and H.Â Wang, â€œClap learning audio concepts from natural language supervision,â€ in _ICASSP 2023-2023 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)_.Â Â Â IEEE, 2023, pp. 1â€“5. 
+  * [10] C.Â Raffel, N.Â Shazeer, A.Â Roberts, K.Â Lee, S.Â Narang, M.Â Matena, Y.Â Zhou, W.Â Li, and P.Â J. Liu, â€œExploring the limits of transfer learning with a unified text-to-text transformer,â€ _Journal of machine learning research_ , vol.Â 21, no. 140, pp. 1â€“67, 2020. 
+  * [11] G.Â Mariani, I.Â Tallini, E.Â Postolache, M.Â Mancusi, L.Â Cosmo, and E.Â RodolÃ , â€œMulti-source diffusion models for simultaneous music generation and separation,â€ in _The Twelfth International Conference on Learning Representations_ , 2024. 
+  * [12] B.Â Han, J.Â Dai, X.Â Song, W.Â Hao, X.Â He, D.Â Guo, J.Â Chen, Y.Â Wang, and Y.Â Qian, â€œInstructme: An instruction guided music edit and remix framework with latent diffusion models,â€ _arXiv preprint arXiv:2308.14360_ , 2023. 
+  * [13] J.Â D. Parker, J.Â Spijkervet, K.Â Kosta, F.Â Yesiler, B.Â Kuznetsov, J.-C. Wang, M.Â Avent, J.Â Chen, and D.Â Le, â€œStemgen: A music generation model that listens,â€ in _ICASSP 2024-2024 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)_.Â Â Â IEEE, 2024, pp. 1116â€“1120. 
+  * [14] M.Â Grachten, S.Â Lattner, and E.Â Deruty, â€œBassnet: A variational gated autoencoder for conditional generation of bass guitar tracks with learned interactive control,â€ _Applied Sciences_ , vol.Â 10, no.Â 18, 2020. [Online]. Available: https://www.mdpi.com/2076-3417/10/18/6627
+  * [15] C.Â Donahue, A.Â Caillon, A.Â Roberts, E.Â Manilow, P.Â Esling, A.Â Agostinelli, M.Â Verzetti, I.Â Simon, O.Â Pietquin, N.Â Zeghidour _etÂ al._ , â€œSingsong: Generating musical accompaniments from singing,â€ _arXiv preprint arXiv:2301.12662_ , 2023. [Online]. Available: https://arxiv.org/abs/2301.12662
+  * [16] D.Â Roblek, K.Â Kilgour, M.Â Sharifi, and M.Â Zuluaga, â€œFr\\\backslash\â€™echet audio distance: A reference-free metric for evaluating music enhancement algorithms,â€ in _Proc. Interspeech_ , 2019, pp. 2350â€“2354. 
+  * [17] L.Â Zhang, A.Â Rao, and M.Â Agrawala, â€œAdding conditional control to text-to-image diffusion models,â€ in _Proceedings of the IEEE/CVF International Conference on Computer Vision_ , 2023, pp. 3836â€“3847. 
+  * [18] S.Â Chopra, R.Â Hadsell, and Y.Â LeCun, â€œLearning a similarity metric discriminatively, with application to face verification,â€ in _2005 IEEE Computer Society Conference on Computer Vision and Pattern Recognition (CVPRâ€™05)_ , vol.Â 1, 2005, pp. 539â€“546 vol. 1. 
+  * [19] A.Â v.Â d. Oord, Y.Â Li, and O.Â Vinyals, â€œRepresentation learning with contrastive predictive coding,â€ _arXiv preprint arXiv:1807.03748_ , 2018. 
+  * [20] F.Â Schroff, D.Â Kalenichenko, and J.Â Philbin, â€œFacenet: A unified embedding for face recognition and clustering,â€ in _Proceedings of the IEEE conference on computer vision and pattern recognition_ , 2015, pp. 815â€“823. 
+  * [21] X.Â Favory, K.Â Drossos, T.Â Virtanen, and X.Â Serra, â€œCOALA: Co-aligned autoencoders for learning semantically enriched audio representations,â€ in _ICML 2020 Workshop on Self-supervision in Audio and Speech_ , 2020. [Online]. Available: https://openreview.net/forum?id=7jxwhNDM0Uv
+  * [22] T.Â Chen, S.Â Kornblith, M.Â Norouzi, and G.Â Hinton, â€œA simple framework for contrastive learning of visual representations,â€ in _International conference on machine learning_.Â Â Â PMLR, 2020, pp. 1597â€“1607. 
+  * [23] A.Â Vaswani, N.Â Shazeer, N.Â Parmar, J.Â Uszkoreit, L.Â Jones, A.Â N. Gomez, Å.Â Kaiser, and I.Â Polosukhin, â€œAttention is all you need,â€ _Advances in neural information processing systems_ , vol.Â 30, 2017. 
+  * [24] I.Â Manco, E.Â Benetos, E.Â Quinton, and G.Â Fazekas, â€œLearning music audio representations via weak language supervision,â€ in _ICASSP 2022-2022 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)_.Â Â Â IEEE, 2022, pp. 456â€“460. 
+  * [25] â€”â€”, â€œContrastive audio-language learning for music,â€ in _Ismir 2022 Hybrid Conference_ , 2022. 
+  * [26] Q.Â Huang, A.Â Jansen, J.Â Lee, R.Â Ganti, J.Â Y. Li, and D.Â P. Ellis, â€œMulan: A joint embedding of music audio and natural language,â€ in _Ismir 2022 Hybrid Conference_ , 2022. 
+  * [27] Y.Â Wu, K.Â Chen, T.Â Zhang, Y.Â Hui, T.Â Berg-Kirkpatrick, and S.Â Dubnov, â€œLarge-scale contrastive language-audio pretraining with feature fusion and keyword-to-caption augmentation,â€ in _ICASSP 2023-2023 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)_.Â Â Â IEEE, 2023, pp. 1â€“5. 
+  * [28] S.Â Pascual, M.Â Ravanelli, J.Â SerrÃ , A.Â Bonafonte, and Y.Â Bengio, â€œLearning problem-agnostic speech representations from multiple self-supervised tasks,â€ _Interspeech 2019_ , 2019. 
+  * [29] M.Â Tagliasacchi, B.Â Gfeller, F.Â d.Â C. Quitry, and D.Â Roblek, â€œPre-training audio representations with self-supervision,â€ _IEEE Signal Processing Letters_ , vol.Â 27, pp. 600â€“604, 2020. 
+  * [30] H.-H. Wu, C.-C. Kao, Q.Â Tang, M.Â Sun, B.Â McFee, J.Â P. Bello, and C.Â Wang, â€œMulti-task self-supervised pre-training for music classification,â€ in _ICASSP 2021-2021 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)_.Â Â Â IEEE, 2021, pp. 556â€“560. 
+  * [31] P.-Y. Huang, H.Â Xu, J.Â Li, A.Â Baevski, M.Â Auli, W.Â Galuba, F.Â Metze, and C.Â Feichtenhofer, â€œMasked autoencoders that listen,â€ _Advances in Neural Information Processing Systems_ , vol.Â 35, pp. 28â€‰708â€“28â€‰720, 2022. 
+  * [32] A.Â Jansen, M.Â Plakal, R.Â Pandya, D.Â P. Ellis, S.Â Hershey, J.Â Liu, R.Â C. Moore, and R.Â A. Saurous, â€œUnsupervised learning of semantic audio representations,â€ in _2018 IEEE international conference on acoustics, speech and signal processing (ICASSP)_.Â Â Â IEEE, 2018, pp. 126â€“130. 
+  * [33] A.Â Saeed, D.Â Grangier, and N.Â Zeghidour, â€œContrastive learning of general-purpose audio representations,â€ in _ICASSP 2021-2021 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)_.Â Â Â IEEE, 2021, pp. 3875â€“3879. 
+  * [34] H.Â Al-Tahan and Y.Â Mohsenzadeh, â€œClar: Contrastive learning of auditory representations,â€ in _International Conference on Artificial Intelligence and Statistics_.Â Â Â PMLR, 2021, pp. 2530â€“2538. 
+  * [35] J.Â Spijkervet, J.Â Burgoyne _etÂ al._ , â€œContrastive learning of musical representations.â€Â Â Â ISMIR, 2021. 
+  * [36] C.Â Garoufis, A.Â Zlatintsi, and P.Â Maragos, â€œMulti-source contrastive learning from musical audio,â€ _arXiv preprint arXiv:2302.07077_ , 2023. 
+  * [37] R.Â Yuan, H.Â Lin, Y.Â Wang, Z.Â Tian, S.Â Wu, T.Â Shen, G.Â Zhang, Y.Â Wu, C.Â Liu, Z.Â Zhou _etÂ al._ , â€œChatmusician: Understanding and generating music intrinsically with llm,â€ _arXiv preprint arXiv:2402.16153_ , 2024. 
+  * [38] J.Â Sohl-Dickstein, E.Â A. Weiss, N.Â Maheswaranathan, and S.Â Ganguli, â€œDeep unsupervised learning using nonequilibrium thermodynamics,â€ in _Proceedings ICML 2015, Lille, France, 6-11 July 2015_ , ser. JMLR Workshop and Conference Proceedings, F.Â R. Bach and D.Â M. Blei, Eds., vol.Â 37.Â Â Â JMLR.org, 2015, pp. 2256â€“2265. [Online]. Available: http://proceedings.mlr.press/v37/sohl-dickstein15.html
+  * [39] Y.Â Song and S.Â Ermon, â€œGenerative modeling by estimating gradients of the data distribution,â€ in _Advances in Neural Information Processing Systems 32: Annual Conference on Neural Information Processing Systems 2019, NeurIPS 2019, December 8-14, 2019, Vancouver, BC, Canada_ , H.Â M. Wallach, H.Â Larochelle, A.Â Beygelzimer, F.Â dâ€™AlchÃ©-Buc, E.Â B. Fox, and R.Â Garnett, Eds., 2019, pp. 11â€‰895â€“11â€‰907. 
+  * [40] T.Â Karras, M.Â Aittala, T.Â Aila, and S.Â Laine, â€œElucidating the design space of diffusion-based generative models,â€ in _Advances in Neural Information Processing Systems_ , 2022. [Online]. Available: https://openreview.net/forum?id=k7FuTOWMOc7
+  * [41] Y.Â Wang, Z.Â Ju, X.Â Tan, L.Â He, Z.Â Wu, J.Â Bian _etÂ al._ , â€œAudit: Audio editing by following instructions with latent diffusion models,â€ _Advances in Neural Information Processing Systems_ , vol.Â 36, 2024. 
+  * [42] O.Â Ronneberger, P.Â Fischer, and T.Â Brox, â€œU-net: Convolutional networks for biomedical image segmentation,â€ in _Medical Image Computing and Computer-Assisted Interventionâ€“MICCAI 2015: 18th International Conference, Munich, Germany, October 5-9, 2015, Proceedings, Part III 18_.Â Â Â Springer, 2015, pp. 234â€“241. 
+  * [43] V.Â Jayaram and J.Â Thickstun, â€œSource separation with deep generative priors,â€ in _International Conference on Machine Learning_.Â Â Â PMLR, 2020, pp. 4724â€“4735. 
+  * [44] G.Â Zhu, J.Â Darefsky, F.Â Jiang, A.Â Selitskiy, and Z.Â Duan, â€œMusic source separation with generative flow,â€ _IEEE Signal Processing Letters_ , vol.Â 29, pp. 2288â€“2292, 2022. 
+  * [45] E.Â Postolache, G.Â Mariani, M.Â Mancusi, A.Â Santilli, L.Â Cosmo, and E.Â RodolÃ , â€œLatent autoregressive source separation,â€ in _Proceedings of the AAAI Conference on Artificial Intelligence_ , vol.Â 37, no.Â 8, 2023, pp. 9444â€“9452. 
+  * [46] E.Â Postolache, G.Â Mariani, L.Â Cosmo, E.Â Benetos, and E.Â RodolÃ , â€œGeneralized multi-source inference for text conditioned music diffusion models,â€ in _ICASSP 2024 - 2024 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)_ , 2024, pp. 6980â€“6984. 
+  * [47] D.Â P. Kingma and M.Â Welling, â€œAuto-encoding variational bayes,â€ in _2nd International Conference on Learning Representations, ICLR 2014, Banff, AB, Canada, April 14-16, 2014, Conference Track Proceedings_ , Y.Â Bengio and Y.Â LeCun, Eds., 2014. 
+  * [48] I.Â Clester and J.Â Freeman, â€œComposing with generative systems in the digital audio workstation 145-148,â€ in _Joint Proceedings of the IUI 2023 Workshops: HAI-GEN, ITAH, MILC, SHAI, SketchRec, SOCIALIZE co-located with the ACM International Conference on Intelligent User Interfaces (IUI 2023), Sydney, Australia, March 27-31, 2023_ , ser. CEUR Workshop Proceedings, A.Â Smith-Renner and P.Â Taele, Eds., vol. 3359.Â Â Â CEUR-WS.org, 2023, pp. 145â€“148. [Online]. Available: https://ceur-ws.org/Vol-3359/paper15.pdf
+  * [49] I.Â G. Pereira, F.Â Araujo, F.Â Korzeniowski, and R.Â Vogl, â€œMoisesdb: A dataset for source separation beyond 4 stems,â€ in _Ismir 2023 Hybrid Conference_ , 2023. 
+  * [50] E.Â Manilow, G.Â Wichern, P.Â Seetharaman, and J.Â LeÂ Roux, â€œCutting music source separation some Slakh: A dataset to study the impact of training data quality and quantity,â€ in _Proc. IEEE Workshop on Applications of Signal Processing to Audio and Acoustics (WASPAA)_.Â Â Â IEEE, 2019, pp. 45â€“49. 
+  * [51] Y.Â Wu, J.Â Gardner, E.Â Manilow, I.Â Simon, C.Â Hawthorne, and J.Â Engel, â€œThe chamber ensemble generator: Limitless high-quality mir data via generative modeling,â€ _arXiv preprint arXiv:2209.14458_ , 2022. 
+  * [52] Z.Â Rafii, A.Â Liutkus, F.-R. StÃ¶ter, S.Â I. Mimilakis, and R.Â Bittner, â€œMusdb18-hq - an uncompressed version of musdb18,â€ Aug. 2019. [Online]. Available: https://doi.org/10.5281/zenodo.3338373
+  * [53] Z.Â Rafii, A.Â Liutkus, F.-R. StÃ¶ter, S.Â I. Mimilakis, and R.Â Bittner, â€œThe MUSDB18 corpus for music separation,â€ Dec. 2017. [Online]. Available: https://doi.org/10.5281/zenodo.1117372
+  * [54] C.Â Raffel, â€œLearning-based methods for comparing sequences, with applications to audio-to-midi alignment and matching,â€ Ph.D. dissertation, Columbia University, USA, 2016. [Online]. Available: https://doi.org/10.7916/D8N58MHV
+  * [55] Y.Â Wu, E.Â Manilow, Y.Â Deng, R.Â Swavely, K.Â Kastner, T.Â Cooijmans, A.Â Courville, C.-Z.Â A. Huang, and J.Â Engel, â€œMidi-ddsp: Detailed control of musical performance via hierarchical modeling,â€ in _International Conference on Learning Representations_ , 2021. 
+  * [56] M.Â Tan and Q.Â Le, â€œEfficientnet: Rethinking model scaling for convolutional neural networks,â€ in _International conference on machine learning_.Â Â Â PMLR, 2019, pp. 6105â€“6114. 
+  * [57] H.Â Liu, Z.Â Chen, Y.Â Yuan, X.Â Mei, X.Â Liu, D.Â Mandic, W.Â Wang, and M.Â D. Plumbley, â€œAudioldm: text-to-audio generation with latent diffusion models,â€ in _Proceedings of the 40th International Conference on Machine Learning_ , 2023, pp. 21â€‰450â€“21â€‰474. 
+  * [58] H.Â Liu, Q.Â Tian, Y.Â Yuan, X.Â Liu, X.Â Mei, Q.Â Kong, Y.Â Wang, W.Â Wang, Y.Â Wang, and M.Â D. Plumbley, â€œAudioldm 2: Learning holistic audio generation with self-supervised pretraining,â€ _arXiv preprint arXiv:2308.05734_ , 2023. 
+  * [59] J.Â F. Gemmeke, D.Â P.Â W. Ellis, D.Â Freedman, A.Â Jansen, W.Â Lawrence, R.Â C. Moore, M.Â Plakal, and M.Â Ritter, â€œAudio set: An ontology and human-labeled dataset for audio events,â€ in _2017 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)_ , 2017, pp. 776â€“780. 
+  * [60] X.Â Mei, C.Â Meng, H.Â Liu, Q.Â Kong, T.Â Ko, C.Â Zhao, M.Â D. Plumbley, Y.Â Zou, and W.Â Wang, â€œWavcaps: A chatgpt-assisted weakly-labelled audio captioning dataset for audio-language multimodal research,â€ _arXiv preprint arXiv:2303.17395_ , 2023. 
+  * [61] C.Â D. Kim, B.Â Kim, H.Â Lee, and G.Â Kim, â€œAudioCaps: Generating captions for audios in the wild,â€ in _Proceedings of the 2019 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies, Volume 1 (Long and Short Papers)_ , J.Â Burstein, C.Â Doran, and T.Â Solorio, Eds.Â Â Â Minneapolis, Minnesota: Association for Computational Linguistics, Jun. 2019, pp. 119â€“132. [Online]. Available: https://aclanthology.org/N19-1011
+  * [62] H.Â Chen, W.Â Xie, A.Â Vedaldi, and A.Â Zisserman, â€œVggsound: A large-scale audio-visual dataset,â€ in _ICASSP 2020-2020 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)_.Â Â Â IEEE, 2020, pp. 721â€“725. 
+  * [63] M.Â Defferrard, K.Â Benzi, P.Â Vandergheynst, and X.Â Bresson, â€œFma: A dataset for music analysis,â€ in _International Society for Music Information Retrieval Conference_ , 2016. 
+  * [64] T.Â Bertin-Mahieux, D.Â P. Ellis, B.Â Whitman, and P.Â Lamere, â€œThe million song dataset,â€ in _Proceedings of the 12th International Conference on Music Information Retrieval (ISMIR 2011)_ , 2011. 
+  * [65] G.Â Chen, S.Â Chai, G.Â Wang, J.Â Du, W.-Q. Zhang, C.Â Weng, D.Â Su, D.Â Povey, J.Â Trmal, J.Â Zhang _etÂ al._ , â€œGigaspeech: An evolving, multi-domain asr corpus with 10,000 hours of transcribed audio,â€ _arXiv preprint arXiv:2106.06909_ , 2021. 
+  * [66] K.Â Ito and L.Â Johnson, â€œThe lj speech dataset,â€ https://keithito.com/LJ-Speech-Dataset/, 2017. 
+  * [67] T.Â Brown, B.Â Mann, N.Â Ryder, M.Â Subbiah, J.Â D. Kaplan, P.Â Dhariwal, A.Â Neelakantan, P.Â Shyam, G.Â Sastry, A.Â Askell _etÂ al._ , â€œLanguage models are few-shot learners,â€ _Advances in neural information processing systems_ , vol.Â 33, pp. 1877â€“1901, 2020. 
+  * [68] D.Â Kingma and J.Â Ba, â€œAdam: A method for stochastic optimization,â€ in _International Conference on Learning Representations (ICLR)_ , San Diega, CA, USA, 2015. 
+  * [69] J.Â Ho and T.Â Salimans, â€œClassifier-free diffusion guidance,â€ in _NeurIPS 2021 Workshop on Deep Generative Models and Downstream Applications_ , 2021. 
+  * [70] A.Â Gui, H.Â Gamper, S.Â Braun, and D.Â Emmanouilidou, â€œAdapting frechet audio distance for generative music evaluation,â€ in _ICASSP 2024-2024 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)_.Â Â Â IEEE, 2024, pp. 1331â€“1335. 
+  * [71] A.Â DÃ©fossez, J.Â Copet, G.Â Synnaeve, and Y.Â Adi, â€œHigh fidelity neural audio compression,â€ _Transactions on Machine Learning Research_ , 2023. [Online]. Available: https://openreview.net/forum?id=ivCd8z8zR2
+  * [72] S.Â Hershey, S.Â Chaudhuri, D.Â P. Ellis, J.Â F. Gemmeke, A.Â Jansen, R.Â C. Moore, M.Â Plakal, D.Â Platt, R.Â A. Saurous, B.Â Seybold _etÂ al._ , â€œCnn architectures for large-scale audio classification,â€ in _2017 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)_.Â Â Â IEEE, 2017. 
+  * [73] S.Â Sarkar, E.Â Benetos, and M.Â Sandler, â€œEnsembleset: a new high quality synthesised dataset for chamber ensemble separation,â€ in _Ismir 2022 Hybrid Conference_ , 2022. 
+  * [74] D.Â Bogdanov, M.Â Won, P.Â Tovstogan, A.Â Porter, and X.Â Serra, â€œThe mtg-jamendo dataset for automatic music tagging,â€ in _Machine Learning for Music Discovery Workshop, International Conference on Machine Learning (ICML 2019)_ , Long Beach, CA, United States, 2019. [Online]. Available: http://hdl.handle.net/10230/42015

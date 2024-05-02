@@ -1,0 +1,314 @@
+  1. 1 Introduction
+  2. 2 Preserving Functionality in 3D Models
+  3. 3 Encoding Physical Functionality in Generative 3D Models
+  4. 4 Conclusion
+  5. 5 Acknowledgments
+
+License: CC BY 4.0
+
+arXiv:2404.10142v2 [cs.HC] 17 Apr 2024
+
+00footnotetext: Licensed under a Creative Commons Attribution 4.0
+International License (CC BY 4.0). Copyright remains with the author(s).
+
+# Shaping Realities: Enhancing 3D Generative AI with Fabrication Constraints
+
+Faraz Faruqi  ffaruqi@mit.edu MIT CSAILCambridgeMAUSA ,  Yingtao Tian
+alantian@google.com Google DeepMindTokyoJapan ,  Vrushank Phadnis
+vrushank@google.com Google ResearchMountain ViewCAUSA ,  Varun Jampani
+varunjampani@gmail.com Stability AICambridgeMAUSA and  Stefanie Mueller
+stefanie.mueller@mit.edu MIT CSAILCambridgeMAUSA
+
+###### Abstract.
+
+Generative AI tools are becoming more prevalent in 3D modeling, enabling users
+to manipulate or create new models with text or images as inputs. This makes
+it easier for users to rapidly customize and iterate on their 3D designs and
+explore new creative ideas. These methods focus on the aesthetic quality of
+the 3D models, refining them to look similar to the prompts provided by the
+user. However, when creating 3D models intended for fabrication, designers
+need to trade-off the aesthetic qualities of a 3D model with their intended
+physical properties. To be functional post-fabrication, 3D models have to
+satisfy structural constraints informed by physical principles. Currently,
+such requirements are not enforced by generative AI tools. This leads to the
+development of aesthetically appealing, but potentially non-functional 3D
+geometry, that would be hard to fabricate and use in the real world. This
+workshop paper highlights the limitations of generative AI tools in
+translating digital creations into the physical world and proposes new
+augmentations to generative AI tools for creating physically viable 3D models.
+We advocate for the development of tools that manipulate or generate 3D models
+by considering not only the aesthetic appearance but also using physical
+properties as constraints. This exploration seeks to bridge the gap between
+digital creativity and real-world applicability, extending the creative
+potential of generative AI into the tangible domain.
+
+generative AI; digital fabrication.
+
+††conference: ; ; ††ccs: Human-centered computing Human computer interaction
+(HCI) ![Refer to caption](extracted/5541356/Figures/main_figure_workshop.png)
+Figure 1. Using Generative AI for creating functional objects requires
+augmenting AI systems to preserve or encode functionality in 3D models. This
+will allow creators to generate personalized 3D models that not only have
+their desired aesthetic attributes but also their intended functionality.
+Here, we show some examples of open-sourced 3D models personalized with
+Generative AI while preserving their functionality and then 3D printed. (a) a
+drinks dispenser model styled as “made of vintage mosaic glass tiles”. (b) A
+vase styled as “a Terracotta vase”. (c) A personalized Thumb Splint styled
+like “a blue knitted sweater”. (d) A personalized AirPods cover “in the style
+of Moroccan Art”. (e) A functional whistle styled as “A beautiful whistle made
+of mahogany wood”.
+
+##  1\. Introduction
+
+Generative AI is a rapidly expanding field and is transforming content
+creation processes. Tools leveraging generative AI enable users to easily and
+rapidly produce content; learning from varied data types like text, images,
+sounds, and 3D models. With an initial prompt in the form of a text
+description (for instance, “a vase with colorful flowers”), or a seed image,
+the tool generates new content inspired by the training data. Innovative tools
+such as DALL-E (Ramesh et al., 2021), Stable-Diffusion (Rombach et al., 2022),
+Muse (Chang et al., 2023), Magenta DDSP (Engel et al., 2020), Get3D (Gao et
+al., 2022), Shap-E (Jun and Nichol, 2023), Magic3D (Lin et al., 2023) and
+Dream Gaussian (Tang et al., 2023) have facilitated the creation of new
+images, music, and high-resolution 3D models.
+
+Novel methods (Michel et al., 2022; Siddiqui et al., 2022; Jun and Nichol,
+2023; Tang et al., 2023) allow text and image-based manipulation of 3D models.
+This allows novice creators to explore open-source 3D models without
+necessitating learning complex 3D modeling techniques. However, these AI-
+driven co-creation tools are primarily oriented toward digital content
+creation. Their focus is on the tool’s aesthetic and reconstruction
+capability; as demonstrated by their optimization method that maximizes
+apparent visual quality. Translation of these digital designs into tangible
+and physical forms via fabrication (Baudisch et al., 2017; Hudson et al.,
+2016; Yildirim et al., 2020; Faruqi et al., 2021) remains an open problem.
+
+Designing 3D models for fabrication requires a trade-off between the aesthetic
+qualities of the design and its functional aspects. For example, designing a
+personalized thumb splint involves structural requirements such as ensuring
+rigidity for appropriate support for effective healing, or creating a movable
+lamp requires maintaining static equilibrium under various configurations.
+Expert designers optimize for both physical constraints and aesthetic goals
+while creating physically viable models. In digital fabrication, creators with
+little or no manufacturing experience often try to reuse previously shared
+designs on online platforms and send them for fabrication to a 3D printer
+(Kuznetsov and Paulos, 2010). However, during customization, its important to
+ensure the new design has the functional properties they expect from the
+model. Conventional structural analysis tools conduct tests such as Finite
+element analysis (FEA) to reveal how a customized version of a model could
+fail. However setting up a model for structural analysis requires expertise in
+software tools, knowledge of structural analysis principles, and high
+computational power. They pose a barrier for non-expert creators who do not
+have specialized knowledge of the underlying principles or know ways to fix
+the failure cases from the simulation.
+
+Researchers have proposed a variety of ways to highlight violations of
+functional properties to non-expert users (e.g., (Hofmann et al., 2018; Faruqi
+et al., 2023)). For instance, Style2Fab (Faruqi et al., 2023) maintains
+physical functionality by using generative AI and a functionality-aware
+segmentation method to stylize the aesthetic parts of models without modifying
+the functional parts. However, functionality cannot always be localized and
+modifications made for aesthetic reasons may reduce the overall structural
+integrity of the model. This complex relationship between form and function in
+a 3D model requires a holistic analysis of the impact of a generative method
+on the physical properties of the model.
+
+This workshop paper aims to propose ideas for how generative AI systems can be
+advanced to support the creation of objects that are not only visually
+compelling but also functionally viable in the physical world. We discuss this
+idea in two different sections: Preserving Functionality and Encoding
+Functionality. Preserving Functionality refers to how generative AI systems
+can be adapted to identify and preserve functional areas in a 3D model when
+manipulating aesthetic segments with text/image inputs. Encoding
+Functionality, on the other hand, refers to encoding new functionality into a
+generated 3D model. Here, we present ideas on how learnings from the previous
+step can be used to guide generative AI methods to incorporate functionality
+while generating 3D models from scratch. Finally, we discuss the potential
+implications of our proposed methods on creators, maker space communities, and
+product design.
+
+##  2\. Preserving Functionality in 3D Models
+
+A key challenge for many makers is modifying or ‘stylizing’ existing open-
+sourced designs shared in online repositories, such as Thingiverse (Buehler et
+al., 2015; Alcock et al., 2016). These platforms allow users to browse and
+download from a large repository of existing models, but customization is
+often constrained to a limited set of pre-defined parameters. Moreover, these
+repositories often contain exported formats (OBJ/STL), which are hard to
+manipulate semantically as compared to CAD formats. Researchers have proposed
+tools such as Attribit (Chaudhuri et al., 2013) and Meshmixer (Schmidt and
+Singh, 2010) which allow limited manipulation of models based on a
+preprocessed set of semantic attributes, and models. However, generative AI
+tools offer an alternative. Methods like Text2Mesh (Michel et al., 2022) and
+Texturify (Siddiqui et al., 2022) allow manipulation of 3D models with text
+and image prompts as input and create stylized versions of the original model.
+However, these methods manipulate the entire 3D model, maximizing the apparent
+visual quality of the model to the desired style.
+
+Beyond aesthetics, 3D printable models have functionality-motivated design
+parameters incorporated into the models. Editing such a design ad-hoc might
+compromise its functionality post-fabrication. Customization can be localized;
+however, that requires users to correctly identify and separate elements in a
+3D model that have functionality associated with them. This would be a
+daunting task for makers without structural and mechanical knowledge of how
+different elements in geometry interact. Style2Fab (Faruqi et al., 2023)
+presented an approach to augment this technique with automated identification
+of functional areas. This method segments a given model, identifies the
+functional areas, and then prevents any geometrical manipulations on these
+regions. This allows a user to manipulate the aesthetic regions of any model
+while preserving the functional regions. Some examples of objects created with
+this tool are shown in Figure 1.
+
+While this method is useful for separating functional regions, it leads to new
+open questions to answer:
+
+  1. (1)
+
+Identification of Functional Regions: Functionality is highly context
+dependent. Similar geometrical segments could have different functionalities
+depending on the overall geometry and use cases of the user. Thus, to identify
+functional segments for a particular use case, any automatic classification
+algorithm has to also consider the context of the model in addition to the
+geometrical features.
+
+  2. (2)
+
+Smart Manipulation of Functional Regions: Style2Fab considers all functional
+segments out of bounds for any manipulation. Doing so allows the user to
+retain the functionality, but also carries risks of over-constraining the
+design space exploration. For example, the flat base of a vase can be
+manipulated, as far as the resulting surface results in a stable vase.
+Extending current tools to be physics-aware can be helpful for a “smart”
+stylizing, which allows creators to manipulate 3D models safely while
+preserving the intended functionality.
+
+  3. (3)
+
+Relationship between Functional and Aesthetic Segments: By separating
+functional and aesthetic segments, prior methods assume that any manipulation
+of aesthetic segments pose no impact on the functional segments of the model.
+In an ideal setting, such an approach creates usable models, as the original
+functional segments are theoretically preserved. But in real-world scenarios,
+this assumption might not hold — In contrast, designers often co-edit the
+stylistic and structural aspects of a 3D model (Häggman et al., 2015). In the
+case of a thumb splint, a user can create a wearable splint by (1) preserving
+the inner section that makes contact with the skin, and (2) manipulating the
+external surface. However, the external and internal sections of the model are
+connected, hence manipulating one of them can easily reduce the structural
+strength of the model, creating a significantly weaker model.
+
+  4. (4)
+
+Material Specific Constraints: The stylizing and structural analysis of a
+model are bound by its material of construction. Yield strength, hardness, and
+corrosion resistance are among a few examples of material properties that have
+a direct bearing on selected stylizing approach. It remains an open problem to
+extend current tools to consider these properties while making geometric
+manipulations on the 3D model.
+
+##  3\. Encoding Physical Functionality in Generative 3D Models
+
+A critical aspect in the evolution of 3D modeling, especially within the
+context of generative AI, is encoding physical functionality into the
+generated designs. As AI-based tools are increasingly used for creating 3D
+models, a significant challenge emerges: ensuring that these models are not
+just visually appealing but also functionally viable when fabricated. The
+process involves integrating complex physical principles and material
+properties into the generative algorithms, which goes beyond the traditional
+focus on aesthetic design. Generative AI systems (Tsalicoglou et al., 2024;
+Tang et al., 2023) are typically adept at creating detailed and intricate
+designs. However, without the encoding of physical functionality, these
+designs may lack practical applicability, especially when subjected to
+specific loading conditions including static and dynamic forces, pressure, and
+other environmental factors. Addressing this challenge involves several key
+considerations:
+
+  1. (1)
+
+Incorporating Material Properties: Understanding and encoding the properties
+of different materials into AI models is crucial. Different materials have
+different physical properties like tensile strength, elasticity, and surface
+hardness which can significantly affect the functionality of the final printed
+object.
+
+  2. (2)
+
+Simulation and Testing within the AI Process: Integrating simulation tools
+into the generative process can help in predicting how a design will perform
+under various conditions. This could involve stress testing, thermal analysis,
+and other simulations to ensure that the generated model will function as
+intended.
+
+  3. (3)
+
+Complex Geometrical Considerations: The encoding process must also account for
+the geometrical complexities of the models. This includes ensuring that moving
+parts can operate without interference, that structures are stable and
+balanced, and that the overall design is optimized for the intended function.
+
+  4. (4)
+
+User-Centric Customization: The generative process should allow for
+customization based on user requirements, which could vary widely. For
+instance, a prosthetic limb generated by AI must be customizable to fit the
+unique anatomical features of its user while ensuring comfort and
+functionality.
+
+  5. (5)
+
+Feedback Loops for Continuous Improvement: Implementing feedback mechanisms
+within AI systems using physical testing can allow for the continuous
+refinement of models based on functional performance. This could involve real-
+world testing feedback being used to iteratively improve the design.
+
+The goal of encoding physical functionality in generative 3D models is to
+bridge the gap between aesthetically driven design and practical, real-world
+applicability. This approach not only enhances the usability of the generated
+models but also opens up new possibilities for innovation in various fields
+where functionality is at the core of the design process.
+
+##  4\. Conclusion
+
+This workshop paper highlights the research opportunities in extending 3D
+generative tools by integrating physical constraints into the process. Such
+systems will enable the creation of functional designs with generative AI,
+allowing creators to prototype creative ideas for objects they can fabricate.
+We describe two focus areas: Preserving Functionality, to maintain
+functionality when manipulating 3D models, and Encoding Functionality, to
+encode functionality along with aesthetics when creating 3D models from
+scratch. By developing generative AI tools that create objects with intended
+functionality and aesthetic attributes, this research would open new avenues
+for innovation in personal fabrication and product design.
+
+##  5\. Acknowledgments
+
+We thank the MIT-Google Program for Computing Innovation for their generous
+support. Furthermore, we thank Douglas Eck and Yuanzhen Li from Google for
+their support to this research.
+
+## References
+
+  * (1)
+  * Alcock et al. (2016) Celena Alcock, Nathaniel Hudson, and Parmit K. Chilana. 2016.  Barriers to Using, Customizing, and Printing 3D Designs on Thingiverse. In _Proceedings of the 2016 ACM International Conference on Supporting Group Work_ (Sanibel Island, Florida, USA) _(GROUP ’16)_. Association for Computing Machinery, New York, NY, USA, 195–199.  https://doi.org/10.1145/2957276.2957301
+  * Baudisch et al. (2017) Patrick Baudisch, Stefanie Mueller, et al. 2017\.  Personal fabrication.  _Foundations and Trends® in Human–Computer Interaction_ 10, 3–4 (2017), 165–293. 
+  * Buehler et al. (2015) Erin Buehler, Stacy Branham, Abdullah Ali, Jeremy J. Chang, Megan Kelly Hofmann, Amy Hurst, and Shaun K. Kane. 2015.  Sharing is Caring: Assistive Technology Designs on Thingiverse. In _Proceedings of the 33rd Annual ACM Conference on Human Factors in Computing Systems_ (Seoul, Republic of Korea) _(CHI ’15)_. Association for Computing Machinery, New York, NY, USA, 525–534.  https://doi.org/10.1145/2702123.2702525
+  * Chang et al. (2023) Huiwen Chang, Han Zhang, Jarred Barber, AJ Maschinot, Jose Lezama, Lu Jiang, Ming-Hsuan Yang, Kevin Murphy, William T Freeman, Michael Rubinstein, et al. 2023\.  Muse: Text-to-image generation via masked generative transformers.  _arXiv preprint arXiv:2301.00704_ (2023). 
+  * Chaudhuri et al. (2013) Siddhartha Chaudhuri, Evangelos Kalogerakis, Stephen Giguere, and Thomas Funkhouser. 2013.  Attribit: Content Creation with Semantic Attributes. In _Proceedings of the 26th Annual ACM Symposium on User Interface Software and Technology_ (St. Andrews, Scotland, United Kingdom) _(UIST ’13)_. Association for Computing Machinery, New York, NY, USA, 193–202.  https://doi.org/10.1145/2501988.2502008
+  * Engel et al. (2020) Jesse Engel, Lamtharn Hantrakul, Chenjie Gu, and Adam Roberts. 2020.  DDSP: Differentiable digital signal processing.  _arXiv preprint arXiv:2001.04643_ (2020). 
+  * Faruqi et al. (2021) Faraz Faruqi, Kenneth Friedman, Leon Cheng, Michael Wessely, Sriram Subramanian, and Stefanie Mueller. 2021.  SliceHub: Augmenting Shared 3D Model Repositories with Slicing Results for 3D Printing.  _arXiv preprint arXiv:2109.14722_ (2021). 
+  * Faruqi et al. (2023) Faraz Faruqi, Ahmed Katary, Tarik Hasic, Amira Abdel-Rahman, Nayeemur Rahman, Leandra Tejedor, Mackenzie Leake, Megan Hofmann, and Stefanie Mueller. 2023.  Style2Fab: Functionality-Aware Segmentation for Fabricating Personalized 3D Models with Generative AI. In _Proceedings of the 36th Annual ACM Symposium on User Interface Software and Technology_. 1–13. 
+  * Gao et al. (2022) Jun Gao, Tianchang Shen, Zian Wang, Wenzheng Chen, Kangxue Yin, Daiqing Li, Or Litany, Zan Gojcic, and Sanja Fidler. 2022.  GET3D: A Generative Model of High Quality 3D Textured Shapes Learned from Images. In _Advances In Neural Information Processing Systems_. 
+  * Hofmann et al. (2018) Megan Hofmann, Gabriella Hann, Scott E. Hudson, and Jennifer Mankoff. 2018.  Greater than the Sum of Its PARTs: Expressing and Reusing Design Intent in 3D Models. In _Proceedings of the 2018 CHI Conference on Human Factors in Computing Systems_ (Montreal QC, Canada) _(CHI ’18)_. Association for Computing Machinery, New York, NY, USA, 1–12.  https://doi.org/10.1145/3173574.3173875
+  * Hudson et al. (2016) Nathaniel Hudson, Celena Alcock, and Parmit K. Chilana. 2016.  Understanding Newcomers to 3D Printing: Motivations, Workflows, and Barriers of Casual Makers. In _Proceedings of the 2016 CHI Conference on Human Factors in Computing Systems_ (San Jose, California, USA) _(CHI ’16)_. Association for Computing Machinery, New York, NY, USA, 384–396.  https://doi.org/10.1145/2858036.2858266
+  * Häggman et al. (2015) Anders Häggman, Geoff Tsai, Catherine Elsen, Tomonori Honda, and Maria C. Yang. 2015.  Connections Between the Design Tool, Design Attributes, and User Preferences in Early Stage Design.  _Journal of Mechanical Design_ 137, 7 (07 2015), 071408.  https://doi.org/10.1115/1.4030181 arXiv:https://asmedigitalcollection.asme.org/mechanicaldesign/article-pdf/137/7/071408/6227052/md_137_07_071408.pdf 
+  * Jun and Nichol (2023) Heewoo Jun and Alex Nichol. 2023.  Shap-e: Generating conditional 3d implicit functions.  _arXiv preprint arXiv:2305.02463_ (2023). 
+  * Kuznetsov and Paulos (2010) Stacey Kuznetsov and Eric Paulos. 2010.  Rise of the Expert Amateur: DIY Projects, Communities, and Cultures. In _Proceedings of the 6th Nordic Conference on Human-Computer Interaction: Extending Boundaries_ _(NordiCHI ’10)_. ACM, 295–304.  https://doi.org/10.1145/1868914.1868950
+  * Lin et al. (2023) Chen-Hsuan Lin, Jun Gao, Luming Tang, Towaki Takikawa, Xiaohui Zeng, Xun Huang, Karsten Kreis, Sanja Fidler, Ming-Yu Liu, and Tsung-Yi Lin. 2023.  Magic3d: High-resolution text-to-3d content creation. In _Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition_. 300–309. 
+  * Michel et al. (2022) Oscar Michel, Roi Bar-On, Richard Liu, Sagie Benaim, and Rana Hanocka. 2022.  Text2mesh: Text-driven neural stylization for meshes. In _Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition_. 13492–13502. 
+  * Ramesh et al. (2021) Aditya Ramesh, Mikhail Pavlov, Gabriel Goh, Scott Gray, Chelsea Voss, Alec Radford, Mark Chen, and Ilya Sutskever. 2021.  Zero-shot text-to-image generation. In _International Conference on Machine Learning_. PMLR, 8821–8831. 
+  * Rombach et al. (2022) Robin Rombach, Andreas Blattmann, Dominik Lorenz, Patrick Esser, and Björn Ommer. 2022.  High-resolution image synthesis with latent diffusion models. In _Proceedings of the IEEE/CVF conference on computer vision and pattern recognition_. 10684–10695. 
+  * Schmidt and Singh (2010) Ryan Schmidt and Karan Singh. 2010.  Meshmixer: An Interface for Rapid Mesh Composition.  In _ACM SIGGRAPH 2010 Talks_. Association for Computing Machinery, New York, NY, USA.  https://doi.org/10.1145/1837026.1837034
+  * Siddiqui et al. (2022) Yawar Siddiqui, Justus Thies, Fangchang Ma, Qi Shan, Matthias Nießner, and Angela Dai. 2022.  Texturify: Generating Textures on 3D Shape Surfaces.  _SpringerLink_ (Nov. 2022), 72–88.  https://doi.org/10.1007/978-3-031-20062-5_5
+  * Tang et al. (2023) Jiaxiang Tang, Jiawei Ren, Hang Zhou, Ziwei Liu, and Gang Zeng. 2023.  Dreamgaussian: Generative gaussian splatting for efficient 3d content creation.  _arXiv preprint arXiv:2309.16653_ (2023). 
+  * Tsalicoglou et al. (2024) Christina Tsalicoglou, Fabian Manhardt, Alessio Tonioni, Michael Niemeyer, and Federico Tombari. 2024.  TextMesh: Generation of Realistic 3D Meshes From Text Prompts. In _International conference on 3D vision (3DV)_. 
+  * Yildirim et al. (2020) Nur Yildirim, James McCann, and John Zimmerman. 2020.  Digital Fabrication Tools at Work: Probing Professionals’ Current Needs and Desired Futures. In _Proceedings of the 2020 CHI Conference on Human Factors in Computing Systems_ (Honolulu, HI, USA) _(CHI ’20)_. Association for Computing Machinery, New York, NY, USA, 1–13.  https://doi.org/10.1145/3313831.3376621

@@ -1,0 +1,1254 @@
+  1. I Introduction
+  2. II Main results
+    1. II.1 Non-stationary ESP
+    2. II.2 Subspace and subset non-stationary ESP
+    3. II.3 Non-stationary ESP of QRC
+      1. II.3.1 ESP and non-stationary ESP
+      2. II.3.2 NARMA tasks
+      3. II.3.3 MC and IPC
+    4. II.4 Subset non-stationary ESP of QRC
+      1. II.4.1 Subset ESP and subset non-stationary ESP
+      2. II.4.2 NARMA tasks, MC and IPC
+  3. III Conclusion
+  4. IV Acknowledgments
+  5. A Equivalence of ESP definitions
+
+HTML conversions sometimes display errors due to content that did not convert
+correctly from the source. This paper uses the following packages that are not
+yet supported by the HTML conversion tool. Feedback on these issues are not
+necessary; they are known and are being worked on.
+
+  * failed: qcircuit
+  * failed: bxcjkjatype
+
+Authors: achieve the best HTML results from your LaTeX submissions by
+following these best practices.
+
+License: arXiv.org perpetual non-exclusive license
+
+arXiv:2403.02686v4 [quant-ph] 17 Apr 2024
+
+fourierlargesymbols147 â€ â€ thanks: Present address for Q. H. Tran: Quantum
+Laboratory, Fujitsu Research, Fujitsu Limited
+
+# Hierarchy of the echo state property in quantum reservoir computing
+
+Shumpei Kobayashi  Department of Creative Informatics, The University of
+Tokyo, Japan  â€ƒâ€ƒ Quoc Hoan Tran  Next Generation Artificial Intelligence
+Research Center (AI Center), The University of Tokyo, Japan  â€ƒâ€ƒ Kohei
+Nakajima  Department of Creative Informatics, The University of Tokyo, Japan
+Next Generation Artificial Intelligence Research Center (AI Center), The
+University of Tokyo, Japan  Department of Mechano-Informatics, The University
+of Tokyo, Japan
+
+(April 17, 2024)
+
+###### Abstract
+
+The echo state property (ESP) represents a fundamental concept in the
+reservoir computing (RC) framework that ensures output-only training of
+reservoir networks by being agnostic to the initial states and far past
+inputs. However, the traditional definition of ESP does not describe possible
+non-stationary systems in which statistical properties evolve. To address this
+issue, we introduce two new categories of ESP: non-stationary ESP, designed
+for potentially non-stationary systems, and subspace/subset ESP, designed for
+systems whose subsystems have ESP. Following the definitions, we numerically
+demonstrate the correspondence between non-stationary ESP in the quantum
+reservoir computer (QRC) framework with typical Hamiltonian dynamics and input
+encoding methods using non-linear autoregressive moving-average (NARMA) tasks.
+We also confirm the correspondence by computing linear/non-linear memory
+capacities that quantify input-dependent components within reservoir states.
+Our study presents a new understanding of the practical design of QRC and
+other possibly non-stationary RC systems in which non-stationary systems and
+subsystems are exploited.
+
+##  I Introduction
+
+Physical reservoir computing (PRC) [1, 2, 3], which utilizes non-linear
+natural dynamics of physical substrate for temporal information processing,
+has garnered much attention. It is seen as a way to mitigate the massive
+computational resource needs of sophisticated machine learning methods, such
+as deep learning. However, not all physical systems are effective as reservoir
+substrates due to potential initial-state sensitivity in their natural
+dynamics, such as in chaotic systems. One precondition for excluding such
+systems is the echo state property (ESP), which requires the initial-state
+dependency to diminish over time [4, 5].
+
+The current state of quantum computing is based on noisy intermediate-scale
+quantum (NISQ) [6] technology, which represents non-fault-tolerant and small
+to medium-sized quantum computer environments. In the NISQ era, non-universal
+quantum computation schemes gained much attention because of their near-term
+feasibility on physical devices. Such computational procedures include, for
+instance, variational quantum computation (VQC) [7, 8] and quantum reservoir
+computing (QRC) [9, 10]. VQC and QRC apply to one-shot and autoregressive
+quantum machine learning algorithms, which have also become a general
+prospective application of quantum computation.
+
+QRC can also be understood as a specific type of PRC that uses a quantum
+system as its physical reservoir. It has recently been shown to be capable of
+implementing temporal quantum tomography [11], predicting large-scale
+spatiotemporal chaos [12], and emulating functions requiring both classical
+and quantum inputs simultaneously with a single quantum reservoir [13]. Other
+works on QRC include proposals of QRC in various physical apparatus [14, 15,
+16, 17, 18, 19], with some performing actual physical experiments [14, 16,
+19], and theoretical analyses [20]. Specifically, some works [16, 21, 22, 23,
+24] focus on the dissipative nature of the natural quantum system to find a
+relationship between the existence of dissipation and the trainability of QRC.
+Kubota et al. [23] analyzed the behavior of QRC driven by natural noise in
+quantum processing units. Additionally, the work in [20] expands on this
+research direction by describing ESP from the perspective of a time-
+independent filter and dynamical systems, which the authorâ€™s term state
+affine systems.
+
+![Refer to caption](extracted/5542156/figures/esp-hierarchy-color.png)  
+Figure 1: Inclusion relationship of traditional ESP and the ESP defined in
+this paper. NS stands for non-stationary, SS stands for subset and SSP stands
+for subspace ESP, respectively.
+
+Quantum systems have been attracting attention as promising substrates for
+PRC. However, quantum systems, in general, are not always stationary, and in
+some cases, the traditional definition of ESP does not adequately ensure their
+capability for temporal information processing. In this paper, we define and
+analyze new conditions that secure such a possibly non-stationary system to
+function effectively as a practical reservoir.
+
+In this paper, we define a two extensions of traditional ESP. One extension is
+non-stationary ESP, which requires finite variance output signals relative to
+initial-state difference decay. Another extension is subset/subspace non-
+stationary ESP, which focuses on a situation in which a part of the system has
+a non-stationary ESP, leaving the entire system possibly initial-state
+dependent. Our analysis includes a numerical study of non-stationary ESP and
+subset non-stationary ESP in a typical QRC setup with a specific type of
+Hamiltonian system.
+
+We have made the following contributions:
+
+  * â€¢
+
+Defined non-stationary and subspace/subset versions of ESP, which could be
+practical for QRC and other non-conventional systems.
+
+  * â€¢
+
+Showed a relationship between non-stationary ESP and the information
+processing capability of QRC using numerical experiments.
+
+##  II Main results
+
+###  II.1 Non-stationary ESP
+
+First, we present the definition of traditional ESP, which has been used
+extensively in the RC context.
+
+######  Definition II.1.
+
+Echo state property [4, 5]
+
+Let a system state space be ğ’®ğ’®\mathcal{S}caligraphic_S, an input space be
+ğ’³ğ’³\mathcal{X}caligraphic_X, and a set of time indexes be
+ğ’¯ğ’¯\mathcal{T}caligraphic_T. For an input-driven dynamical system with
+dynamical map st=fâ¢({ğ®Ï„}Ï„<t;s0)subscriptğ‘
+ğ‘¡ğ‘“subscriptsubscriptğ®ğœğœğ‘¡subscriptğ‘
+0s_{t}=f(\\{\mathbf{u}_{\tau}\\}_{\tau<t};s_{0})italic_s start_POSTSUBSCRIPT
+italic_t end_POSTSUBSCRIPT = italic_f ( { bold_u start_POSTSUBSCRIPT italic_Ï„
+end_POSTSUBSCRIPT } start_POSTSUBSCRIPT italic_Ï„ < italic_t end_POSTSUBSCRIPT
+; italic_s start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT ) such that
+f:ğ’³ğ’¯Ã—ğ’®â†’ğ’®:ğ‘“â†’superscriptğ’³ğ’¯ğ’®ğ’®f:\mathcal{X}^{\mathcal{T}}\times\mathcal{S}\to\mathcal{S}italic_f
+: caligraphic_X start_POSTSUPERSCRIPT caligraphic_T end_POSTSUPERSCRIPT Ã—
+caligraphic_S â†’ caligraphic_S, where s0subscriptğ‘ 0s_{0}italic_s
+start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT is the initial state and
+{ğ®Ï„}subscriptğ®ğœ\\{\mathbf{u}_{\tau}\\}{ bold_u start_POSTSUBSCRIPT
+italic_Ï„ end_POSTSUBSCRIPT } is a sequence of inputs indexed by time
+Ï„ğœ\tauitalic_Ï„, the ESP holds if and only if
+
+| âˆ€{ğ®Ï„},for-allsubscriptğ®ğœ\displaystyle\forall\\{\mathbf{u}_{\tau}\\},\ âˆ€ { bold_u start_POSTSUBSCRIPT italic_Ï„ end_POSTSUBSCRIPT } , | âˆ€(s0,s0â€²),for-allsubscriptğ‘ 0superscriptsubscriptğ‘ 0â€²\displaystyle\forall(s_{0},s_{0}^{\prime}),âˆ€ ( italic_s start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT , italic_s start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT ) , |  | (1)  
+---|---|---|---|---  
+|  | â€–fâ¢({ğ®Ï„}Ï„â‰¤t;s0)âˆ’fâ¢({ğ®Ï„}Ï„â‰¤t;s0â€²)â€–â¢â†’tâ†’âˆâ¢0.normğ‘“subscriptsubscriptğ®ğœğœğ‘¡subscriptğ‘ 0ğ‘“subscriptsubscriptğ®ğœğœğ‘¡superscriptsubscriptğ‘ 0â€²â†’ğ‘¡â†’0\displaystyle\|f(\\{\mathbf{u}_{\tau}\\}_{\tau\leq t};s_{0})-f(\\{\mathbf{u}_{% \tau}\\}_{\tau\leq t};s_{0}^{\prime})\|\underset{t\to\infty}{\to}0.âˆ¥ italic_f ( { bold_u start_POSTSUBSCRIPT italic_Ï„ end_POSTSUBSCRIPT } start_POSTSUBSCRIPT italic_Ï„ â‰¤ italic_t end_POSTSUBSCRIPT ; italic_s start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT ) - italic_f ( { bold_u start_POSTSUBSCRIPT italic_Ï„ end_POSTSUBSCRIPT } start_POSTSUBSCRIPT italic_Ï„ â‰¤ italic_t end_POSTSUBSCRIPT ; italic_s start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT ) âˆ¥ start_UNDERACCENT italic_t â†’ âˆ end_UNDERACCENT start_ARG â†’ end_ARG 0 . |   
+  
+We argue that this ESP definition by state difference decay is general in that
+all known definitions of ESP are equivalent to this form. For further
+discussion, please refer to Appendix.Â A.
+
+ESP is supposed to work on stationary systems. However, a quantum system, for
+instance, is not always stationary even if the system state does not
+explicitly depend on time. A trivial example is the case in which a Pauli
+noise exists. Let us depict an example where uniform depolarization of rate
+Ïµitalic-Ïµ\epsilonitalic_Ïµ exists. When the depolarization is the only noise
+that exists in the system, the norm of the system state ÏğœŒ\rhoitalic_Ï is
+measured using the trace norm; Dâ¢(Ï,I)ğ·ğœŒğ¼D(\rho,I)italic_D ( italic_Ï ,
+italic_I ) vanishes when tâ†’âˆâ†’ğ‘¡t\to\inftyitalic_t â†’ âˆ, namely,
+Dâ¢(Ï,I)âˆ(1âˆ’Ïµ)tproportional-toğ·ğœŒğ¼superscript1italic-
+Ïµğ‘¡D(\rho,I)\propto(1-\epsilon)^{t}italic_D ( italic_Ï , italic_I ) âˆ ( 1 -
+italic_Ïµ ) start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT.
+
+In this case, ESP does not mean fading memory because the state difference
+â€–fâ¢({ğ®Ï„}Ï„â‰¤t;s0)âˆ’fâ¢({ğ®Ï„}Ï„â‰¤t;s0â€²)â€–normğ‘“subscriptsubscriptğ®ğœğœğ‘¡subscriptğ‘
+0ğ‘“subscriptsubscriptğ®ğœğœğ‘¡superscriptsubscriptğ‘
+0â€²\|f(\\{\mathbf{u}_{\tau}\\}_{\tau\leq
+t};s_{0})-f(\\{\mathbf{u}_{\tau}\\}_{\tau% \leq t};s_{0}^{\prime})\|âˆ¥
+italic_f ( { bold_u start_POSTSUBSCRIPT italic_Ï„ end_POSTSUBSCRIPT }
+start_POSTSUBSCRIPT italic_Ï„ â‰¤ italic_t end_POSTSUBSCRIPT ; italic_s
+start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT ) - italic_f ( { bold_u
+start_POSTSUBSCRIPT italic_Ï„ end_POSTSUBSCRIPT } start_POSTSUBSCRIPT
+italic_Ï„ â‰¤ italic_t end_POSTSUBSCRIPT ; italic_s start_POSTSUBSCRIPT 0
+end_POSTSUBSCRIPT start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT ) âˆ¥ relative
+to
+â€–fâ¢({ğ®Ï„}Ï„â‰¤t;s0â€²)â€–normğ‘“subscriptsubscriptğ®ğœğœğ‘¡superscriptsubscriptğ‘
+0â€²\|f(\\{\mathbf{u}_{\tau}\\}_{\tau\leq t};s_{0}^{\prime})\|âˆ¥ italic_f ( {
+bold_u start_POSTSUBSCRIPT italic_Ï„ end_POSTSUBSCRIPT } start_POSTSUBSCRIPT
+italic_Ï„ â‰¤ italic_t end_POSTSUBSCRIPT ; italic_s start_POSTSUBSCRIPT 0
+end_POSTSUBSCRIPT start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT ) âˆ¥ does not
+change. In our analysis, we propoesed the following modified definition of ESP
+to handle such a non-stationary system.
+
+######  Definition II.2.
+
+Non-stationary ESP (NS-ESP)
+
+![Refer to caption](extracted/5542156/figures/non-stationary-esp.png) ((a))
+Non-stationary ESP
+
+![Refer to caption](extracted/5542156/figures/not-non-stationary-esp.png)
+((b)) Traditional ESP with input-invariant fixed point
+
+Figure 2: Schematics of two types of ESPs. State space is illustrated as a
+circle, and different states are illustrated as red arrows. (a) Non-stationary
+ESP. State difference decays, but the state space remains finite. (b) With
+traditional ESP but not with the non-stationary ESP. The state difference
+decays as fast as the state decay. Schematics show representative cases where
+two states compared in ESP calculation are on the same shrinking state space
+for simplicity.
+
+Given system dynamics
+f:ğ’³ğ’¯Ã—ğ’®â†’ğ’®:ğ‘“â†’superscriptğ’³ğ’¯ğ’®ğ’®f:\mathcal{X}^{\mathcal{T}}\times\mathcal{S}\to\mathcal{S}italic_f
+: caligraphic_X start_POSTSUPERSCRIPT caligraphic_T end_POSTSUPERSCRIPT Ã—
+caligraphic_S â†’ caligraphic_S, where ğ’®ğ’®\mathcal{S}caligraphic_S is
+bounded, fğ‘“fitalic_f has non-stationary ESP if the following condition
+holds:
+
+|  | âˆ€{ğ®Ï„},âˆ€(s0,s0â€²),âˆƒwâˆˆâ„•<+âˆâ¢Â s.t.for-allsubscriptğ®ğœfor-allsubscriptğ‘ 0superscriptsubscriptğ‘ 0â€²ğ‘¤â„•Â s.t.\displaystyle\forall\\{\mathbf{u}_{\tau}\\},\ \forall(s_{0},s_{0}^{\prime}),\ % \exists w\in\mathbb{N}<+\infty\text{ s.t. }âˆ€ { bold_u start_POSTSUBSCRIPT italic_Ï„ end_POSTSUBSCRIPT } , âˆ€ ( italic_s start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT , italic_s start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT ) , âˆƒ italic_w âˆˆ blackboard_N < \+ âˆ s.t. |  | (2)  
+---|---|---|---|---  
+|  | lim inftâ†’âˆâ¢[Varwtâ¢({ğ®Ï„})]>0â‡’â†’ğ‘¡limit-infimumdelimited-[]superscriptsubscriptVarğ‘¤ğ‘¡subscriptğ®ğœ0â‡’absent\displaystyle\quad\underset{t\to\infty}{\liminf}\left[\mathrm{Var}_{w}^{t}(\\{% \mathbf{u}_{\tau}\\})\right]>0\Rightarrowstart_UNDERACCENT italic_t â†’ âˆ end_UNDERACCENT start_ARG lim inf end_ARG [ roman_Var start_POSTSUBSCRIPT italic_w end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT ( { bold_u start_POSTSUBSCRIPT italic_Ï„ end_POSTSUBSCRIPT } ) ] > 0 â‡’ |   
+|  | â€–fâ¢({ğ®Ï„}Ï„â‰¤t;s0)âˆ’fâ¢({ğ®Ï„}Ï„â‰¤t;s0â€²)â€–minâ¡[VarÂ¯wtâ¢(f;s0),VarÂ¯wtâ¢(f;s0â€²)]â¢â†’tâ†’âˆâ¢0,normğ‘“subscriptsubscriptğ®ğœğœğ‘¡subscriptğ‘ 0ğ‘“subscriptsubscriptğ®ğœğœğ‘¡superscriptsubscriptğ‘ 0â€²superscriptsubscriptÂ¯Varğ‘¤ğ‘¡ğ‘“subscriptğ‘ 0superscriptsubscriptÂ¯Varğ‘¤ğ‘¡ğ‘“subscriptsuperscriptğ‘ â€²0â†’ğ‘¡â†’0\displaystyle\frac{\|f(\\{\mathbf{u}_{\tau}\\}_{\tau\leq t};s_{0})-f(\\{\mathbf{u% }_{\tau}\\}_{\tau\leq t};s_{0}^{\prime})\|}{\sqrt{\min\left[\overline{\mathrm{% Var}}_{w}^{t}(f;s_{0}),\overline{\mathrm{Var}}_{w}^{t}(f;s^{\prime}_{0})\right% ]}}\underset{t\to\infty}{\to}0,divide start_ARG âˆ¥ italic_f ( { bold_u start_POSTSUBSCRIPT italic_Ï„ end_POSTSUBSCRIPT } start_POSTSUBSCRIPT italic_Ï„ â‰¤ italic_t end_POSTSUBSCRIPT ; italic_s start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT ) - italic_f ( { bold_u start_POSTSUBSCRIPT italic_Ï„ end_POSTSUBSCRIPT } start_POSTSUBSCRIPT italic_Ï„ â‰¤ italic_t end_POSTSUBSCRIPT ; italic_s start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT ) âˆ¥ end_ARG start_ARG square-root start_ARG roman_min [ overÂ¯ start_ARG roman_Var end_ARG start_POSTSUBSCRIPT italic_w end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT ( italic_f ; italic_s start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT ) , overÂ¯ start_ARG roman_Var end_ARG start_POSTSUBSCRIPT italic_w end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT ( italic_f ; italic_s start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT ) ] end_ARG end_ARG start_UNDERACCENT italic_t â†’ âˆ end_UNDERACCENT start_ARG â†’ end_ARG 0 , |   
+  
+where
+
+| Ewtâ¢({ğ®Ï„})superscriptsubscriptEğ‘¤ğ‘¡subscriptğ®ğœ\displaystyle\mathrm{E}_{w}^{t}(\\{\mathbf{u}_{\tau}\\})roman_E start_POSTSUBSCRIPT italic_w end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT ( { bold_u start_POSTSUBSCRIPT italic_Ï„ end_POSTSUBSCRIPT } ) | â‰¡1wâ¢âˆ‘k=0wâˆ’1ğ®tâˆ’kabsent1ğ‘¤superscriptsubscriptğ‘˜0ğ‘¤1subscriptğ®ğ‘¡ğ‘˜\displaystyle\equiv\frac{1}{w}\sum_{k=0}^{w-1}\mathbf{u}_{t-k}â‰¡ divide start_ARG 1 end_ARG start_ARG italic_w end_ARG âˆ‘ start_POSTSUBSCRIPT italic_k = 0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_w - 1 end_POSTSUPERSCRIPT bold_u start_POSTSUBSCRIPT italic_t - italic_k end_POSTSUBSCRIPT |  | (3)  
+---|---|---|---|---  
+| Varwtâ¢({ğ®Ï„})superscriptsubscriptVarğ‘¤ğ‘¡subscriptğ®ğœ\displaystyle\mathrm{Var}_{w}^{t}(\\{\mathbf{u}_{\tau}\\})roman_Var start_POSTSUBSCRIPT italic_w end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT ( { bold_u start_POSTSUBSCRIPT italic_Ï„ end_POSTSUBSCRIPT } ) | â‰¡Ewtâ¢({â€–ğ®Ï„âˆ’Ewtâ¢({ğ®Ï„})â€–2})absentsuperscriptsubscriptEğ‘¤ğ‘¡superscriptnormsubscriptğ®ğœsuperscriptsubscriptEğ‘¤ğ‘¡subscriptğ®ğœ2\displaystyle\equiv{\mathrm{E}}_{w}^{t}\left(\\{\|\mathbf{u}_{\tau}-\mathrm{E}_% {w}^{t}(\\{\mathbf{u}_{\tau}\\})\|^{2}\\}\right)â‰¡ roman_E start_POSTSUBSCRIPT italic_w end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT ( { âˆ¥ bold_u start_POSTSUBSCRIPT italic_Ï„ end_POSTSUBSCRIPT - roman_E start_POSTSUBSCRIPT italic_w end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT ( { bold_u start_POSTSUBSCRIPT italic_Ï„ end_POSTSUBSCRIPT } ) âˆ¥ start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT } ) |   
+| EÂ¯wtâ¢(f;s0)superscriptsubscriptÂ¯Eğ‘¤ğ‘¡ğ‘“subscriptğ‘ 0\displaystyle\overline{\mathrm{E}}_{w}^{t}(f;s_{0})overÂ¯ start_ARG roman_E end_ARG start_POSTSUBSCRIPT italic_w end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT ( italic_f ; italic_s start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT ) | â‰¡1wâ¢âˆ‘k=0wâˆ’1fâ¢({ğ®Ï„}Ï„â‰¤tâˆ’k;s0)absent1ğ‘¤superscriptsubscriptğ‘˜0ğ‘¤1ğ‘“subscriptsubscriptğ®ğœğœğ‘¡ğ‘˜subscriptğ‘ 0\displaystyle\equiv\frac{1}{w}\sum_{k=0}^{w-1}f(\\{\mathbf{u}_{\tau}\\}_{\tau% \leq t-k};s_{0})â‰¡ divide start_ARG 1 end_ARG start_ARG italic_w end_ARG âˆ‘ start_POSTSUBSCRIPT italic_k = 0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_w - 1 end_POSTSUPERSCRIPT italic_f ( { bold_u start_POSTSUBSCRIPT italic_Ï„ end_POSTSUBSCRIPT } start_POSTSUBSCRIPT italic_Ï„ â‰¤ italic_t - italic_k end_POSTSUBSCRIPT ; italic_s start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT ) |   
+| VarÂ¯wtâ¢(f;s0)superscriptsubscriptÂ¯Varğ‘¤ğ‘¡ğ‘“subscriptğ‘ 0\displaystyle\overline{\mathrm{Var}}_{w}^{t}(f;s_{0})overÂ¯ start_ARG roman_Var end_ARG start_POSTSUBSCRIPT italic_w end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT ( italic_f ; italic_s start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT ) | â‰¡EÂ¯wtâ¢(â€–fâˆ’EÂ¯wtâ¢(f,s0)â€–2;s0).absentsuperscriptsubscriptÂ¯Eğ‘¤ğ‘¡superscriptnormğ‘“superscriptsubscriptÂ¯Eğ‘¤ğ‘¡ğ‘“subscriptğ‘ 02subscriptğ‘ 0\displaystyle\equiv\overline{\mathrm{E}}_{w}^{t}\left(\|f-\overline{\mathrm{E}% }_{w}^{t}(f,s_{0})\|^{2};s_{0}\right).â‰¡ overÂ¯ start_ARG roman_E end_ARG start_POSTSUBSCRIPT italic_w end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT ( âˆ¥ italic_f - overÂ¯ start_ARG roman_E end_ARG start_POSTSUBSCRIPT italic_w end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT ( italic_f , italic_s start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT ) âˆ¥ start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT ; italic_s start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT ) . |   
+  
+The normalizing part on the denominator causes a non-stationary system, such
+as one with a strong depolarizing channel, to not satisfy the condition.
+Additionally, it follows that if non-stationary ESP holds, then ESP holds.
+
+In stationary systems, satisfying non-stationary ESP excludes trivial
+scenarios in which constant output signals are observed. Additionally, in non-
+stationary systems, we expect output signals to be utilized in temporal
+information processing tasks under suitable post-processing, given that non-
+stationary ESP is satisfied. The expected scenarios for non-stationary cases
+include the following:
+
+  1. 1.
+
+Suppose the state space itself shrinks, yet state difference shrinks faster
+than space itself. In this case, appropriately scaling up the states based on
+the input step cycle will generate a traditional ESP-compatible state
+sequence.
+
+  2. 2.
+
+Suppose the state space size and the state difference diverge, yet the state
+difference diverges slower than the state space itself. In this case,
+appropriately scaling down the states based on the input step cycle will
+generate a traditional ESP-compatible state sequence.
+
+  3. 3.
+
+Suppose the stateâ€™s mean monotonically varies, and non-stationary ESP holds.
+In this case, appropriately shifting the states based on the input step cycle
+will generate a traditional ESP-compatible state sequence.
+
+Overall, we expect the definition of non-stationary ESP to cover a more
+prominent family of dynamical systems that may have information processing
+capability.
+
+###  II.2 Subspace and subset non-stationary ESP
+
+![Refer to caption](extracted/5542156/figures/subspace-esp.png) ((a)) Subspace
+ESP
+
+![Refer to caption](extracted/5542156/figures/subset-esp.png) ((b)) Subset ESP
+
+Figure 3: (a) In the subspace ESP, the full state space ğ’®ğ’®\mathcal{S}caligraphic_S has an invariant subspace ğ’®â€²âŠ†ğ’®superscriptğ’®â€²ğ’®\mathcal{S^{\prime}}\subseteq\mathcal{S}caligraphic_S start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT âŠ† caligraphic_S under the input-driven system dynamics fğ‘“fitalic_f. Furthermore, ğ’®â€²superscriptğ’®â€²\mathcal{S^{\prime}}caligraphic_S start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT satisfies non-stationary ESP under f|ğ’®â€²evaluated-atğ‘“superscriptğ’®â€²f|_{\mathcal{S^{\prime}}}italic_f | start_POSTSUBSCRIPT caligraphic_S start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT end_POSTSUBSCRIPT. (b) In the subset ESP, a limited set of vector elements of each state sâˆˆğ’®ğ‘ ğ’®s\in\mathcal{S}italic_s âˆˆ caligraphic_S has ESP.
+
+In the RC setup, we can post-process output signals from the reservoir. Simple
+post-processing methods include linear transformation and subset selection.
+Here, subset selection denotes the selection of mâ‰¤nğ‘šğ‘›m\leq nitalic_m â‰¤
+italic_n elements from the system output
+xâˆˆâ„nğ‘¥superscriptâ„ğ‘›x\in\mathbb{R}^{n}italic_x âˆˆ blackboard_R
+start_POSTSUPERSCRIPT italic_n end_POSTSUPERSCRIPT.
+
+For instance, if an invariant subspace of the input-driven dynamics exists,
+and that subsystem holds non-stationary ESP, then it can obtain non-stationary
+ESP-compatible output signals by post-projecting the outputs to that invariant
+subspace. In other words, if the system dynamics has a disjoint structure
+among its elements and a non-stationary ESP-compatible subset of the outputs
+exists, we can post-restrict them to that subset to obtain non-stationary ESP-
+compatible output signals.
+
+Following the observation above, we formally define a weak version of non-
+stationary ESP to preclude a situation where only a part of the system is
+initial-state dependent.
+
+The subspace non-stationary ESP holds if one or more linear system subspaces,
+including the trivial subspace, have non-stationary ESP.
+
+######  Definition II.3.
+
+Subspace non-stationary ESP
+
+Given system dynamics
+f:ğ’³ğ’¯Ã—ğ’®â†’ğ’®:ğ‘“â†’superscriptğ’³ğ’¯ğ’®ğ’®f:\mathcal{X}^{\mathcal{T}}\times\mathcal{S}\to\mathcal{S}italic_f
+: caligraphic_X start_POSTSUPERSCRIPT caligraphic_T end_POSTSUPERSCRIPT Ã—
+caligraphic_S â†’ caligraphic_S, where ğ’®ğ’®\mathcal{S}caligraphic_S is
+bounded, fğ‘“fitalic_f has subspace non-stationary ESP if there exists a
+transformation
+â„™:ğ’®â†’ğ’®â€²:â„™â†’ğ’®superscriptğ’®â€²\mathbb{P}:\mathcal{S}\to\mathcal{S}^{\prime}blackboard_P
+: caligraphic_S â†’ caligraphic_S start_POSTSUPERSCRIPT â€²
+end_POSTSUPERSCRIPT such that
+ğ’®â€²âŠ†ğ’®superscriptğ’®â€²ğ’®\mathcal{S^{\prime}}\subseteq\mathcal{S}caligraphic_S
+start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT âŠ† caligraphic_S and
+â„™âˆ˜fâ„™ğ‘“\mathbb{P}\circ fblackboard_P âˆ˜ italic_f satisfies non-
+stationary ESP.
+
+Specifically, to treat cases in which a subset
+ğ’®â€²superscriptğ’®â€²\mathcal{S}^{\prime}caligraphic_S start_POSTSUPERSCRIPT
+â€² end_POSTSUPERSCRIPT of ğ’®ğ’®\mathcal{S}caligraphic_S satisfies non-
+stationary ESP, we define the following version.
+
+######  Definition II.4.
+
+Subset non-stationary ESP
+
+Given system dynamics
+f:ğ’³ğ’¯Ã—ğ’®â†’ğ’®:ğ‘“â†’superscriptğ’³ğ’¯ğ’®ğ’®f:\mathcal{X}^{\mathcal{T}}\times\mathcal{S}\to\mathcal{S}italic_f
+: caligraphic_X start_POSTSUPERSCRIPT caligraphic_T end_POSTSUPERSCRIPT Ã—
+caligraphic_S â†’ caligraphic_S, where ğ’®ğ’®\mathcal{S}caligraphic_S is
+bounded, fğ‘“fitalic_f has subset non-stationary ESP if there exists a subset
+selection procedure
+ğ’«:ğ’®â†’ğ’®â€²:ğ’«â†’ğ’®superscriptğ’®â€²\mathcal{P}:\mathcal{S}\to\mathcal{S^{\prime}}caligraphic_P
+: caligraphic_S â†’ caligraphic_S start_POSTSUPERSCRIPT â€²
+end_POSTSUPERSCRIPT such that
+ğ’®â€²â‰¤ğ’®superscriptğ’®â€²ğ’®\mathcal{S^{\prime}}\leq\mathcal{S}caligraphic_S
+start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT â‰¤ caligraphic_S and
+ğ’«âˆ˜fğ’«ğ‘“\mathcal{P}\circ fcaligraphic_P âˆ˜ italic_f satisfies non-
+stationary ESP.
+
+The expression Bâ‰¤Ağµğ´B\leq Aitalic_B â‰¤ italic_A denotes that BğµBitalic_B
+is a non-void element-wise subset of Ağ´Aitalic_A. If
+Aâ‰¡â„nğ´superscriptâ„ğ‘›A\equiv\mathbb{R}^{n}italic_A â‰¡ blackboard_R
+start_POSTSUPERSCRIPT italic_n end_POSTSUPERSCRIPT, then
+B=â„mğµsuperscriptâ„ğ‘šB=\mathbb{R}^{m}italic_B = blackboard_R
+start_POSTSUPERSCRIPT italic_m end_POSTSUPERSCRIPT (mâ‰¤n)ğ‘šğ‘›(m\leq n)(
+italic_m â‰¤ italic_n ), for instance.
+
+It follows that if subset non-stationary ESP holds, then subspace non-
+stationary ESP holds because we can define â„™â„™\mathbb{P}blackboard_P as a
+linear transformation represented by a diagonal matrix such that it has 1111
+in the dimension included in
+ğ’®â€²superscriptğ’®â€²\mathcal{S}^{\prime}caligraphic_S start_POSTSUPERSCRIPT
+â€² end_POSTSUPERSCRIPT and 00 otherwise. In addition, if non-stationary ESP
+holds, then every element of the system state has non-stationary ESP.
+Therefore, the subset non-stationary ESP retains. These relationships can be
+written as
+
+|  | NS-ESPâŠŠSubset NS-ESPâŠŠSubspace NS-ESP,NS-ESPSubset NS-ESPSubspace NS-ESP\displaystyle\text{NS-ESP}\subsetneq\text{Subset NS-ESP}\subsetneq\text{% Subspace NS-ESP},NS-ESP âŠŠ Subset NS-ESP âŠŠ Subspace NS-ESP , |  | (4)  
+---|---|---|---|---  
+  
+where NS-ESP stands for non-stationary ESP.
+
+More generally, we have the inclusion relationship of the ESP variants, as
+seen in Fig.Â 1.
+
+The definition of the subset non-stationary ESP is natural for practical QRC
+because we can select any observable for our system output. That is usually a
+subset of all Pauli strings or a linear combination of them, which can be
+reconstructed by measuring some of the observables.
+
+If the subset non-stationary ESP holds for some non-trivial subset of a
+system, a linear regression automatically makes emphasis on that subset guided
+by a loss function, provided that initial-state sensitive variables do not
+contribute sufficiently to temporal information processing.
+
+Def.Â II.3 and Def.Â II.4 are meant to be used for systems in which some parts
+have ESP while the remaining portion does not. An example of such a system in
+a quantum case is when the system dynamics are a tensor product of unitary and
+dissipative evolution. Ensuring a subset of non-stationary ESP guarantees that
+such a system can be used as a reservoir with a simple transformation of
+output signals.
+
+###  II.3 Non-stationary ESP of QRC
+
+![Refer to caption](x1.png) ((a)) ESP
+
+![Refer to caption](x2.png) ((b)) Non-stationary ESP
+
+![Refer to caption](x3.png) ((c)) ESP
+
+![Refer to caption](x4.png) ((d)) Non-stationary ESP
+
+Figure 4:  Grid search result of input rotation axis Î¸ğœƒ\thetaitalic_Î¸ for a QRC with SK Hamiltonian with external field and qubit-reset for input encoding. Each spherical coordinate corresponds to the input rotation axis Î¸ğœƒ\thetaitalic_Î¸ described in the main text. (a) ESP characterized by the ESP indicator drawn on the Bloch sphere. (b) Non-stationary ESP characterized by the non-stationary ESP indicator, with values capped at an upper bound of 1, drawn on the Bloch sphere. Our experiments are done with |{ğ®Ï„}|=200subscriptğ®ğœ200|\\{\mathbf{u}_{\tau}\\}|=200| { bold_u start_POSTSUBSCRIPT italic_Ï„ end_POSTSUBSCRIPT } | = 200 and w=10ğ‘¤10w=10italic_w = 10, where wğ‘¤witalic_w is the variable defined in Eq.Â (2). (c) The flattened surface of the Bloch sphere of traditional ESP in (a). (d) The flattened surface of the Bloch sphere of non-stationary ESP in (d). The top and bottom lines in (c-d) correspond to the north and south poles, respectively. Please note that the strong and weak ESP regionsâ€™ pattern is Hamiltonian-dependent. Namely, this result is specific to our selected random Hamiltonian. 
+
+To numerically examine the correspondence between non-stationary ESP indicator
+Eq.Â (2) and the actual information processing capability of QRC, we prepared
+a QRC of the following Sherringtonâ€“Kirkpatrick (SK) Hamiltonian [25] with an
+external field:
+
+| H=âˆ‘i>j=1NJiâ¢jâ¢Ïƒixâ¢Ïƒjx+12â¢âˆ‘i=1N(h+Di)â¢Ïƒiz,ğ»superscriptsubscriptğ‘–ğ‘—1ğ‘subscriptğ½ğ‘–ğ‘—superscriptsubscriptğœğ‘–ğ‘¥superscriptsubscriptğœğ‘—ğ‘¥12superscriptsubscriptğ‘–1ğ‘â„subscriptğ·ğ‘–superscriptsubscriptğœğ‘–ğ‘§H=\sum_{i>j=1}^{N}J_{ij}\sigma_{i}^{x}\sigma_{j}^{x}+\frac{1}{2}\sum_{i=1}^{N}% (h+D_{i})\sigma_{i}^{z},italic_H = âˆ‘ start_POSTSUBSCRIPT italic_i > italic_j = 1 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_N end_POSTSUPERSCRIPT italic_J start_POSTSUBSCRIPT italic_i italic_j end_POSTSUBSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_x end_POSTSUPERSCRIPT italic_Ïƒ start_POSTSUBSCRIPT italic_j end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_x end_POSTSUPERSCRIPT + divide start_ARG 1 end_ARG start_ARG 2 end_ARG âˆ‘ start_POSTSUBSCRIPT italic_i = 1 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_N end_POSTSUPERSCRIPT ( italic_h + italic_D start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT ) italic_Ïƒ start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_z end_POSTSUPERSCRIPT , |  | (5)  
+---|---|---|---  
+  
+where Nğ‘Nitalic_N was the number of qubits in the system,
+Ïƒixsubscriptsuperscriptğœğ‘¥ğ‘–\sigma^{x}_{i}italic_Ïƒ start_POSTSUPERSCRIPT
+italic_x end_POSTSUPERSCRIPT start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT
+and Ïƒizsubscriptsuperscriptğœğ‘§ğ‘–\sigma^{z}_{i}italic_Ïƒ
+start_POSTSUPERSCRIPT italic_z end_POSTSUPERSCRIPT start_POSTSUBSCRIPT
+italic_i end_POSTSUBSCRIPT were Pauli X and Z operators of the iğ‘–iitalic_i-
+th qubit, respectively, and Jiâ¢jsubscriptğ½ğ‘–ğ‘—J_{ij}italic_J
+start_POSTSUBSCRIPT italic_i italic_j end_POSTSUBSCRIPT and
+hisubscriptâ„ğ‘–h_{i}italic_h start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT
+were sampled from the following probability distribution:
+
+| Jiâ¢jsubscriptğ½ğ‘–ğ‘—\displaystyle J_{ij}italic_J start_POSTSUBSCRIPT italic_i italic_j end_POSTSUBSCRIPT | âˆ¼Uniformâ¢([âˆ’Js/2,Js/2])similar-toabsentUniformsubscriptğ½ğ‘ 2subscriptğ½ğ‘ 2\displaystyle\sim\mathrm{Uniform}([-J_{s}/2,J_{s}/2])âˆ¼ roman_Uniform ( [ - italic_J start_POSTSUBSCRIPT italic_s end_POSTSUBSCRIPT / 2 , italic_J start_POSTSUBSCRIPT italic_s end_POSTSUBSCRIPT / 2 ] ) |  | (6)  
+---|---|---|---|---  
+| Disubscriptğ·ğ‘–\displaystyle D_{i}italic_D start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT | âˆ¼Uniformâ¢([âˆ’Wâ¢Js/2,Wâ¢Js/2]),similar-toabsentUniformğ‘Šsubscriptğ½ğ‘ 2ğ‘Šsubscriptğ½ğ‘ 2\displaystyle\sim\mathrm{Uniform}([-WJ_{s}/2,WJ_{s}/2]),âˆ¼ roman_Uniform ( [ - italic_W italic_J start_POSTSUBSCRIPT italic_s end_POSTSUBSCRIPT / 2 , italic_W italic_J start_POSTSUBSCRIPT italic_s end_POSTSUBSCRIPT / 2 ] ) , |   
+  
+where Js=1subscriptğ½ğ‘ 1J_{s}=1italic_J start_POSTSUBSCRIPT italic_s
+end_POSTSUBSCRIPT = 1, W=0.312ğ‘Š0.312W=0.312italic_W = 0.312, and
+h=0.013â„0.013h=0.013italic_h = 0.013, in precision up to the third digit
+after the decimal point.
+
+The input sequence ğ’°â‰¡{ğ®t}tâˆˆğ’¯âˆˆâ„|ğ’¯|ğ’°subscriptsubscriptğ®ğ‘¡ğ‘¡ğ’¯superscriptâ„ğ’¯\mathcal{U}\equiv\\{\mathbf{u}_{t}\\}_{t\in\mathcal{T}}\in\mathbb{R}^{|\mathcal{% T}|}caligraphic_U â‰¡ { bold_u start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } start_POSTSUBSCRIPT italic_t âˆˆ caligraphic_T end_POSTSUBSCRIPT âˆˆ blackboard_R start_POSTSUPERSCRIPT | caligraphic_T | end_POSTSUPERSCRIPT were fed into the reservoir using the following input encoding method named reset-input encoding:
+
+| Ïâ€²superscriptğœŒâ€²\displaystyle\rho^{\prime}italic_Ï start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT | =â„°â¢(Ï,ğ®;Î¸)absentâ„°ğœŒğ®ğœƒ\displaystyle=\mathcal{E}(\rho,\mathbf{u};\theta)= caligraphic_E ( italic_Ï , bold_u ; italic_Î¸ ) |  | (7)  
+---|---|---|---|---  
+|  | =trAâ¢(Ï)âŠ—ÏƒAâ¢(ğ®;Î¸),absenttensor-productsubscripttrAğœŒsubscriptğœAğ®ğœƒ\displaystyle=\mathrm{tr}_{\mathrm{A}}(\rho)\otimes\sigma_{\mathrm{A}}(\mathbf% {u};\theta),= roman_tr start_POSTSUBSCRIPT roman_A end_POSTSUBSCRIPT ( italic_Ï ) âŠ— italic_Ïƒ start_POSTSUBSCRIPT roman_A end_POSTSUBSCRIPT ( bold_u ; italic_Î¸ ) , |   
+  
+where AA\mathrm{A}roman_A was the subsystem that we used for qubit state
+replacement by subsystem state
+ÏƒAâ¢(ğ®)subscriptğœAğ®\sigma_{\mathrm{A}}(\mathbf{u})italic_Ïƒ
+start_POSTSUBSCRIPT roman_A end_POSTSUBSCRIPT ( bold_u ) of form
+
+| ÏƒAâ¢(ğ®;Î¸)â‰¡Uâ¢(ğ®;Î¸)â¢(|0âŸ©â¢âŸ¨0|âŠ—|A|)â¢Uâ€ â¢(ğ®;Î¸),subscriptğœğ´ğ®ğœƒğ‘ˆğ®ğœƒket0superscriptbra0tensor-productabsentğ´superscriptğ‘ˆâ€ ğ®ğœƒ\sigma_{A}(\mathbf{u};\theta)\equiv U(\mathbf{u};\theta)\left(|0\rangle\langle 0% |^{\otimes|A|}\right)U^{\dagger}(\mathbf{u};\theta),italic_Ïƒ start_POSTSUBSCRIPT italic_A end_POSTSUBSCRIPT ( bold_u ; italic_Î¸ ) â‰¡ italic_U ( bold_u ; italic_Î¸ ) ( | 0 âŸ© âŸ¨ 0 | start_POSTSUPERSCRIPT âŠ— | italic_A | end_POSTSUPERSCRIPT ) italic_U start_POSTSUPERSCRIPT â€ end_POSTSUPERSCRIPT ( bold_u ; italic_Î¸ ) , |  | (8)  
+---|---|---|---  
+  
+where
+
+| Uâ¢(ğ®;Î¸)ğ‘ˆğ®ğœƒ\displaystyle U(\mathbf{u};\theta)italic_U ( bold_u ; italic_Î¸ ) | â‰¡U3â€ â¢(Î¸)â¢RZâ¢(arccosâ¢(ğ®))â¢U3â¢(Î¸)absentsuperscriptsubscriptğ‘ˆ3â€ ğœƒsubscriptğ‘…ğ‘arccosğ®subscriptğ‘ˆ3ğœƒ\displaystyle\equiv U_{3}^{\dagger}(\theta)R_{Z}(\mathrm{arccos}(\mathbf{u}))U% _{3}(\theta)â‰¡ italic_U start_POSTSUBSCRIPT 3 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT â€ end_POSTSUPERSCRIPT ( italic_Î¸ ) italic_R start_POSTSUBSCRIPT italic_Z end_POSTSUBSCRIPT ( roman_arccos ( bold_u ) ) italic_U start_POSTSUBSCRIPT 3 end_POSTSUBSCRIPT ( italic_Î¸ ) |  | (9)  
+---|---|---|---|---  
+| U3â¢(Î¸)subscriptğ‘ˆ3ğœƒ\displaystyle U_{3}(\theta)italic_U start_POSTSUBSCRIPT 3 end_POSTSUBSCRIPT ( italic_Î¸ ) | â‰¡(cosâ¡(Î˜â¢(Î¸)2)âˆ’eiâ¢Î›â¢(Î¸)â¢sinâ¡(Î˜â¢(Î¸)2)eiâ¢Î¦â¢(Î¸)â¢sinâ¡(Î˜â¢(Î¸)2)eiâ¢(Î¦â¢(Î¸)+Î›â¢(Î¸))â¢cosâ¡(Î˜â¢(Î¸)2))absentmatrixÎ˜ğœƒ2superscriptğ‘’ğ‘–Î›ğœƒÎ˜ğœƒ2superscriptğ‘’ğ‘–Î¦ğœƒÎ˜ğœƒ2superscriptğ‘’ğ‘–Î¦ğœƒÎ›ğœƒÎ˜ğœƒ2\displaystyle\equiv\begin{pmatrix}\cos\left(\frac{\Theta(\theta)}{2}\right)&-e% ^{i\Lambda(\theta)}\sin\left(\frac{\Theta(\theta)}{2}\right)\\\ e^{i\Phi(\theta)}\sin\left(\frac{\Theta(\theta)}{2}\right)&e^{i\left(\Phi(% \theta)+\Lambda(\theta)\right)}\cos\left(\frac{\Theta(\theta)}{2}\right)\end{pmatrix}â‰¡ ( start_ARG start_ROW start_CELL roman_cos ( divide start_ARG roman_Î˜ ( italic_Î¸ ) end_ARG start_ARG 2 end_ARG ) end_CELL start_CELL - italic_e start_POSTSUPERSCRIPT italic_i roman_Î› ( italic_Î¸ ) end_POSTSUPERSCRIPT roman_sin ( divide start_ARG roman_Î˜ ( italic_Î¸ ) end_ARG start_ARG 2 end_ARG ) end_CELL end_ROW start_ROW start_CELL italic_e start_POSTSUPERSCRIPT italic_i roman_Î¦ ( italic_Î¸ ) end_POSTSUPERSCRIPT roman_sin ( divide start_ARG roman_Î˜ ( italic_Î¸ ) end_ARG start_ARG 2 end_ARG ) end_CELL start_CELL italic_e start_POSTSUPERSCRIPT italic_i ( roman_Î¦ ( italic_Î¸ ) + roman_Î› ( italic_Î¸ ) ) end_POSTSUPERSCRIPT roman_cos ( divide start_ARG roman_Î˜ ( italic_Î¸ ) end_ARG start_ARG 2 end_ARG ) end_CELL end_ROW end_ARG ) |   
+  
+where Î˜â¢(Î¸),Î¦â¢(Î¸)Î˜ğœƒÎ¦ğœƒ\Theta(\theta),\ \Phi(\theta)roman_Î˜ (
+italic_Î¸ ) , roman_Î¦ ( italic_Î¸ ), and Î›â¢(Î¸)Î›ğœƒ\Lambda(\theta)roman_Î›
+( italic_Î¸ ) were Euler angles from our rotation axis
+Î¸âˆˆâ„3ğœƒsuperscriptâ„3\theta\in\mathbb{R}^{3}italic_Î¸ âˆˆ blackboard_R
+start_POSTSUPERSCRIPT 3 end_POSTSUPERSCRIPT to the Zğ‘Zitalic_Z axis on the
+Bloch sphere. Therefore, the overall state update was
+
+| Ït+1=eâˆ’iâ¢Hâ¢â„°â¢(Ït,ğ®t;Î¸)â¢eiâ¢H,subscriptğœŒğ‘¡1superscriptğ‘’ğ‘–ğ»â„°subscriptğœŒğ‘¡subscriptğ®ğ‘¡ğœƒsuperscriptğ‘’ğ‘–ğ»\rho_{t+1}=e^{-iH}\mathcal{E}(\rho_{t},\mathbf{u}_{t};\theta)e^{iH},italic_Ï start_POSTSUBSCRIPT italic_t + 1 end_POSTSUBSCRIPT = italic_e start_POSTSUPERSCRIPT - italic_i italic_H end_POSTSUPERSCRIPT caligraphic_E ( italic_Ï start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT , bold_u start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ; italic_Î¸ ) italic_e start_POSTSUPERSCRIPT italic_i italic_H end_POSTSUPERSCRIPT , |  | (10)  
+---|---|---|---  
+  
+and reservoir output signals were
+
+| {trâ¢(Pâ¢Ït)âˆ£Pâˆˆ{I,X,Y,Z}âŠ—N}conditional-settrğ‘ƒsubscriptğœŒğ‘¡ğ‘ƒsuperscriptğ¼ğ‘‹ğ‘Œğ‘tensor-productabsentğ‘\left\\{\mathrm{tr}(P\rho_{t})\mid P\in\\{I,X,Y,Z\\}^{\otimes N}\right\\}{ roman_tr ( italic_P italic_Ï start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ) âˆ£ italic_P âˆˆ { italic_I , italic_X , italic_Y , italic_Z } start_POSTSUPERSCRIPT âŠ— italic_N end_POSTSUPERSCRIPT } |  | (11)  
+---|---|---|---  
+  
+for each tğ‘¡titalic_t.
+
+Here, we parametrized the input encoding unitary Uâ¢(â‹…;Î¸)ğ‘ˆâ‹…ğœƒU(\cdot\ ;\theta)italic_U ( â‹… ; italic_Î¸ ) by a parameter of Î¸ğœƒ\thetaitalic_Î¸ to explore different configurations to ensure that the QRC had different non-stationary ESP, while system Hamiltonian Hğ»Hitalic_H was fixed. The experiment was done on a 2-qubit setup, with |A|ğ´|A|| italic_A | = 1, while Î¸ğœƒ\thetaitalic_Î¸ stood for the axis of single-qubit rotation in the Bloch sphere.
+
+![Refer to caption](x5.png) ((a)) NARMA2 RNMSE
+
+![Refer to caption](x6.png) ((b)) NARMA10 RNMSE
+
+Figure 5: Root normalized mean squared error (RNMSE) of (a) NARMA2, (b)
+NARMA10 tasks with the same setup.
+
+####  II.3.1 ESP and non-stationary ESP
+
+First, we computed the ESP indicator, defined as follows:
+
+| â„Eâ¢Sâ¢Pâ¢(t,s0,s0â€²)â‰¡â€–fâ¢({ğ®Ï„}Ï„â‰¤t;s0)âˆ’fâ¢({ğ®Ï„}Ï„â‰¤t;s0â€²)â€–â€–s0âˆ’s0â€²â€–,subscriptâ„ğ¸ğ‘†ğ‘ƒğ‘¡subscriptğ‘ 0superscriptsubscriptğ‘ 0â€²normğ‘“subscriptsubscriptğ®ğœğœğ‘¡subscriptğ‘ 0ğ‘“subscriptsubscriptğ®ğœğœğ‘¡superscriptsubscriptğ‘ 0â€²normsubscriptğ‘ 0superscriptsubscriptğ‘ 0â€²\mathcal{I}_{ESP}(t,s_{0},s_{0}^{\prime})\equiv\frac{\|f(\\{\mathbf{u}_{\tau}\\}% _{\tau\leq t};s_{0})-f(\\{\mathbf{u}_{\tau}\\}_{\tau\leq t};s_{0}^{\prime})\|}{% \|s_{0}-s_{0}^{\prime}\|},caligraphic_I start_POSTSUBSCRIPT italic_E italic_S italic_P end_POSTSUBSCRIPT ( italic_t , italic_s start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT , italic_s start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT ) â‰¡ divide start_ARG âˆ¥ italic_f ( { bold_u start_POSTSUBSCRIPT italic_Ï„ end_POSTSUBSCRIPT } start_POSTSUBSCRIPT italic_Ï„ â‰¤ italic_t end_POSTSUBSCRIPT ; italic_s start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT ) - italic_f ( { bold_u start_POSTSUBSCRIPT italic_Ï„ end_POSTSUBSCRIPT } start_POSTSUBSCRIPT italic_Ï„ â‰¤ italic_t end_POSTSUBSCRIPT ; italic_s start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT ) âˆ¥ end_ARG start_ARG âˆ¥ italic_s start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT - italic_s start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT âˆ¥ end_ARG , |  | (12)  
+---|---|---|---  
+  
+and the non-stationary ESP indicator defined as follows:
+
+|  | â„Nâ¢Sâ¢(t,s0,s0â€²,w)â‰¡subscriptâ„ğ‘ğ‘†ğ‘¡subscriptğ‘ 0superscriptsubscriptğ‘ 0â€²ğ‘¤absent\displaystyle\mathcal{I}_{NS}(t,s_{0},s_{0}^{\prime},w)\equivcaligraphic_I start_POSTSUBSCRIPT italic_N italic_S end_POSTSUBSCRIPT ( italic_t , italic_s start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT , italic_s start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT , italic_w ) â‰¡ |  | (13)  
+---|---|---|---|---  
+|  | â„Eâ¢Sâ¢Pâ¢(t,s0,s0â€²)Ã—minâ¡[VarÂ¯wwâ¢(f;s0),VarÂ¯wwâ¢(f;s0â€²)]minâ¡[VarÂ¯wtâ¢(f;s0),VarÂ¯wtâ¢(f;s0â€²)]subscriptâ„ğ¸ğ‘†ğ‘ƒğ‘¡subscriptğ‘ 0superscriptsubscriptğ‘ 0â€²superscriptsubscriptÂ¯Varğ‘¤ğ‘¤ğ‘“subscriptğ‘ 0superscriptsubscriptÂ¯Varğ‘¤ğ‘¤ğ‘“subscriptsuperscriptğ‘ â€²0superscriptsubscriptÂ¯Varğ‘¤ğ‘¡ğ‘“subscriptğ‘ 0superscriptsubscriptÂ¯Varğ‘¤ğ‘¡ğ‘“subscriptsuperscriptğ‘ â€²0\displaystyle\quad\mathcal{I}_{ESP}(t,s_{0},s_{0}^{\prime})\times\frac{\sqrt{% \min\left[\overline{\mathrm{Var}}_{w}^{w}(f;s_{0}),\overline{\mathrm{Var}}_{w}% ^{w}(f;s^{\prime}_{0})\right]}}{\sqrt{\min\left[\overline{\mathrm{Var}}_{w}^{t% }(f;s_{0}),\overline{\mathrm{Var}}_{w}^{t}(f;s^{\prime}_{0})\right]}}caligraphic_I start_POSTSUBSCRIPT italic_E italic_S italic_P end_POSTSUBSCRIPT ( italic_t , italic_s start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT , italic_s start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT ) Ã— divide start_ARG square-root start_ARG roman_min [ overÂ¯ start_ARG roman_Var end_ARG start_POSTSUBSCRIPT italic_w end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_w end_POSTSUPERSCRIPT ( italic_f ; italic_s start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT ) , overÂ¯ start_ARG roman_Var end_ARG start_POSTSUBSCRIPT italic_w end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_w end_POSTSUPERSCRIPT ( italic_f ; italic_s start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT ) ] end_ARG end_ARG start_ARG square-root start_ARG roman_min [ overÂ¯ start_ARG roman_Var end_ARG start_POSTSUBSCRIPT italic_w end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT ( italic_f ; italic_s start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT ) , overÂ¯ start_ARG roman_Var end_ARG start_POSTSUBSCRIPT italic_w end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT ( italic_f ; italic_s start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT ) ] end_ARG end_ARG |   
+  
+for every configuration of the parameter Î¸ğœƒ\thetaitalic_Î¸. We randomly
+sampled four input sequences of size 200200200200 from
+Uniformâ¢([âˆ’1,1])Uniform11\mathrm{Uniform}([-1,1])roman_Uniform ( [ - 1 , 1
+] ) and three initial reservoir states from Haar random distribution of
+2-qubit pure states.
+
+Output signals of QRC were collected for every initial reservoir state and
+input sequence combination. For each input sequence, the ESP indicator and
+non-stationary ESP indicator were examined for every different initial state
+combination. The result of Fig.Â 4 was the average of all such twelve
+(12=4Ã—(32)124binomial3212=4\times{{3}\choose{2}}12 = 4 Ã— ( binomial
+start_ARG 3 end_ARG start_ARG 2 end_ARG ))calculations.
+
+The flattened surface plots in Fig.Â 4(c) and Fig.Â 4(d) showed an expanded
+Bloch sphere surface, where the upper line and bottom line, respectively,
+correspond to the north and south poles. We can see the difference between ESP
+and non-stationary ESP in those poles, where ESP is satisfied, while non-
+stationary ESP is not. Please note that ESP and non-stationary ESP indicators
+are upper bound by one because indicators greater than one imply that there is
+no possibility of convergence, even if we increase the input sequence length
+in the experiments. The boundaries between red and blue regions colored by
+white are not intentional because we did not cap values by any lower bounds.
+
+These poles correspond to the input configurations in which an input encoding
+axis direction and the direction of the system state Bloch vector coincide
+after a reset operation. In such settings, input encoding does not modulate
+the systemâ€™s fixed point, and the system falls into constant output.
+
+####  II.3.2 NARMA tasks
+
+Next, to check the correspondence between QRCâ€™s temporal information
+processing capability and non-stationary ESP, we conducted experiments on non-
+linear autoregressive moving-average (NARMA) tasks [26]. Given an input
+sequence {ğ®t}subscriptğ®ğ‘¡\\{\mathbf{u}_{t}\\}{ bold_u start_POSTSUBSCRIPT
+italic_t end_POSTSUBSCRIPT }, a NARMA sequence
+{ğ²t}subscriptğ²ğ‘¡\\{\mathbf{y}_{t}\\}{ bold_y start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT } of order kğ‘˜kitalic_k, termed NARMAkğ‘˜kitalic_k, is
+defined as a nonlinear combination of {ğ²t}subscriptğ²ğ‘¡\\{\mathbf{y}_{t}\\}{
+bold_y start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } and
+{ğ®t}subscriptğ®ğ‘¡\\{\mathbf{u}_{t}\\}{ bold_u start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT } in the past, as follows:
+
+![Refer to caption](x7.png) ((a)) X-axis rotation input (Raw)
+
+![Refer to caption](x8.png) ((b)) X-axis rotation input (LR)
+
+![Refer to caption](x9.png) ((c)) Y-axis rotation input (Raw)
+
+![Refer to caption](x10.png) ((d)) Y-axis rotation input (LR)
+
+Figure 6:  Raw and linear regression (LR) outputs of 2 different input
+rotation axis (Î¸ğœƒ\thetaitalic_Î¸) configurations: (a, b) X-axis and (c, d)
+Y-axis. (a, c) Raw measurement results. (b, d) Target sequence (blue) and
+linear regression results (orange).
+
+| ğ²t=0.3â¢ğ²tâˆ’1+0.05â¢ğ²tâˆ’1â¢âˆ‘i=tâˆ’ktâˆ’1ğ²i+1.5â¢ğ®tâˆ’1â¢ğ®tâˆ’k+0.1,subscriptğ²ğ‘¡0.3subscriptğ²ğ‘¡10.05subscriptğ²ğ‘¡1superscriptsubscriptğ‘–ğ‘¡ğ‘˜ğ‘¡1subscriptğ²ğ‘–1.5subscriptğ®ğ‘¡1subscriptğ®ğ‘¡ğ‘˜0.1\mathbf{y}_{t}=0.3\mathbf{y}_{t-1}+0.05\mathbf{y}_{t-1}\sum_{i=t-k}^{t-1}% \mathbf{y}_{i}+1.5\mathbf{u}_{t-1}\mathbf{u}_{t-k}+0.1,bold_y start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT = 0.3 bold_y start_POSTSUBSCRIPT italic_t - 1 end_POSTSUBSCRIPT + 0.05 bold_y start_POSTSUBSCRIPT italic_t - 1 end_POSTSUBSCRIPT âˆ‘ start_POSTSUBSCRIPT italic_i = italic_t - italic_k end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t - 1 end_POSTSUPERSCRIPT bold_y start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT + 1.5 bold_u start_POSTSUBSCRIPT italic_t - 1 end_POSTSUBSCRIPT bold_u start_POSTSUBSCRIPT italic_t - italic_k end_POSTSUBSCRIPT + 0.1 , |  | (14)  
+---|---|---|---  
+  
+where each utsubscriptğ‘¢ğ‘¡u_{t}italic_u start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT was identically drawn from
+Uniformâ¢([0,0.5])Uniform00.5\mathrm{Uniform}([0,0.5])roman_Uniform ( [ 0 ,
+0.5 ] ).
+
+Our sequences had a length of 2Ã—1052superscript1052\times 10^{5}2 Ã— 10
+start_POSTSUPERSCRIPT 5 end_POSTSUPERSCRIPT. The first 50% of
+{ğ®t}subscriptğ®ğ‘¡\\{\mathbf{u}_{t}\\}{ bold_u start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT } were discarded as washout, and 80% of the remainder was
+used to fit a linear regression to optimize MSE against the first 80% of the
+remainder. The test results were computed using the remaining 20% of the
+sequences after washout. We had 5 NARMA sequences for each order
+kğ‘˜kitalic_k, and the results in Fig.5 were averaged over the sequences.
+
+We computed the root normalized mean square error (RNMSE)
+
+| Râ¢Nâ¢Mâ¢Sâ¢Eâ¢({ğ²t},{ğ²^t})=ğ”¼tâ¢[(ğ²^tâˆ’ğ²t)2]Vartâ¢(ğ²t)ğ‘…ğ‘ğ‘€ğ‘†ğ¸subscriptğ²ğ‘¡subscript^ğ²ğ‘¡subscriptğ”¼ğ‘¡delimited-[]superscriptsubscript^ğ²ğ‘¡subscriptğ²ğ‘¡2subscriptVarğ‘¡subscriptğ²ğ‘¡RNMSE(\left\\{\mathbf{y}_{t}\right\\},\left\\{\mathbf{\hat{y}}_{t}\right\\})=\sqrt% {\frac{\mathbb{E}_{t}\left[\left(\hat{\mathbf{y}}_{t}-\mathbf{y}_{t}\right)^{2% }\right]}{\mathrm{Var}_{t}(\mathbf{y}_{t})}}italic_R italic_N italic_M italic_S italic_E ( { bold_y start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } , { over^ start_ARG bold_y end_ARG start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } ) = square-root start_ARG divide start_ARG blackboard_E start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT [ ( over^ start_ARG bold_y end_ARG start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT - bold_y start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ) start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT ] end_ARG start_ARG roman_Var start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ( bold_y start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ) end_ARG end_ARG |  | (15)  
+---|---|---|---  
+  
+for target sequence {ğ²t}subscriptğ²ğ‘¡\left\\{\mathbf{y}_{t}\right\\}{ bold_y
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } and linear regression result
+{ğ²^t}subscript^ğ²ğ‘¡\left\\{\hat{\mathbf{y}}_{t}\right\\}{ over^ start_ARG
+bold_y end_ARG start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT }.
+
+We observed that the results of both NARMA2 and NARMA10 tasks in Fig.Â 5(a)
+and Fig.Â 5(b), respectively, nicely corresponded to non-stationary ESP
+results in Fig.Â 4(d). It should be noted that the red line at the top and
+bottom of Fig.Â 4(d), which corresponds to the convergence of the dynamics to
+a single fixed point, and results in large RNMSE in Fig.Â 5(a) and Fig.Â 5(b),
+cannot be reproduced by the traditional ESP indicator, as shown in Fig.Â 4(c).
+
+To clarify the actual dynamics and prediction behavior of different input
+encoding axes in the NARMA2 experiment of Sec.Â II.3.2, we show actual output
+signals of two separate input axis configurations depicted in Fig.Â 6(a) and
+Fig.Â 6(c), in which all Pauli string measurement results from
+t=3000ğ‘¡3000t=3000italic_t = 3000 to t=3100ğ‘¡3100t=3100italic_t = 3100 are
+plotted for both setups. In Fig.Â 6(b) and Fig.Â 6(d), the target sequence
+yğ‘¦yitalic_y and the predicted sequence y^^ğ‘¦\hat{y}over^ start_ARG italic_y
+end_ARG from an optimized linear regression readout for the first
+2000200020002000 steps of the test sequence are shown.
+
+In this comparison, the X-axis input demonstrates a configuration where non-
+stationary ESP does not hold, while the Y-axis input is for non-stationary
+ESP-compatible demonstration. We cannot identify which has non-stationary ESP
+by simply seeing the raw output signal in Fig.Â 6(a) and Fig.Â 6(c). However,
+linear readout results in Fig.Â 6(b) and Fig.Â 6(d) clearly show the
+performance difference between the two configurations.
+
+![Refer to caption](x11.png) ((a)) MC11{}_{1}start_FLOATSUBSCRIPT 1
+end_FLOATSUBSCRIPT
+
+![Refer to caption](x12.png) ((b))
+IPCtâ¢oâ¢tğ‘¡ğ‘œğ‘¡{}_{tot}start_FLOATSUBSCRIPT italic_t italic_o italic_t
+end_FLOATSUBSCRIPT
+
+![Refer to caption](x13.png) ((c)) Linear memory decay (kâ‰¤300ğ‘˜300k\leq
+300italic_k â‰¤ 300)
+
+![Refer to caption](x14.png) ((d)) Max linear delay
+
+![Refer to caption](x15.png) ((e)) Rank after washout
+
+![Refer to caption](x16.png) ((f)) Linear memory decay (kâ‰¤10ğ‘˜10k\leq
+10italic_k â‰¤ 10)
+
+Figure 7: (a) Memory function of delay 1. X, Y, and A denote different
+parameter configurations that are further explored in (c) and (f). (b) Total
+IPC. (c,f) Memory function decay with respect to kğ‘˜kitalic_k for different
+axes configurations within a timescale of (c) 300 steps and (f) 10 steps. The
+X-axis has a longer memory with a weaker short-term memory. The Y-axis has a
+strong short-term memory. The A-axis has a shorter and a weaker memory. (d)
+Maximum linear delay, computed by
+argmaxkâ¢(Mâ¢Ck>10âˆ’4)subscriptargmaxğ‘˜ğ‘€subscriptğ¶ğ‘˜superscript104\mathrm{argmax}_{k}(MC_{k}>10^{-4})roman_argmax
+start_POSTSUBSCRIPT italic_k end_POSTSUBSCRIPT ( italic_M italic_C
+start_POSTSUBSCRIPT italic_k end_POSTSUBSCRIPT > 10 start_POSTSUPERSCRIPT - 4
+end_POSTSUPERSCRIPT ). (e) Rank of the reservoirâ€™s output signals of length
+106superscript10610^{6}10 start_POSTSUPERSCRIPT 6 end_POSTSUPERSCRIPT after
+washout of 3â‹…105â‹…3superscript1053\cdot 10^{5}3 â‹… 10
+start_POSTSUPERSCRIPT 5 end_POSTSUPERSCRIPT steps. Rank is 2222 at the north
+and south poles and 13131313 for other configurations. Boxes in (b) and (d)
+denote typical parameter configurations exhibiting non-consistent behavior
+concerning NS-ESP in Fig.Â 4(d).
+
+####  II.3.3 MC and IPC
+
+Finally, we computed memory capacity (MC) [27] and information processing
+capacity (IPC) [28] that measure how much linear and non-linear input
+dependency is within the output signal. Given a random input sequence
+{utâˆˆâ„}subscriptğ‘¢ğ‘¡â„\\{u_{t}\in\mathbb{R}\\}{ italic_u
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT âˆˆ blackboard_R } and
+corresponding reservoir outputs
+{xtâˆˆâ„d}subscriptğ‘¥ğ‘¡superscriptâ„ğ‘‘\\{x_{t}\in\mathbb{R}^{d}\\}{
+italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT âˆˆ blackboard_R
+start_POSTSUPERSCRIPT italic_d end_POSTSUPERSCRIPT }, where dğ‘‘ditalic_d is
+the number of the observables involved, we computed MC and IPC for all
+parameter configurations as the ESP experiment. The total memory capacity
+Mâ¢Ctâ¢oâ¢tğ‘€subscriptğ¶ğ‘¡ğ‘œğ‘¡MC_{tot}italic_M italic_C
+start_POSTSUBSCRIPT italic_t italic_o italic_t end_POSTSUBSCRIPT can be
+calculated as
+
+| Mâ¢Ctâ¢oâ¢tâ¢({ut},{xt})ğ‘€subscriptğ¶ğ‘¡ğ‘œğ‘¡subscriptğ‘¢ğ‘¡subscriptğ‘¥ğ‘¡\displaystyle MC_{tot}(\\{u_{t}\\},\\{x_{t}\\})italic_M italic_C start_POSTSUBSCRIPT italic_t italic_o italic_t end_POSTSUBSCRIPT ( { italic_u start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } , { italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } ) | =âˆ‘kMâ¢Ckâ¢({ut},{xt})whereabsentsubscriptğ‘˜ğ‘€subscriptğ¶ğ‘˜subscriptğ‘¢ğ‘¡subscriptğ‘¥ğ‘¡where\displaystyle=\sum_{k}MC_{k}(\\{u_{t}\\},\\{x_{t}\\})\quad\text{where}= âˆ‘ start_POSTSUBSCRIPT italic_k end_POSTSUBSCRIPT italic_M italic_C start_POSTSUBSCRIPT italic_k end_POSTSUBSCRIPT ( { italic_u start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } , { italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } ) where |  | (16)  
+---|---|---|---|---  
+| Mâ¢Ckâ¢({ut},{xt})ğ‘€subscriptğ¶ğ‘˜subscriptğ‘¢ğ‘¡subscriptğ‘¥ğ‘¡\displaystyle MC_{k}(\\{u_{t}\\},\\{x_{t}\\})italic_M italic_C start_POSTSUBSCRIPT italic_k end_POSTSUBSCRIPT ( { italic_u start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } , { italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } ) | =ğ”¼tâ¢[utâˆ’kâ¢xtT]â¢ğ”¼tâ¢[xtâ¢xtT]â¢ğ”¼tâ¢[utâˆ’kâ¢xt]ğ”¼tâ¢[(utâˆ’ğ”¼tâ¢(ut))2].absentsubscriptğ”¼ğ‘¡delimited-[]subscriptğ‘¢ğ‘¡ğ‘˜superscriptsubscriptğ‘¥ğ‘¡ğ‘‡subscriptğ”¼ğ‘¡delimited-[]subscriptğ‘¥ğ‘¡superscriptsubscriptğ‘¥ğ‘¡ğ‘‡subscriptğ”¼ğ‘¡delimited-[]subscriptğ‘¢ğ‘¡ğ‘˜subscriptğ‘¥ğ‘¡subscriptğ”¼ğ‘¡delimited-[]superscriptsubscriptğ‘¢ğ‘¡subscriptğ”¼ğ‘¡subscriptğ‘¢ğ‘¡2\displaystyle=\frac{\mathbb{E}_{t}[u_{t-k}x_{t}^{T}]\mathbb{E}_{t}[x_{t}x_{t}^% {T}]\mathbb{E}_{t}[u_{t-k}x_{t}]}{\mathbb{E}_{t}[\left(u_{t}-\mathbb{E}_{t}(u_% {t})\right)^{2}]}.= divide start_ARG blackboard_E start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT [ italic_u start_POSTSUBSCRIPT italic_t - italic_k end_POSTSUBSCRIPT italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_T end_POSTSUPERSCRIPT ] blackboard_E start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT [ italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_T end_POSTSUPERSCRIPT ] blackboard_E start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT [ italic_u start_POSTSUBSCRIPT italic_t - italic_k end_POSTSUBSCRIPT italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ] end_ARG start_ARG blackboard_E start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT [ ( italic_u start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT - blackboard_E start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ( italic_u start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ) ) start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT ] end_ARG . |   
+  
+Here Mâ¢Ckğ‘€subscriptğ¶ğ‘˜MC_{k}italic_M italic_C start_POSTSUBSCRIPT
+italic_k end_POSTSUBSCRIPT is called a memory function of delay kğ‘˜kitalic_k.
+IPC can be calculated using products of orthogonal polynomial transformations
+of {uk}subscriptğ‘¢ğ‘˜\\{u_{k}\\}{ italic_u start_POSTSUBSCRIPT italic_k
+end_POSTSUBSCRIPT } and its delayed sequences as target sequences. Namely,
+total IPC and degree dğ‘‘ditalic_d IPC,
+Iâ¢Pâ¢Cdğ¼ğ‘ƒsubscriptğ¶ğ‘‘IPC_{d}italic_I italic_P italic_C
+start_POSTSUBSCRIPT italic_d end_POSTSUBSCRIPT, can be calculated as
+
+| Iâ¢Pâ¢Ctâ¢oâ¢tğ¼ğ‘ƒsubscriptğ¶ğ‘¡ğ‘œğ‘¡\displaystyle IPC_{tot}italic_I italic_P italic_C start_POSTSUBSCRIPT italic_t italic_o italic_t end_POSTSUBSCRIPT | ({ut},{xt};ğ’´)=âˆ‘dIâ¢Pâ¢Cdâ¢({ut},{xt};ğ’´)subscriptğ‘¢ğ‘¡subscriptğ‘¥ğ‘¡ğ’´subscriptğ‘‘ğ¼ğ‘ƒsubscriptğ¶ğ‘‘subscriptğ‘¢ğ‘¡subscriptğ‘¥ğ‘¡ğ’´\displaystyle\left(\\{u_{t}\\},\\{x_{t}\\};\mathcal{Y}\right)=\sum_{d}IPC_{d}\left% (\\{u_{t}\\},\\{x_{t}\\};\mathcal{Y}\right)( { italic_u start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } , { italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } ; caligraphic_Y ) = âˆ‘ start_POSTSUBSCRIPT italic_d end_POSTSUBSCRIPT italic_I italic_P italic_C start_POSTSUBSCRIPT italic_d end_POSTSUBSCRIPT ( { italic_u start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } , { italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } ; caligraphic_Y ) |  | (17)  
+---|---|---|---|---  
+| Iâ¢Pâ¢Cdğ¼ğ‘ƒsubscriptğ¶ğ‘‘\displaystyle IPC_{d}italic_I italic_P italic_C start_POSTSUBSCRIPT italic_d end_POSTSUBSCRIPT | ({ut},{xt};ğ’´)=subscriptğ‘¢ğ‘¡subscriptğ‘¥ğ‘¡ğ’´absent\displaystyle\left(\\{u_{t}\\},\\{x_{t}\\};\mathcal{Y}\right)=( { italic_u start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } , { italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } ; caligraphic_Y ) = |   
+|  | âˆ‘{vt}âˆˆğ’´â¢({ut};d)ğ”¼tâ¢[vtâ¢xtT]â¢ğ”¼tâ¢[xtâ¢xtT]â¢ğ”¼tâ¢[vtâ¢xt]ğ”¼tâ¢[(vtâˆ’ğ”¼tâ¢(vt))2],subscriptsubscriptğ‘£ğ‘¡ğ’´subscriptğ‘¢ğ‘¡ğ‘‘subscriptğ”¼ğ‘¡delimited-[]subscriptğ‘£ğ‘¡superscriptsubscriptğ‘¥ğ‘¡ğ‘‡subscriptğ”¼ğ‘¡delimited-[]subscriptğ‘¥ğ‘¡superscriptsubscriptğ‘¥ğ‘¡ğ‘‡subscriptğ”¼ğ‘¡delimited-[]subscriptğ‘£ğ‘¡subscriptğ‘¥ğ‘¡subscriptğ”¼ğ‘¡delimited-[]superscriptsubscriptğ‘£ğ‘¡subscriptğ”¼ğ‘¡subscriptğ‘£ğ‘¡2\displaystyle\sum_{\\{v_{t}\\}\in\mathcal{Y}\left(\\{u_{t}\\};d\right)}\frac{% \mathbb{E}_{t}[v_{t}x_{t}^{T}]\mathbb{E}_{t}[x_{t}x_{t}^{T}]\mathbb{E}_{t}[v_{% t}x_{t}]}{\mathbb{E}_{t}[\left(v_{t}-\mathbb{E}_{t}(v_{t})\right)^{2}]},âˆ‘ start_POSTSUBSCRIPT { italic_v start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } âˆˆ caligraphic_Y ( { italic_u start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } ; italic_d ) end_POSTSUBSCRIPT divide start_ARG blackboard_E start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT [ italic_v start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_T end_POSTSUPERSCRIPT ] blackboard_E start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT [ italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_T end_POSTSUPERSCRIPT ] blackboard_E start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT [ italic_v start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT italic_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ] end_ARG start_ARG blackboard_E start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT [ ( italic_v start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT - blackboard_E start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ( italic_v start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ) ) start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT ] end_ARG , |   
+  
+where ğ’´ğ’´\mathcal{Y}caligraphic_Y is a system of orthogonal polynomial and
+ğ’´â¢({ut};d)ğ’´subscriptğ‘¢ğ‘¡ğ‘‘\mathcal{Y}\left(\\{u_{t}\\};d\right)caligraphic_Y
+( { italic_u start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } ; italic_d ) is
+a set of transformed inputs, whose elements are a sequence having form in each
+time step tğ‘¡titalic_t as
+
+| vt=âˆiYdiâ¢(utâˆ’ki)s.t.âˆ‘idi=d.formulae-sequencesubscriptğ‘£ğ‘¡subscriptproductğ‘–subscriptğ‘Œsubscriptğ‘‘ğ‘–subscriptğ‘¢ğ‘¡subscriptğ‘˜ğ‘–s.t.subscriptğ‘–subscriptğ‘‘ğ‘–ğ‘‘v_{t}=\prod_{i}Y_{d_{i}}(u_{t-k_{i}})\quad\text{s.t.}\quad\sum_{i}d_{i}=d.italic_v start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT = âˆ start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT italic_Y start_POSTSUBSCRIPT italic_d start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT end_POSTSUBSCRIPT ( italic_u start_POSTSUBSCRIPT italic_t - italic_k start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT end_POSTSUBSCRIPT ) s.t. âˆ‘ start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT italic_d start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT = italic_d . |  | (18)  
+---|---|---|---  
+  
+Here, Ydsubscriptğ‘Œğ‘‘Y_{d}italic_Y start_POSTSUBSCRIPT italic_d
+end_POSTSUBSCRIPT is a degree-dğ‘‘ditalic_d polynomial in
+ğ’´ğ’´\mathcal{Y}caligraphic_Y, and 0â‰¤ki0subscriptğ‘˜ğ‘–0\leq k_{i}0 â‰¤
+italic_k start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT is the delay for
+iğ‘–iitalic_ith component in the product. Ideally,
+Iâ¢Pâ¢Ctâ¢oâ¢tğ¼ğ‘ƒsubscriptğ¶ğ‘¡ğ‘œğ‘¡IPC_{tot}italic_I italic_P italic_C
+start_POSTSUBSCRIPT italic_t italic_o italic_t end_POSTSUBSCRIPT and
+Iâ¢Pâ¢Cdğ¼ğ‘ƒsubscriptğ¶ğ‘‘IPC_{d}italic_I italic_P italic_C
+start_POSTSUBSCRIPT italic_d end_POSTSUBSCRIPT will be calculated using
+polynomials of every degree and inputs of every delay. However, since this is
+impractical, we usually limit degree and delay range. In this experiment, IPC
+calculations are limited to maximum-delay/degree pairs denoted by
+kğ‘˜kitalic_k-dğ‘‘ditalic_d for maximum degree kğ‘˜kitalic_k and maximum delay
+dğ‘‘ditalic_d as follows: 1111-300300300300, 2222-100100100100, 3333-30303030,
+4444-10101010 and 5555-10101010. We further select a subset of delay-degree
+configurations by computing IPC with all configurations for the aforementioned
+maximum-delay/degree pairs for some of the parameter configurations, then
+selecting delay-degree configurations that significantly contribute to
+Iâ¢Pâ¢Ctâ¢oâ¢tğ¼ğ‘ƒsubscriptğ¶ğ‘¡ğ‘œğ‘¡IPC_{tot}italic_I italic_P italic_C
+start_POSTSUBSCRIPT italic_t italic_o italic_t end_POSTSUBSCRIPT.
+
+We observed that the low values of memory function of delay k=1ğ‘˜1k=1italic_k
+= 1 (Mâ¢C1ğ‘€subscriptğ¶1MC_{1}italic_M italic_C start_POSTSUBSCRIPT 1
+end_POSTSUBSCRIPT) depicted as the blue region in Fig.Â 7(a) partially
+corresponds to the red high-error region in Fig.Â 5(a). Furthermore, the
+maximum linear delay, computed by
+argmaxkâ¢(Mâ¢Ck>10âˆ’4)subscriptargmaxğ‘˜ğ‘€subscriptğ¶ğ‘˜superscript104\mathrm{argmax}_{k}(MC_{k}>10^{-4})roman_argmax
+start_POSTSUBSCRIPT italic_k end_POSTSUBSCRIPT ( italic_M italic_C
+start_POSTSUBSCRIPT italic_k end_POSTSUBSCRIPT > 10 start_POSTSUPERSCRIPT - 4
+end_POSTSUPERSCRIPT ), shown in Fig.Â 7(d), has global consistency with the
+non-stationary ESP depicted in Fig.Â 4(d). However, regions in Fig.Â 7(d)
+indicated by black rectangles are inconsistent with the corresponding regions
+in Fig.Â 4(d). It can be speculated that those regions have longer memory in
+non-linear terms, as we can see from the non-saturating
+Iâ¢Pâ¢Cğ¼ğ‘ƒğ¶IPCitalic_I italic_P italic_C values in the region, also
+indicated by black rectangles in Fig.Â 7(b).
+
+FigureÂ 7(e) depicts the rank of a state sequence, computed using the number
+of significant singular values of a matrix formed by arranging every state in
+the time direction. It is expected that the total IPC
+(Iâ¢Pâ¢Ctâ¢oâ¢tğ¼ğ‘ƒsubscriptğ¶ğ‘¡ğ‘œğ‘¡IPC_{tot}italic_I italic_P italic_C
+start_POSTSUBSCRIPT italic_t italic_o italic_t end_POSTSUBSCRIPT) in Fig.Â
+7(b) should saturate at the value of these rank values. For instance, as the
+rank is 13131313 for every configuration except the northern and southern
+poles in Fig.Â 7(e), we anticipate that the low IPC region in Fig.Â 7(b) would
+vanish if a sufficient number of higher-degree/longer-delay nonlinear memory
+functions were collected. However, this is computationally infeasible in our
+current environment due to the high calculation cost of IPC for higher-degree
+capacities.
+
+The annotated parameter region, X, Y, and the A-axis in Fig.Â 7(a), has
+different memory decay properties. As we can see in Fig.Â 7(c) and Fig.Â 7(f),
+the X-axis input corresponds to small short-term memory and large long-term
+memory, the Y-axis input corresponds to large short-term memory and no long-
+term memory, and the A-axis input corresponds to small short-term and long-
+term memories.
+
+###  II.4 Subset non-stationary ESP of QRC
+
+![Refer to caption](x17.png) Figure 8: Schematics of subset non-stationary ESP
+experiment setup. We have two qubits: q0subscriptğ‘0q_{0}italic_q
+start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT and q1subscriptğ‘1q_{1}italic_q
+start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT. Only q0subscriptğ‘0q_{0}italic_q
+start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT has amplitude damping channel
+â„°aâ¢d(0)superscriptsubscriptâ„°ğ‘ğ‘‘0\mathcal{E}_{ad}^{(0)}caligraphic_E
+start_POSTSUBSCRIPT italic_a italic_d end_POSTSUBSCRIPT start_POSTSUPERSCRIPT
+( 0 ) end_POSTSUPERSCRIPT. Although U0subscriptğ‘ˆ0U_{0}italic_U
+start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT and U1subscriptğ‘ˆ1U_{1}italic_U
+start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT are local to each qubits,
+q0subscriptğ‘0q_{0}italic_q start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT and
+q1subscriptğ‘1q_{1}italic_q start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT,
+respectively, UCâ¢Xpsuperscriptsubscriptğ‘ˆğ¶ğ‘‹ğ‘U_{CX}^{p}italic_U
+start_POSTSUBSCRIPT italic_C italic_X end_POSTSUBSCRIPT start_POSTSUPERSCRIPT
+italic_p end_POSTSUPERSCRIPT induces entangling dynamics.
+
+![Refer to caption](x18.png) ((a)) Total system
+
+![Refer to caption](x19.png) ((b)) Damping subsystem
+
+![Refer to caption](x20.png) ((c)) Non-damping subsystem
+
+Figure 9:  (a) Non-stationary ESP of the total system, and subset non-
+stationary ESP of (b) the damping subsystem, and (c) the non-damping
+subsystem.
+
+We also demonstrated numerically that the subset non-stationary ESP can
+characterize the information processing power of systems with partial fading
+memory. We devised a two-qubit system; each of its qubits had random unitary
+U0subscriptğ‘ˆ0U_{0}italic_U start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT and
+U1subscriptğ‘ˆ1U_{1}italic_U start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT,
+respectively, as its dynamics. One of the qubits had amplitude damping channel
+â„°aâ¢d(0)â¢(â‹…,Î³)superscriptsubscriptâ„°ğ‘ğ‘‘0â‹…ğ›¾\mathcal{E}_{ad}^{(0)}(\cdot,\gamma)caligraphic_E
+start_POSTSUBSCRIPT italic_a italic_d end_POSTSUBSCRIPT start_POSTSUPERSCRIPT
+( 0 ) end_POSTSUPERSCRIPT ( â‹… , italic_Î³ ) of damping rate
+Î³ğ›¾\gammaitalic_Î³ applied locally to the subsystem 00 after local unitary
+evolution. Here, an amplitude damping channel
+â„°aâ¢d(0)â¢(â‹…,Î³)superscriptsubscriptâ„°ğ‘ğ‘‘0â‹…ğ›¾\mathcal{E}_{ad}^{(0)}(\cdot,\gamma)caligraphic_E
+start_POSTSUBSCRIPT italic_a italic_d end_POSTSUBSCRIPT start_POSTSUPERSCRIPT
+( 0 ) end_POSTSUPERSCRIPT ( â‹… , italic_Î³ ) was defined as
+
+| â„°aâ¢d(0)â¢(Ï,Î³)superscriptsubscriptâ„°ğ‘ğ‘‘0ğœŒğ›¾\displaystyle\mathcal{E}_{ad}^{(0)}(\rho,\gamma)caligraphic_E start_POSTSUBSCRIPT italic_a italic_d end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( 0 ) end_POSTSUPERSCRIPT ( italic_Ï , italic_Î³ ) | =(K0â¢(Î³)(0)âŠ—I(1))â¢Ïâ¢(K0â€ â¢(Î³)(0)âŠ—I(1))absenttensor-productsubscriptğ¾0superscriptğ›¾0superscriptğ¼1ğœŒtensor-productsuperscriptsubscriptğ¾0â€ superscriptğ›¾0superscriptğ¼1\displaystyle=\left(K_{0}(\gamma)^{(0)}\otimes I^{(1)}\right)\rho\left(K_{0}^{% \dagger}(\gamma)^{(0)}\otimes I^{(1)}\right)= ( italic_K start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT ( italic_Î³ ) start_POSTSUPERSCRIPT ( 0 ) end_POSTSUPERSCRIPT âŠ— italic_I start_POSTSUPERSCRIPT ( 1 ) end_POSTSUPERSCRIPT ) italic_Ï ( italic_K start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT â€ end_POSTSUPERSCRIPT ( italic_Î³ ) start_POSTSUPERSCRIPT ( 0 ) end_POSTSUPERSCRIPT âŠ— italic_I start_POSTSUPERSCRIPT ( 1 ) end_POSTSUPERSCRIPT ) |  | (19)  
+---|---|---|---|---  
+|  | +(K1â¢(Î³)(0)âŠ—I(1))â¢Ïâ¢(K1â€ â¢(Î³)(0)âŠ—I(1))tensor-productsubscriptğ¾1superscriptğ›¾0superscriptğ¼1ğœŒtensor-productsuperscriptsubscriptğ¾1â€ superscriptğ›¾0superscriptğ¼1\displaystyle+\left(K_{1}(\gamma)^{(0)}\otimes I^{(1)}\right)\rho\left(K_{1}^{% \dagger}(\gamma)^{(0)}\otimes I^{(1)}\right)\+ ( italic_K start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT ( italic_Î³ ) start_POSTSUPERSCRIPT ( 0 ) end_POSTSUPERSCRIPT âŠ— italic_I start_POSTSUPERSCRIPT ( 1 ) end_POSTSUPERSCRIPT ) italic_Ï ( italic_K start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT â€ end_POSTSUPERSCRIPT ( italic_Î³ ) start_POSTSUPERSCRIPT ( 0 ) end_POSTSUPERSCRIPT âŠ— italic_I start_POSTSUPERSCRIPT ( 1 ) end_POSTSUPERSCRIPT ) |   
+  
+where
+
+| K0â¢(Î³)subscriptğ¾0ğ›¾\displaystyle K_{0}(\gamma)italic_K start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT ( italic_Î³ ) | =(1001âˆ’Î³)andabsentmatrix1001ğ›¾and\displaystyle=\begin{pmatrix}1&0\\\ 0&\sqrt{1-\gamma}\end{pmatrix}\quad\text{and}= ( start_ARG start_ROW start_CELL 1 end_CELL start_CELL 0 end_CELL end_ROW start_ROW start_CELL 0 end_CELL start_CELL square-root start_ARG 1 - italic_Î³ end_ARG end_CELL end_ROW end_ARG ) and |  | (20)  
+---|---|---|---|---  
+| K1â¢(Î³)subscriptğ¾1ğ›¾\displaystyle K_{1}(\gamma)italic_K start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT ( italic_Î³ ) | =(0Î³00).absentmatrix0ğ›¾00\displaystyle=\begin{pmatrix}0&\sqrt{\gamma}\\\ 0&0\end{pmatrix}.= ( start_ARG start_ROW start_CELL 0 end_CELL start_CELL square-root start_ARG italic_Î³ end_ARG end_CELL end_ROW start_ROW start_CELL 0 end_CELL start_CELL 0 end_CELL end_ROW end_ARG ) . |   
+  
+Furthermore, we modulated the entanglement between two qubits by applying the
+matrix power of CNOT gate:
+UCâ¢Xpsuperscriptsubscriptğ‘ˆğ¶ğ‘‹ğ‘U_{CX}^{p}italic_U start_POSTSUBSCRIPT
+italic_C italic_X end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_p
+end_POSTSUPERSCRIPT for pâˆˆ[0,1]ğ‘01p\in[0,1]italic_p âˆˆ [ 0 , 1 ] where
+
+| UCâ¢X=(1000010000010010).subscriptğ‘ˆğ¶ğ‘‹matrix1000010000010010U_{CX}=\begin{pmatrix}1&0&0&0\\\ 0&1&0&0\\\ 0&0&0&1\\\ 0&0&1&0\\\ \end{pmatrix}.italic_U start_POSTSUBSCRIPT italic_C italic_X end_POSTSUBSCRIPT = ( start_ARG start_ROW start_CELL 1 end_CELL start_CELL 0 end_CELL start_CELL 0 end_CELL start_CELL 0 end_CELL end_ROW start_ROW start_CELL 0 end_CELL start_CELL 1 end_CELL start_CELL 0 end_CELL start_CELL 0 end_CELL end_ROW start_ROW start_CELL 0 end_CELL start_CELL 0 end_CELL start_CELL 0 end_CELL start_CELL 1 end_CELL end_ROW start_ROW start_CELL 0 end_CELL start_CELL 0 end_CELL start_CELL 1 end_CELL start_CELL 0 end_CELL end_ROW end_ARG ) . |  | (21)  
+---|---|---|---  
+  
+Namely, if p=0ğ‘0p=0italic_p = 0, it equaled an identity, and if
+p=1ğ‘1p=1italic_p = 1, it equaled a CNOT gate that took
+q0subscriptğ‘0q_{0}italic_q start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT as the
+control qubit. Overall, non-input-driven system dynamics became
+
+| ÏğœŒ\displaystyle\rhoitalic_Ï | â†’â„°sâ¢yâ¢sâ¢(Ï)whereâ†’absentsubscriptâ„°ğ‘ ğ‘¦ğ‘ ğœŒwhere\displaystyle\to\mathcal{E}_{sys}(\rho)\ \ \textrm{where}â†’ caligraphic_E start_POSTSUBSCRIPT italic_s italic_y italic_s end_POSTSUBSCRIPT ( italic_Ï ) where |  | (22)  
+---|---|---|---|---  
+| â„°sâ¢yâ¢sâ¢(Ï)subscriptâ„°ğ‘ ğ‘¦ğ‘ ğœŒ\displaystyle\mathcal{E}_{sys}(\rho)caligraphic_E start_POSTSUBSCRIPT italic_s italic_y italic_s end_POSTSUBSCRIPT ( italic_Ï ) | â‰¡UCâ¢Xpâ¢â„°aâ¢d(0)â¢((U0âŠ—U1)â¢Ïâ¢(U0â€ âŠ—U1â€ ),Î³)â¢(UCâ¢Xâ€ )p.absentsuperscriptsubscriptğ‘ˆğ¶ğ‘‹ğ‘superscriptsubscriptâ„°ğ‘ğ‘‘0tensor-productsubscriptğ‘ˆ0subscriptğ‘ˆ1ğœŒtensor-productsuperscriptsubscriptğ‘ˆ0â€ superscriptsubscriptğ‘ˆ1â€ ğ›¾superscriptsuperscriptsubscriptğ‘ˆğ¶ğ‘‹â€ ğ‘\displaystyle\equiv U_{CX}^{p}\mathcal{E}_{ad}^{(0)}\left((U_{0}\otimes U_{1})% \rho(U_{0}^{\dagger}\otimes U_{1}^{\dagger}),\gamma\right)\left(U_{CX}^{% \dagger}\right)^{p}.â‰¡ italic_U start_POSTSUBSCRIPT italic_C italic_X end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_p end_POSTSUPERSCRIPT caligraphic_E start_POSTSUBSCRIPT italic_a italic_d end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( 0 ) end_POSTSUPERSCRIPT ( ( italic_U start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT âŠ— italic_U start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT ) italic_Ï ( italic_U start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT â€ end_POSTSUPERSCRIPT âŠ— italic_U start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT â€ end_POSTSUPERSCRIPT ) , italic_Î³ ) ( italic_U start_POSTSUBSCRIPT italic_C italic_X end_POSTSUBSCRIPT start_POSTSUPERSCRIPT â€ end_POSTSUPERSCRIPT ) start_POSTSUPERSCRIPT italic_p end_POSTSUPERSCRIPT . |   
+  
+![Refer to caption](x21.png) ((a)) Total system
+
+![Refer to caption](x22.png) ((b)) Damping subsystem
+
+![Refer to caption](x23.png) ((c)) Non-damping subsystem
+
+![Refer to caption](x24.png) ((d)) Total system
+
+![Refer to caption](x25.png) ((e)) Damping subsystem
+
+![Refer to caption](x26.png) ((f)) Non-damping subsystem
+
+![Refer to caption](x27.png) ((g)) Total system
+
+![Refer to caption](x28.png) ((h)) Damping subsystem
+
+![Refer to caption](x29.png) ((i)) Non-damping subsystem
+
+![Refer to caption](x30.png) ((j)) Total system
+
+![Refer to caption](x31.png) ((k)) Damping subsystem
+
+![Refer to caption](x32.png) ((l)) Non-damping subsystem
+
+Figure 10:  (a-c) RNMSE of NARMA2 task, (d-f) linear memory capacity
+(Mâ¢Ctâ¢oâ¢tğ‘€subscriptğ¶ğ‘¡ğ‘œğ‘¡MC_{tot}italic_M italic_C
+start_POSTSUBSCRIPT italic_t italic_o italic_t end_POSTSUBSCRIPT), (g-i) non-
+linear memory capacity (Iâ¢Pâ¢C2+ğ¼ğ‘ƒsubscriptğ¶limit-from2IPC_{2+}italic_I
+italic_P italic_C start_POSTSUBSCRIPT 2 + end_POSTSUBSCRIPT) and rank of
+reservoirâ€™s output signals (j-l) of (a,d,g,j) total system, (b,e,h,k) the
+damping subsystem, and (c,f,i,l) the non-damping subsystem.
+
+In this setup, the entanglement between two qubits can be devised by changing
+pğ‘pitalic_p; the system dynamics is a complete tensor product of single qubit
+dynamics when p=0ğ‘0p=0italic_p = 0 and pğ‘pitalic_p-dependent entanglements
+are introduced based on the relationship between
+UCâ¢Xpsuperscriptsubscriptğ‘ˆğ¶ğ‘‹ğ‘U_{CX}^{p}italic_U start_POSTSUBSCRIPT
+italic_C italic_X end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_p
+end_POSTSUPERSCRIPT, U0subscriptğ‘ˆ0U_{0}italic_U start_POSTSUBSCRIPT 0
+end_POSTSUBSCRIPT, and U1subscriptğ‘ˆ1U_{1}italic_U start_POSTSUBSCRIPT 1
+end_POSTSUBSCRIPT when p>0ğ‘0p>0italic_p > 0.
+
+The input encoding also has a tensor product structure. Namely, given an input
+ğ®âˆˆ[âˆ’1,1]ğ®11\mathbf{u}\in[-1,1]bold_u âˆˆ [ - 1 , 1 ], our input encoding
+unitary Uiâ¢nsubscriptğ‘ˆğ‘–ğ‘›U_{in}italic_U start_POSTSUBSCRIPT italic_i
+italic_n end_POSTSUBSCRIPT was
+
+| Uiâ¢nâ¢(u)â‰¡RY(0)â¢(arccosâ¢(ğ®))âŠ—RY(1)â¢(arccosâ¢(ğ®)).subscriptğ‘ˆğ‘–ğ‘›ğ‘¢tensor-productsuperscriptsubscriptğ‘…ğ‘Œ0arccosğ®superscriptsubscriptğ‘…ğ‘Œ1arccosğ®U_{in}(u)\equiv R_{Y}^{(0)}(\mathrm{arccos}(\mathbf{u}))\otimes R_{Y}^{(1)}(% \mathrm{arccos}(\mathbf{u})).italic_U start_POSTSUBSCRIPT italic_i italic_n end_POSTSUBSCRIPT ( italic_u ) â‰¡ italic_R start_POSTSUBSCRIPT italic_Y end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( 0 ) end_POSTSUPERSCRIPT ( roman_arccos ( bold_u ) ) âŠ— italic_R start_POSTSUBSCRIPT italic_Y end_POSTSUBSCRIPT start_POSTSUPERSCRIPT ( 1 ) end_POSTSUPERSCRIPT ( roman_arccos ( bold_u ) ) . |  | (23)  
+---|---|---|---  
+  
+Therefore, the final input-driven dynamics became
+
+| Ït+1subscriptğœŒğ‘¡1\displaystyle\rho_{t+1}italic_Ï start_POSTSUBSCRIPT italic_t + 1 end_POSTSUBSCRIPT | =â„°iâ¢nâ¢(â„°sâ¢yâ¢sâ¢(Ï),ğ®t)whereabsentsubscriptâ„°ğ‘–ğ‘›subscriptâ„°ğ‘ ğ‘¦ğ‘ ğœŒsubscriptğ®ğ‘¡where\displaystyle=\mathcal{E}_{in}\left(\mathcal{E}_{sys}\left(\rho\right),\mathbf% {u}_{t}\right)\ \ \ \textrm{where}= caligraphic_E start_POSTSUBSCRIPT italic_i italic_n end_POSTSUBSCRIPT ( caligraphic_E start_POSTSUBSCRIPT italic_s italic_y italic_s end_POSTSUBSCRIPT ( italic_Ï ) , bold_u start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ) where |  | (24)  
+---|---|---|---|---  
+|  | â„°iâ¢nâ¢(Ï,ğ®t)â‰¡Uiâ¢nâ¢(ğ®t)â¢Ïâ¢Uiâ¢nâ€ â¢(ğ®t).subscriptâ„°ğ‘–ğ‘›ğœŒsubscriptğ®ğ‘¡subscriptğ‘ˆğ‘–ğ‘›subscriptğ®ğ‘¡ğœŒsuperscriptsubscriptğ‘ˆğ‘–ğ‘›â€ subscriptğ®ğ‘¡\displaystyle\mathcal{E}_{in}(\rho,\mathbf{u}_{t})\equiv U_{in}(\mathbf{u}_{t}% )\rho U_{in}^{\dagger}(\mathbf{u}_{t}).caligraphic_E start_POSTSUBSCRIPT italic_i italic_n end_POSTSUBSCRIPT ( italic_Ï , bold_u start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ) â‰¡ italic_U start_POSTSUBSCRIPT italic_i italic_n end_POSTSUBSCRIPT ( bold_u start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ) italic_Ï italic_U start_POSTSUBSCRIPT italic_i italic_n end_POSTSUBSCRIPT start_POSTSUPERSCRIPT â€ end_POSTSUPERSCRIPT ( bold_u start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ) . |   
+  
+####  II.4.1 Subset ESP and subset non-stationary ESP
+
+Similar to the setup in the non-stationary ESP experiments, we computed the
+non-stationary ESP indicator (Eq.Â (13)) for every configuration of
+Î³ğ›¾\gammaitalic_Î³ and pğ‘pitalic_p. The other setups are the same in the
+non-stationary ESP experiment in SecÂ II.3.1. We randomly sampled four input
+sequences of size 200200200200 from a uniform distribution over the interval
+[âˆ’1,1]11[-1,1][ - 1 , 1 ] and three initial reservoir states from Haar
+random distribution of 2-qubit pure states.
+
+FigureÂ 9 depicts the non-stationary ESP of the total system (Fig.Â 9(a)), the
+subset non-stationary ESP of the damping subsystem (Fig.Â 9(b)), and the non-
+damping subsystem (Fig.Â 9(c)). As we can see, the damping subsystem has a
+strong subset non-stationary ESP in almost every parameter region except when
+there is no amplitude damping (Î³=0ğ›¾0\gamma=0italic_Î³ = 0). Therefore, we
+can expect that the damping subsystem has fading memory in almost every
+parameter configurations of Î³ğ›¾\gammaitalic_Î³ and pğ‘pitalic_p even when
+the total system does not in a certain configuration.
+
+####  II.4.2 NARMA tasks, MC and IPC
+
+Next, in Fig.Â 10, we examined the relationship between the subset non-
+stationary ESP and the information processing capabilities as indicated by
+performance on the NARMA2 task, MC, and IPC. The input, target, and metrics
+settings were identical to those used in the non-stationary ESP experiments in
+Sec.Â II.3. We observed that the NARMA2 task performance and MC were more
+closely related to the subset non-stationary ESP of the damping subsystem than
+to that of the total system. Specifically, in regions of small pğ‘pitalic_p
+and large Î³ğ›¾\gammaitalic_Î³, both NARMA2 performance and MC were good, even
+if the non-stationary ESP of the total system was not maintained, as shown in
+Fig.Â 9(a). In the NARMA2 task, the performance of the total system was also
+affected by the performance of the damping subsystem, as evidenced in the
+lower right part of Fig.Â 10(a) and Fig.Â 10(c).
+
+We hypothesize that the low-performance range around pâˆ¼0.7similar-
+toğ‘0.7p\sim 0.7italic_p âˆ¼ 0.7 in Fig.Â 10(a) results from a sweet spot in
+the trade-off between the fading memory in the damping subsystem and the
+information propagation between entangling and non-entangling bases, which is
+modulated by the completeness of the CNOT gate: pğ‘pitalic_p.
+
+![Refer to caption](x33.png) ((a)) Mâ¢C0ğ‘€subscriptğ¶0MC_{0}italic_M italic_C
+start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT
+
+![Refer to caption](x34.png) ((b)) Mâ¢C1ğ‘€subscriptğ¶1MC_{1}italic_M italic_C
+start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT
+
+![Refer to caption](x35.png) ((c)) Mâ¢C2ğ‘€subscriptğ¶2MC_{2}italic_M italic_C
+start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT
+
+![Refer to caption](x36.png) ((d)) Mâ¢C3ğ‘€subscriptğ¶3MC_{3}italic_M italic_C
+start_POSTSUBSCRIPT 3 end_POSTSUBSCRIPT
+
+![Refer to caption](x37.png) ((e))
+Mâ¢Ceâ¢vâ¢eâ¢nğ‘€subscriptğ¶ğ‘’ğ‘£ğ‘’ğ‘›MC_{even}italic_M italic_C
+start_POSTSUBSCRIPT italic_e italic_v italic_e italic_n end_POSTSUBSCRIPT
+
+![Refer to caption](x38.png) ((f))
+Mâ¢Coâ¢dâ¢dğ‘€subscriptğ¶ğ‘œğ‘‘ğ‘‘MC_{odd}italic_M italic_C
+start_POSTSUBSCRIPT italic_o italic_d italic_d end_POSTSUBSCRIPT
+
+Figure 11:  (a-d) Mâ¢C0ğ‘€subscriptğ¶0MC_{0}italic_M italic_C
+start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT to Mâ¢C3ğ‘€subscriptğ¶3MC_{3}italic_M
+italic_C start_POSTSUBSCRIPT 3 end_POSTSUBSCRIPT, (e)
+Mâ¢Ceâ¢vâ¢eâ¢nğ‘€subscriptğ¶ğ‘’ğ‘£ğ‘’ğ‘›MC_{even}italic_M italic_C
+start_POSTSUBSCRIPT italic_e italic_v italic_e italic_n end_POSTSUBSCRIPT, and
+(f) Mâ¢Coâ¢dâ¢dğ‘€subscriptğ¶ğ‘œğ‘‘ğ‘‘MC_{odd}italic_M italic_C
+start_POSTSUBSCRIPT italic_o italic_d italic_d end_POSTSUBSCRIPT of the
+damping subsystem.
+
+The mechanism of the trade-off includes utilizing entangling basis:
+{â¨‚Piâˆ£Piâˆˆ{X,Y,Z}}conditional-settensor-
+productsubscriptğ‘ƒğ‘–subscriptğ‘ƒğ‘–ğ‘‹ğ‘Œğ‘\left\\{\bigotimes P_{i}\mid
+P_{i}\in\\{X,Y,Z\\}\right\\}{ â¨‚ italic_P start_POSTSUBSCRIPT italic_i
+end_POSTSUBSCRIPT âˆ£ italic_P start_POSTSUBSCRIPT italic_i end_POSTSUBSCRIPT
+âˆˆ { italic_X , italic_Y , italic_Z } } as memory as follows. ESP does not
+hold if Î³ğ›¾\gammaitalic_Î³ is small. Also, the information encoded in this
+system is almost fully transferred to the entangling basis when pğ‘pitalic_p
+is large. This is the mechanism of Mâ¢C0ğ‘€subscriptğ¶0MC_{0}italic_M italic_C
+start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT in Fig.Â 11(a). The next application
+of CNOT brings information encoded in the entangling basis back to this
+system. Therefore, Mâ¢C1ğ‘€subscriptğ¶1MC_{1}italic_M italic_C
+start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT has a large value even if pğ‘pitalic_p
+is large (Fig.Â 11(b)). However, yet another application of the CNOT brings
+the information back to the entangling basis again. Therefore,
+Mâ¢C2ğ‘€subscriptğ¶2MC_{2}italic_M italic_C start_POSTSUBSCRIPT 2
+end_POSTSUBSCRIPT does not have value in the parameter range of interest
+(Fig.Â 11(c)). Successive application of CNOT is the repetition of the process
+above (Fig.Â 11(d)). These differences between even and odd delay memory
+capacities are clear in Fig.Â 11(e) and Fig.Â 11(f) where
+Mâ¢Coâ¢dâ¢dâ‰¡âˆ‘i:oâ¢dâ¢dMâ¢Ciğ‘€subscriptğ¶ğ‘œğ‘‘ğ‘‘subscript:ğ‘–ğ‘œğ‘‘ğ‘‘ğ‘€subscriptğ¶ğ‘–MC_{odd}\equiv\sum_{i:odd}MC_{i}italic_M
+italic_C start_POSTSUBSCRIPT italic_o italic_d italic_d end_POSTSUBSCRIPT â‰¡
+âˆ‘ start_POSTSUBSCRIPT italic_i : italic_o italic_d italic_d
+end_POSTSUBSCRIPT italic_M italic_C start_POSTSUBSCRIPT italic_i
+end_POSTSUBSCRIPT and
+Mâ¢Ceâ¢vâ¢eâ¢nâ‰¡âˆ‘i:eâ¢vâ¢eâ¢nMâ¢Ciğ‘€subscriptğ¶ğ‘’ğ‘£ğ‘’ğ‘›subscript:ğ‘–ğ‘’ğ‘£ğ‘’ğ‘›ğ‘€subscriptğ¶ğ‘–MC_{even}\equiv\sum_{i:even}MC_{i}italic_M
+italic_C start_POSTSUBSCRIPT italic_e italic_v italic_e italic_n
+end_POSTSUBSCRIPT â‰¡ âˆ‘ start_POSTSUBSCRIPT italic_i : italic_e italic_v
+italic_e italic_n end_POSTSUBSCRIPT italic_M italic_C start_POSTSUBSCRIPT
+italic_i end_POSTSUBSCRIPT are plotted.
+
+We imagine that a gap exists between the parameter ranges in which the
+entangling basis can behave as memory and cannot. Thus, as depicted in Fig.Â
+12, kâ‰¥2ğ‘˜2k\geq 2italic_k â‰¥ 2 memory capacities,
+Mâ¢C2+â‰¡âˆ‘iâ‰¥2Mâ¢Ciğ‘€subscriptğ¶limit-
+from2subscriptğ‘–2ğ‘€subscriptğ¶ğ‘–MC_{2+}\equiv\sum_{i\geq 2}MC_{i}italic_M
+italic_C start_POSTSUBSCRIPT 2 + end_POSTSUBSCRIPT â‰¡ âˆ‘ start_POSTSUBSCRIPT
+italic_i â‰¥ 2 end_POSTSUBSCRIPT italic_M italic_C start_POSTSUBSCRIPT
+italic_i end_POSTSUBSCRIPT, is composed of two regions where entangling basis
+can behave as memory.
+
+![Refer to caption](x39.png) ((a)) Entangling basis
+
+![Refer to caption](x40.png) ((b)) Total system
+
+Figure 12:  Mâ¢C2+ğ‘€subscriptğ¶limit-from2MC_{2+}italic_M italic_C
+start_POSTSUBSCRIPT 2 + end_POSTSUBSCRIPT of the entangling basis and the
+total system.
+
+![Refer to caption](x41.png) ((a)) Mâ¢C0ğ‘€subscriptğ¶0MC_{0}italic_M italic_C
+start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT
+
+![Refer to caption](x42.png) ((b)) Mâ¢C1ğ‘€subscriptğ¶1MC_{1}italic_M italic_C
+start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT
+
+![Refer to caption](x43.png) ((c)) Mâ¢C2ğ‘€subscriptğ¶2MC_{2}italic_M italic_C
+start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT
+
+![Refer to caption](x44.png) ((d)) Mâ¢C3ğ‘€subscriptğ¶3MC_{3}italic_M italic_C
+start_POSTSUBSCRIPT 3 end_POSTSUBSCRIPT
+
+![Refer to caption](x45.png) ((e)) Mâ¢C4ğ‘€subscriptğ¶4MC_{4}italic_M italic_C
+start_POSTSUBSCRIPT 4 end_POSTSUBSCRIPT
+
+![Refer to caption](x46.png) ((f)) Mâ¢C5ğ‘€subscriptğ¶5MC_{5}italic_M italic_C
+start_POSTSUBSCRIPT 5 end_POSTSUBSCRIPT
+
+![Refer to caption](x47.png) ((g)) Mâ¢C6ğ‘€subscriptğ¶6MC_{6}italic_M italic_C
+start_POSTSUBSCRIPT 6 end_POSTSUBSCRIPT
+
+![Refer to caption](x48.png) ((h)) Mâ¢C7ğ‘€subscriptğ¶7MC_{7}italic_M italic_C
+start_POSTSUBSCRIPT 7 end_POSTSUBSCRIPT
+
+![Refer to caption](x49.png) ((i)) Mâ¢C8ğ‘€subscriptğ¶8MC_{8}italic_M italic_C
+start_POSTSUBSCRIPT 8 end_POSTSUBSCRIPT
+
+![Refer to caption](x50.png) ((j)) Mâ¢C9ğ‘€subscriptğ¶9MC_{9}italic_M italic_C
+start_POSTSUBSCRIPT 9 end_POSTSUBSCRIPT
+
+![Refer to caption](x51.png) ((k)) Mâ¢C10ğ‘€subscriptğ¶10MC_{10}italic_M
+italic_C start_POSTSUBSCRIPT 10 end_POSTSUBSCRIPT
+
+![Refer to caption](x52.png) ((l)) Mâ¢C11ğ‘€subscriptğ¶11MC_{11}italic_M
+italic_C start_POSTSUBSCRIPT 11 end_POSTSUBSCRIPT
+
+![Refer to caption](x53.png) ((m)) Mâ¢C12ğ‘€subscriptğ¶12MC_{12}italic_M
+italic_C start_POSTSUBSCRIPT 12 end_POSTSUBSCRIPT
+
+![Refer to caption](x54.png) ((n)) Mâ¢C13ğ‘€subscriptğ¶13MC_{13}italic_M
+italic_C start_POSTSUBSCRIPT 13 end_POSTSUBSCRIPT
+
+![Refer to caption](x55.png) ((o)) Mâ¢C14ğ‘€subscriptğ¶14MC_{14}italic_M
+italic_C start_POSTSUBSCRIPT 14 end_POSTSUBSCRIPT
+
+![Refer to caption](x56.png) ((p)) Mâ¢C15ğ‘€subscriptğ¶15MC_{15}italic_M
+italic_C start_POSTSUBSCRIPT 15 end_POSTSUBSCRIPT
+
+![Refer to caption](x57.png) ((q)) Mâ¢C16ğ‘€subscriptğ¶16MC_{16}italic_M
+italic_C start_POSTSUBSCRIPT 16 end_POSTSUBSCRIPT
+
+![Refer to caption](x58.png) ((r)) Mâ¢C17ğ‘€subscriptğ¶17MC_{17}italic_M
+italic_C start_POSTSUBSCRIPT 17 end_POSTSUBSCRIPT
+
+![Refer to caption](x59.png) ((s)) Mâ¢C18ğ‘€subscriptğ¶18MC_{18}italic_M
+italic_C start_POSTSUBSCRIPT 18 end_POSTSUBSCRIPT
+
+![Refer to caption](x60.png) ((t)) Mâ¢C19ğ‘€subscriptğ¶19MC_{19}italic_M
+italic_C start_POSTSUBSCRIPT 19 end_POSTSUBSCRIPT
+
+Figure 13:  Memory functions of delay 0â‰¤kâ‰¤190ğ‘˜190\leq k\leq 190 â‰¤
+italic_k â‰¤ 19 by XZ basis measurement results. The red region has finite
+memory functions. Please be warned that each heatmap has a different scale.
+Small values still have statistical meaning because each memory function is
+thresholded by a random shuffle surrogate [29].
+
+Furthermore, by evaluating the memory functions of every Pauli string
+measurement (especially those of entangling basis) in the subset ESP
+experiment of Sec.Â II.4, we observed parameter dependencies of delay of
+memory functions with finite value. An interesting example was the
+Xâ¢Zğ‘‹ğ‘XZitalic_X italic_Z basis, in which parameter regions with finite
+memory had multiple islands in a longer delay. (See Fig.Â 13 for detail.)
+
+##  III Conclusion
+
+This paper proposes non-stationary and subspace/subset ESPs that are helpful
+in real-world RC scenarios. As a concrete application, we numerically analyzed
+a QRC with a well-known SK Hamiltonian, a reset-input encoding method for non-
+stationary ESP, and an adaptive entanglement system for a subset of non-
+stationary ESP. Our study revealed a partial correspondence between the non-
+stationary ESP and the subset/subspace ESP and the information processing
+capabilities, as demonstrated using NARMA tasks and MC/IPC calculations.
+
+Notably, using non-stationary ESP over the traditional ESP enables us to rule
+out dynamics that converge input independently to a fixed point. Furthermore,
+using subset non-stationary ESP enables us to predict the information
+processing capability of possibly disjoint systems, such as tensor product
+systems of qubits, as observed in subset non-stationary ESP experiments. Our
+theory provides novel perspectives for the practical design of QRC and other
+possibly non-stationary RC systems.
+
+##  IV Acknowledgments
+
+This work was supported by the MEXT Quantum Leap Flagship Program (MEXT
+Q-LEAP) Grant No. JPMXS0120319794.
+
+##  Appendix A Equivalence of ESP definitions
+
+Here, we prove the equivalence of two distinct ESP definitions introduced in
+[4] so that our following discussion becomes general.
+
+######  Remark A.1.
+
+The following ESP conditions are equivalent. Following the notations
+introduced in [27], let us consider input sequences
+{ğ®t}tâˆˆğ’¯âˆˆUğ’¯subscriptsubscriptğ®ğ‘¡ğ‘¡ğ’¯superscriptğ‘ˆğ’¯\\{\mathbf{u}_{t}\\}_{t\in\mathcal{T}}\in
+U^{\mathcal{T}}{ bold_u start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT }
+start_POSTSUBSCRIPT italic_t âˆˆ caligraphic_T end_POSTSUBSCRIPT âˆˆ italic_U
+start_POSTSUPERSCRIPT caligraphic_T end_POSTSUPERSCRIPT where Uğ‘ˆUitalic_U is
+compact. Let Uâˆ’â„•superscriptğ‘ˆâ„•U^{-\mathbb{N}}italic_U
+start_POSTSUPERSCRIPT - blackboard_N end_POSTSUPERSCRIPT be a left-infinite
+sequence up to some tâ‰¥0ğ‘¡0t\geq 0italic_t â‰¥ 0, namely,
+Uâˆ’â„•={â‹¯,ğ®tâˆ’1,ğ®t}superscriptğ‘ˆâ„•â‹¯subscriptğ®ğ‘¡1subscriptğ®ğ‘¡U^{-\mathbb{N}}=\\{\cdots,\mathbf{u}_{t-1},\mathbf{u}_{t}\\}italic_U
+start_POSTSUPERSCRIPT - blackboard_N end_POSTSUPERSCRIPT = { â‹¯ , bold_u
+start_POSTSUBSCRIPT italic_t - 1 end_POSTSUBSCRIPT , bold_u
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT }.
+
+  1. 1.
+
+Let a state sequence given inputs {ğ®t}subscriptğ®ğ‘¡\\{\mathbf{u}_{t}\\}{
+bold_u start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } be
+{ğ±t}subscriptğ±ğ‘¡\\{\mathbf{x}_{t}\\}{ bold_x start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT } such that
+ğ±t=Tâ¢(ğ±tâˆ’1,ğ®t)subscriptğ±ğ‘¡ğ‘‡subscriptğ±ğ‘¡1subscriptğ®ğ‘¡\mathbf{x}_{t}=T(\mathbf{x}_{t-1},\mathbf{u}_{t})bold_x
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT = italic_T ( bold_x
+start_POSTSUBSCRIPT italic_t - 1 end_POSTSUBSCRIPT , bold_u
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ). Let
+{ğ±t}subscriptğ±ğ‘¡\\{\mathbf{x}_{t}\\}{ bold_x start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT } and
+{ğ±tâ€²}superscriptsubscriptğ±ğ‘¡â€²\\{\mathbf{x}_{t}^{\prime}\\}{ bold_x
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT â€²
+end_POSTSUPERSCRIPT } be two different state sequences with the same input
+sequence and different initial states. Then,
+
+| âˆ€{ğ®t}âˆˆUâˆ’â„•,limtâ†’âˆâ¢â€–ğ±tâˆ’ğ±tâ€²â€–=0formulae-sequencefor-allsubscriptğ®ğ‘¡superscriptğ‘ˆâ„•â†’ğ‘¡normsubscriptğ±ğ‘¡superscriptsubscriptğ±ğ‘¡â€²0\forall\\{\mathbf{u}_{t}\\}\in U^{-\mathbb{N}},\ \underset{t\to\infty}{\lim}\|% \mathbf{x}_{t}-\mathbf{x}_{t}^{\prime}\|=0âˆ€ { bold_u start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } âˆˆ italic_U start_POSTSUPERSCRIPT - blackboard_N end_POSTSUPERSCRIPT , start_UNDERACCENT italic_t â†’ âˆ end_UNDERACCENT start_ARG roman_lim end_ARG âˆ¥ bold_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT - bold_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT âˆ¥ = 0 |  | (25)  
+---|---|---|---  
+  
+  2. 2.
+
+Let an echo function be
+ğ„:(Uâˆ’â„•â†’â„)N:ğ„superscriptâ†’superscriptğ‘ˆâ„•â„ğ‘\mathbf{E}:\left(U^{-\mathbb{N}}\to\mathbb{R}\right)^{N}bold_E
+: ( italic_U start_POSTSUPERSCRIPT - blackboard_N end_POSTSUPERSCRIPT â†’
+blackboard_R ) start_POSTSUPERSCRIPT italic_N end_POSTSUPERSCRIPT. Then,
+
+| âˆ€{ğ®t}âˆˆUâˆ’â„•,ğ±t=ğ„â¢({ğ®t}).formulae-sequencefor-allsubscriptğ®ğ‘¡superscriptğ‘ˆâ„•subscriptğ±ğ‘¡ğ„subscriptğ®ğ‘¡\forall\\{\mathbf{u}_{t}\\}\in U^{-\mathbb{N}},\mathbf{x}_{t}=\mathbf{E}(\\{% \mathbf{u}_{t}\\}).âˆ€ { bold_u start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } âˆˆ italic_U start_POSTSUPERSCRIPT - blackboard_N end_POSTSUPERSCRIPT , bold_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT = bold_E ( { bold_u start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } ) . |  | (26)  
+---|---|---|---  
+  
+
+###### Proof.
+
+  * â€¢
+
+2â†’1â†’212\to 12 â†’ 1 If
+ğ±t=ğ„â¢({ğ®t})subscriptğ±ğ‘¡ğ„subscriptğ®ğ‘¡\mathbf{x}_{t}=\mathbf{E}(\\{\mathbf{u}_{t}\\})bold_x
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT = bold_E ( { bold_u
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } ), then
+ğ±t=ğ±tâ€²=ğ„â¢({ğ®t})subscriptğ±ğ‘¡superscriptsubscriptğ±ğ‘¡â€²ğ„subscriptğ®ğ‘¡\mathbf{x}_{t}=\mathbf{x}_{t}^{\prime}=\mathbf{E}(\\{\mathbf{u}_{t}\\})bold_x
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT = bold_x start_POSTSUBSCRIPT
+italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT =
+bold_E ( { bold_u start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } ). This
+proves the necessity of the remark.
+
+  * â€¢
+
+1â†’2â†’121\to 21 â†’ 2  
+We prove the contraposition of the fact. Namely, if
+ğ±tsubscriptğ±ğ‘¡\mathbf{x}_{t}bold_x start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT is not an echo function, then there exists an input sequence
+{ğ®t}subscriptğ®ğ‘¡\\{\mathbf{u}_{t}\\}{ bold_u start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT } such that ğ±tâ‰
+ğ±tâ€²subscriptğ±ğ‘¡superscriptsubscriptğ±ğ‘¡â€²\mathbf{x}_{t}\neq\mathbf{x}_{t}^{\prime}bold_x
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT â‰ bold_x start_POSTSUBSCRIPT
+italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT.
+Indeed, if ğ±tsubscriptğ±ğ‘¡\mathbf{x}_{t}bold_x start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT is not an echo function, there exists at least one input-
+independent parameter Î¸ğœƒ\thetaitalic_Î¸ such that
+ğ±t=ğ„â€²â¢({ğ®t},Î¸)subscriptğ±ğ‘¡superscriptğ„â€²subscriptğ®ğ‘¡ğœƒ\mathbf{x}_{t}=\mathbf{E}^{\prime}(\\{\mathbf{u}_{t}\\},\theta)bold_x
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT = bold_E start_POSTSUPERSCRIPT
+â€² end_POSTSUPERSCRIPT ( { bold_u start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT } , italic_Î¸ ). This form implies that the effect of
+Î¸ğœƒ\thetaitalic_Î¸ remains finite after processing an infinite number of
+inputs for at least one input sequence because
+{ğ®t}subscriptğ®ğ‘¡\\{\mathbf{u}_{t}\\}{ bold_u start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT } is left-infinite. Therefore, for different states
+ğ±tsubscriptğ±ğ‘¡\mathbf{x}_{t}bold_x start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT and
+ğ±tâ€²superscriptsubscriptğ±ğ‘¡â€²\mathbf{x}_{t}^{\prime}bold_x
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT â€²
+end_POSTSUPERSCRIPT with different Î¸ğœƒ\thetaitalic_Î¸, there exists at least
+one input sequence
+{ğ®t}âˆˆUâˆ’â„•subscriptğ®ğ‘¡superscriptğ‘ˆâ„•\\{\mathbf{u}_{t}\\}\in
+U^{-\mathbb{N}}{ bold_u start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } âˆˆ
+italic_U start_POSTSUPERSCRIPT - blackboard_N end_POSTSUPERSCRIPT such that
+ğ±tâ‰
+ğ±tâ€²subscriptğ±ğ‘¡superscriptsubscriptğ±ğ‘¡â€²\mathbf{x}_{t}\neq\mathbf{x}_{t}^{\prime}bold_x
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT â‰ bold_x start_POSTSUBSCRIPT
+italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT â€² end_POSTSUPERSCRIPT. This
+proves the sufficiency of the remark.
+
+âˆ
+
+The result above ensures that all known ESP definitions are equivalent because
+Eq.Â (1) is equivalent to Eq.Â (25) and Eq.Â (11) in [20] is equivalent to
+Eq.Â (26).
+
+Furthermore, the following fact is implied.
+
+######  Remark A.2.
+
+Timestamp function
+
+If ESP holds and the state sequence {ğ±t}subscriptğ±ğ‘¡\\{\mathbf{x}_{t}\\}{
+bold_x start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } depends on input cycle
+tğ‘¡titalic_t, there exists a function
+t~:Uâˆ’â„•â†’â„•:~ğ‘¡â†’superscriptğ‘ˆâ„•â„•\tilde{t}:U^{-\mathbb{N}}\to\mathbb{N}over~
+start_ARG italic_t end_ARG : italic_U start_POSTSUPERSCRIPT - blackboard_N
+end_POSTSUPERSCRIPT â†’ blackboard_N such that
+
+| âˆ€{ğ®t}âˆˆUâˆ’â„•,t~â¢(â€¦,ğ®tâˆ’1,ğ®t)=t.formulae-sequencefor-allsubscriptğ®ğ‘¡superscriptğ‘ˆâ„•~ğ‘¡â€¦subscriptğ®ğ‘¡1subscriptğ®ğ‘¡ğ‘¡\forall\\{\mathbf{u}_{t}\\}\in U^{-\mathbb{N}},\ \tilde{t}\left(\dots,\mathbf{u}% _{t-1},\mathbf{u}_{t}\right)=t.âˆ€ { bold_u start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT } âˆˆ italic_U start_POSTSUPERSCRIPT - blackboard_N end_POSTSUPERSCRIPT , over~ start_ARG italic_t end_ARG ( â€¦ , bold_u start_POSTSUBSCRIPT italic_t - 1 end_POSTSUBSCRIPT , bold_u start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT ) = italic_t . |  | (27)  
+---|---|---|---  
+  
+One of the confusions about the equality of the conditions comes when we let
+Î¸=tğœƒğ‘¡\theta=titalic_Î¸ = italic_t, a time parameter. Since input sequence
+{ğ®t}subscriptğ®ğ‘¡\\{\mathbf{u}_{t}\\}{ bold_u start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT } also has time parameter tğ‘¡titalic_t, we are keen to
+equate them. However, the time parameter tğ‘¡titalic_t of
+{ğ®t}subscriptğ®ğ‘¡\\{\mathbf{u}_{t}\\}{ bold_u start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT } is a constant between all dynamics with different initial
+states for each time step: a function of the input sequence itself. Namely,
+for states ğ±ğ±\mathbf{x}bold_x and
+ğ±â€²superscriptğ±â€²\mathbf{x}^{\prime}bold_x start_POSTSUPERSCRIPT â€²
+end_POSTSUPERSCRIPT having the same input sequence
+{ğ®t}subscriptğ®ğ‘¡\\{\mathbf{u}_{t}\\}{ bold_u start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT } at every input cycle, tğ‘¡titalic_t, the input cycle, does
+not differentiate their states. Therefore, if we set a time parameter
+Î¸=Ï„ğœƒğœ\theta=\tauitalic_Î¸ = italic_Ï„ as a parameter of the echo
+function, Ï„ğœ\tauitalic_Ï„ must not depend on the timestamp of the input
+sequence. It is an unrelated parameter to the cycle of the data input
+procedure and typically an initial time t0subscriptğ‘¡0t_{0}italic_t
+start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT. There is a work [29] in which
+temporal information processing capacity (TIPC) analyzes the input cycle-
+dependent structure of state sequences. We argue that all input sequences are
+input cycle-dependent. TIPC examines how initial state dependency, which does
+not converge after washout, evolves through the input cycle. Namely, it
+analyzes the dynamics of initial state dependency.
+
+## References
+
+  * TanakaÂ  _etÂ al._ [2019] G.Â Tanaka, T.Â Yamane, J.Â B.Â HÃ©roux, R.Â Nakane, N.Â Kanazawa, S.Â Takeda, H.Â Numata, D.Â Nakano,Â andÂ A.Â Hirose,Â Neural NetworksÂ 115,Â 100 (2019). 
+  * Nakajima [2020] K.Â Nakajima,Â Japanese Journal of Applied PhysicsÂ 59,Â 060501 (2020). 
+  * NakajimaÂ andÂ Fischer [2021] K.Â NakajimaÂ andÂ I.Â Fischer,Â eds.,Â  _Reservoir Computing: Theory, Physical Implementations, and Applications_ Â (Springer Singapore,Â Singapore,Â 2021). 
+  * Jaeger [2001a] H.Â Jaeger,Â Bonn, Germany: German National Research Center for Information Technology GMD Technical ReportÂ 148 (2001a). 
+  * YildizÂ  _etÂ al._ [2012] I.Â B.Â Yildiz, H.Â Jaeger,Â andÂ S.Â J.Â Kiebel,Â Neural networksÂ 35,Â 1 (2012). 
+  * Preskill [2018] J.Â Preskill,Â QuantumÂ 2,Â 79 (2018). 
+  * McCleanÂ  _etÂ al._ [2016] J.Â R.Â McClean, J.Â Romero, R.Â Babbush,Â andÂ A.Â Aspuru-Guzik,Â New Journal of PhysicsÂ 18,Â 023023 (2016). 
+  * MitaraiÂ  _etÂ al._ [2018] K.Â Mitarai, M.Â Negoro, M.Â Kitagawa,Â andÂ K.Â Fujii,Â Physical Review AÂ 98,Â 10.1103/physreva.98.032309 (2018). 
+  * FujiiÂ andÂ Nakajima [2017] K.Â FujiiÂ andÂ K.Â Nakajima,Â Physical Review AppliedÂ 8,Â 10.1103/physrevapplied.8.024030 (2017). 
+  * GhoshÂ  _etÂ al._ [2019a] S.Â Ghosh, A.Â Opala, M.Â Matuszewski, T.Â Paterek,Â andÂ T.Â C.Â H.Â Liew,Â npj Quantum InformationÂ 5,Â 35 (2019a). 
+  * TranÂ andÂ Nakajima [2021] Q.Â H.Â TranÂ andÂ K.Â Nakajima,Â Phys. Rev. Lett.Â 127,Â 260401 (2021). 
+  * TranÂ andÂ Nakajima [2020] Q.Â H.Â TranÂ andÂ K.Â Nakajima,Â Higher-order quantum reservoir computing (2020),Â arXiv:2006.08999 [quant-ph] . 
+  * TranÂ  _etÂ al._ [2023] Q.Â H.Â Tran, S.Â Ghosh,Â andÂ K.Â Nakajima,Â Phys. Rev. Res.Â 5,Â 043127 (2023). 
+  * NegoroÂ  _etÂ al._ [2018] M.Â Negoro, K.Â Mitarai, K.Â Fujii, K.Â Nakajima,Â andÂ M.Â Kitagawa,Â Machine learning with controllable quantum dynamics of a nuclear spin ensemble in a solid (2018),Â arXiv:1806.10910 [quant-ph] . 
+  * GhoshÂ  _etÂ al._ [2019b] S.Â Ghosh, T.Â Paterek,Â andÂ T.Â C.Â H.Â Liew,Â Phys. Rev. Lett.Â 123,Â 260404 (2019b). 
+  * ChenÂ  _etÂ al._ [2020] J.Â Chen, H.Â I.Â Nurdin,Â andÂ N.Â Yamamoto,Â Physical Review AppliedÂ 14,Â 10.1103/physrevapplied.14.024065 (2020). 
+  * NokkalaÂ  _etÂ al._ [2021] J.Â Nokkala, R.Â MartÃ­nez-PeÃ±a, G.Â L.Â Giorgi, V.Â Parigi, M.Â C.Â Soriano,Â andÂ R.Â Zambrini,Â Communications PhysicsÂ 4,Â 10.1038/s42005-021-00556-w (2021). 
+  * GoviaÂ  _etÂ al._ [2021] L.Â C.Â G.Â Govia, G.Â J.Â Ribeill, G.Â E.Â Rowlands, H.Â K.Â Krovi,Â andÂ T.Â A.Â Ohki,Â Phys. Rev. Res.Â 3,Â 013077 (2021). 
+  * SpagnoloÂ  _etÂ al._ [2022] M.Â Spagnolo, J.Â Morris, S.Â Piacentini, M.Â Antesberger, F.Â Massa, A.Â Crespi, F.Â Ceccarelli, R.Â Osellame,Â andÂ P.Â Walther,Â Nature PhotonicsÂ 16,Â 318 (2022). 
+  * MartÃ­nez-PeÃ±aÂ andÂ Ortega [2023] R.Â MartÃ­nez-PeÃ±aÂ andÂ J.-P.Â Ortega,Â Physical Review EÂ 107,Â 10.1103/physreve.107.035306 (2023). 
+  * SuzukiÂ  _etÂ al._ [2022] Y.Â Suzuki, Q.Â Gao, K.Â C.Â Pradel, K.Â Yasuoka,Â andÂ N.Â Yamamoto,Â Scientific ReportsÂ 12,Â 1353 (2022). 
+  * SanniaÂ  _etÂ al._ [2022] A.Â Sannia, R.Â MartÃ­nez-PeÃ±a, M.Â C.Â Soriano, G.Â L.Â Giorgi,Â andÂ R.Â Zambrini,Â Dissipation as a resource for quantum reservoir computing (2022),Â arXiv:2212.12078 [quant-ph] . 
+  * KubotaÂ  _etÂ al._ [2023] T.Â Kubota, Y.Â Suzuki, S.Â Kobayashi, Q.Â H.Â Tran, N.Â Yamamoto,Â andÂ K.Â Nakajima,Â Phys. Rev. Res.Â 5,Â 023057 (2023). 
+  * FryÂ  _etÂ al._ [2023] D.Â Fry, A.Â Deshmukh, S.Â Y.-C.Â Chen, V.Â Rastunkov,Â andÂ V.Â Markov,Â Optimizing quantum noise-induced reservoir computing for nonlinear and chaotic time series prediction (2023),Â arXiv:2303.05488 [quant-ph] . 
+  * SherringtonÂ andÂ Kirkpatrick [1975] D.Â SherringtonÂ andÂ S.Â Kirkpatrick,Â Phys. Rev. Lett.Â 35,Â 1792 (1975). 
+  * AtiyaÂ andÂ Parlos [2000] A.Â AtiyaÂ andÂ A.Â Parlos,Â IEEE Transactions on Neural NetworksÂ 11,Â 697 (2000). 
+  * Jaeger [2001b] H.Â Jaeger,Â  _Short term memory in echo state networks_Â (GMD Forschungszentrum Informationstechnik,Â 2001). 
+  * DambreÂ  _etÂ al._ [2012] J.Â Dambre, D.Â Verstraeten, B.Â Schrauwen,Â andÂ S.Â Massar,Â Scientific reportsÂ 2,Â 514 (2012). 
+  * KubotaÂ  _etÂ al._ [2021] T.Â Kubota, H.Â Takahashi,Â andÂ K.Â Nakajima,Â Phys. Rev. Res.Â 3,Â 043135 (2021). 

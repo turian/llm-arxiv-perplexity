@@ -1,0 +1,873 @@
+  1. 1 Introduction
+  2. 2 Related Literature
+  3. 3 Proposed Method
+    1. 3.1 Model Architecture
+    2. 3.2 Learning
+  4. 4 Experiment and Discussion
+    1. 4.1 Moving MNIST
+    2. 4.2 Results and Discussion
+  5. 5 Conclusion
+
+License: CC BY-NC-SA 4.0
+
+arXiv:2404.10096v2 [cs.CV] 17 Apr 2024
+
+#  Vision Augmentation Prediction Autoencoder with Attention Design (VAPAAD)
+
+Yiqiao Yin  
+Corresponding Author  
+University of Chicago, Booth School of Business  
+Columbia University  
+yy2502@columbia.edu  
+
+###### Abstract
+
+> Recent advancements in sequence prediction have significantly improved the
+> accuracy of video data interpretation; however, existing models often
+> overlook the potential of attention-based mechanisms for next-frame
+> prediction. This study introduces the Vision Augmentation Prediction
+> Autoencoder with Attention Design (VAPAAD), an innovative approach that
+> integrates attention mechanisms into sequence prediction, enabling nuanced
+> analysis and understanding of temporal dynamics in video sequences.
+> Utilizing the Moving MNIST dataset, we demonstrate VAPAADâ€™s robust
+> performance and superior handling of complex temporal data compared to
+> traditional methods. VAPAAD combines data augmentation, ConvLSTM2D layers,
+> and a custom-built self-attention mechanism to effectively focus on salient
+> features within a sequence, enhancing predictive accuracy and context-aware
+> analysis. This methodology not only adheres to human cognitive processes
+> during video interpretation but also addresses limitations in conventional
+> models, which often struggle with the variability inherent in video
+> sequences. The experimental results confirm that VAPAAD outperforms existing
+> models, especially in integrating attention mechanisms, which significantly
+> improve predictive performance.
+
+_K_ eywordsâ€‚Computer Vision Â â‹…â‹…\cdotâ‹… Autoencoder Â â‹…â‹…\cdotâ‹…
+Vision Transformer Â â‹…â‹…\cdotâ‹… Image Reconstruction Â â‹…â‹…\cdotâ‹…
+Next-frame Prediction Â â‹…â‹…\cdotâ‹… Vision Augmentation Â â‹…â‹…\cdotâ‹…
+Attention Layer
+
+##  1 Introduction
+
+Despite the significant advancements in sequence prediction models, current
+literature still lacks comprehensive exploration into attention-based
+mechanisms for next-frame prediction. The landmark study by [1] laid the
+groundwork in this domain, demonstrating the potential of unsupervised
+learning approaches for video and multi-frame prediction tasks. However, their
+methodology primarily focused on conventional recurrent neural network
+structures without integrating the nuances of attention mechanisms that have
+shown great promise in other areas of deep learning.
+
+Our work is motivated by the hypothesis that integrating attention mechanisms
+can substantially enhance the predictive performance of models by enabling
+them to focus selectively on the most relevant features of past frames.
+Attention designs, particularly in the context of next-frame prediction, can
+provide a more nuanced understanding and handling of temporal dynamics and
+visual cues in video data. This approach not only aligns with the cognitive
+processes humans use when interpreting video sequences but also addresses some
+of the limitations observed in traditional models which often struggle with
+the complexity and variability inherent in sequential video data.
+
+As such, this research aims to bridge the gap in the literature by proposing
+and validating the effectiveness of an attention-based model, VAPAAD, which
+innovatively predicts future frames by learning complex dependencies and
+dynamics from previous sequences. This exploration not only extends the
+foundational work of [1, 2, 3] but also opens new avenues for more
+sophisticated, accurate, and efficient predictive models in the realm of video
+analysis and beyond.
+
+##  2 Related Literature
+
+Why unsupervised learning? Supervised learning has demonstrated remarkable
+efficacy in visual representation tasks, as evidenced by extensive high-
+quality research [4, 5]. Studies have consistently utilized convolutional
+representations to develop advanced neural networks that set new benchmarks in
+performance [6, 7, 8, 9, 10]. Nevertheless, executing these tasks has grown
+more challenging as the training process demands extensive volumes of labeled
+data [1]. While acquiring additional labeled data and investing in more
+ingenious engineering efforts can significantly address specific issues, such
+approaches ultimately fall short of providing a satisfying solution within the
+realm of machine learning.
+
+Current RNN-like Models for Next Frame Predictions Early methods for learning
+video representations without supervision initially utilized Independent
+Component Analysis (ICA) [11, 1, 12]. Efforts to promote temporal coherence
+through a contrastive hinge loss were made, alongside approaches employing
+Independent Subspace Analysis modules for tackling the problem with multiple
+layers [13]. The concept of generative models was explored to comprehend
+transformations between consecutive image pairs, which was later extended to
+address longer sequences [14, 15].
+
+A notable recent development introduced a generative model utilizing a
+recurrent neural network designed to either predict subsequent frames or
+interpolate between existing ones [16]. This approach underlined the
+significance of selecting an appropriate loss function, critiquing the squared
+loss due to its insensitivity to minor input distortions. The proposed remedy
+involved quantizing image patches into a sizable dictionary, aiming for the
+model to identify the correct patch. While addressing issues related to
+squared loss, this method introduces complications by setting an arbitrary
+dictionary size and eliminating the notion of patch similarity or
+dissimilarity.
+
+The literature indicates challenges with current recurrent neural network
+models for predicting the next frame in videos. The primary concern lies in
+the choice of loss function. The squared loss often used does not effectively
+handle minor distortions, leading to a search for alternative approaches that
+can introduce their own set of problems, such as the introduction of an
+arbitrary dictionary size which complicates the model further.
+
+Autoencoder-like Architecture as Image Constructor Autoencoders have gained
+prominence in the realm of image generation and reconstruction due to their
+unique architecture and operational dynamics, which effectively capture and
+encode the underlying patterns and features within images [17, 18, 19, 20].
+Central to their appeal is the ability to distill high-dimensional data into a
+lower-dimensional, compressed representation through the encoder component,
+before reconstructing it back to its original form with the decoder component.
+This process not only aids in reducing data dimensionality but also in
+learning efficient representations of data, making autoencoders particularly
+adept at capturing the essence of complex image data.
+
+The versatility of autoencoders extends to various applications, from
+denoising images to more sophisticated tasks like generating new images that
+resemble the training data. Their ability to learn a latent space
+representation of the input data enables the generation of new content by
+sampling and decoding from this space, laying the groundwork for more complex
+generative models like Variational Autoencoders (VAEs) and Generative
+Adversarial Networks (GANs).
+
+The popularity of autoencoders as a foundational structure for image
+generation stems from their simplicity, efficiency, and the quality of the
+generated images. By learning to prioritize the most salient features of the
+images, autoencoders ensure that the generated images retain the critical
+attributes of the input data, making them a powerful tool for tasks requiring
+high-fidelity image generation and manipulation.
+
+Attention-based Models in Images The integration of attention-based designs
+within the domain of next-frame prediction and sequential image generation
+marks a significant advancement, leveraging the innate strengths of attention
+mechanisms to enhance model performance in handling temporal data [2, 21, 22,
+23, 24, 25, 26, 3, 27]. The fundamental appeal of incorporating attention lies
+in its proficiency in capturing and prioritizing the most relevant aspects of
+sequential data, thereby facilitating a more nuanced understanding and
+generation of future frames in a video sequence. Attention mechanisms excel at
+modeling the probabilistic nature of sequential data, enabling models to focus
+selectively on specific parts of the input sequence that are most predictive
+of future outcomes. This selective focus is especially beneficial in video
+sequences where not all frames contribute equally to the understanding of
+future states, allowing models to allocate computational resources more
+effectively and improve prediction accuracy.
+
+The capacity of attention mechanisms to adaptively weigh different segments of
+input data makes them particularly suited for tasks involving sequential image
+generation. By identifying and emphasizing salient features and temporal
+dynamics within video frames, attention-based models can generate subsequent
+frames that are not only visually coherent but also contextually aligned with
+the preceding sequence. This capability stems from the attention mechanismâ€™s
+ability to parse through the temporal dimension, discerning patterns and
+dependencies that span across frames, which is crucial for predicting
+plausible future states in video sequences.
+
+Despite these advantages, the current literature indicates a growing demand
+for innovative designs that harness attention layers more effectively to learn
+from and generate video content. The challenge lies in crafting attention
+models that can seamlessly integrate with existing video processing
+architectures, enabling a harmonious blend of spatial and temporal feature
+extraction with the nuanced focus provided by attention mechanisms. Such novel
+designs would ideally exploit the full potential of attention to model complex
+dependencies within video data, thereby elevating the field of video
+generation to new heights. Innovations in this direction could lead to
+significant improvements in various applications, from enhancing video
+compression techniques to creating more lifelike and dynamic synthetic video
+content for entertainment, education, and simulation purposes.
+
+As the field progresses, it becomes increasingly clear that attention-based
+designs offer a promising avenue for addressing the inherent complexities of
+sequential image generation. The ability of attention mechanisms to model
+probabilistic relationships in sequential data, coupled with their flexibility
+and efficiency, positions them as a pivotal component in the evolution of
+video processing technologies. The onus is now on researchers and
+practitioners to explore and materialize novel designs that can fully harness
+the capabilities of attention layers, paving the way for advancements in
+generating high-fidelity videos from existing video content. With continued
+exploration and innovation, attention-based models are poised to redefine the
+standards of next-frame prediction and sequential image generation, offering
+richer, more detailed, and contextually coherent video experiences.
+
+Contribution of our work: This paper brings to the literature the following
+contributions.
+
+  * â€¢
+
+The paper introduces VAPAAD, an advanced video processing model that enhances
+video data interpretation through a blend of data augmentation, ConvLSTM2D
+layers, and self-attention mechanisms for nuanced, context-aware analysis.
+
+  * â€¢
+
+Our investigation describes the development of a custom-built attention
+mechanism that enables a neural network to prioritize and focus on the most
+relevant segments of its input, improving data processing and interpretation
+significantly.
+
+  * â€¢
+
+The research the modelâ€™s ability to not only recognize patterns within video
+data but also comprehend the context and significance behind these patterns,
+positioning it as a versatile tool for various video analysis tasks, from
+surveillance to content categorization.
+
+##  3 Proposed Method
+
+The VAPAAD model is a cutting-edge video processing framework that leverages
+data augmentation, â€œConvLSTM2Dâ€ layers, and â€œself-attentionâ€ mechanisms
+to enhance the analysis and interpretation of video data. By introducing data
+augmentation, the model gains robustness and better generalizes to unseen
+videos. The â€œConvLSTM2Dâ€ layers enable the model to extract spatial-
+temporal features, essential for understanding the dynamics within video
+sequences. The integration of self-attention mechanisms allows the model to
+focus on the most relevant parts of the video, improving the modelâ€™s
+efficiency and performance. Finally, a â€œConv3Dâ€ layer compiles the
+processed information into a coherent output, making VAPAAD highly effective
+for complex video analysis tasks.
+
+###  3.1 Model Architecture
+
+Model Architecture - Vision Augmentation Prediction Autoencoder with Attention
+Design or VAPAAD: This section outlines a sophisticated video processing model
+designed to enhance the interpretation and analysis of video data. At its
+core, the model employs a combination of data augmentation techniques,
+advanced convolutional layers tailored for video input (ConvLSTM2D), and a
+self-attention mechanism to refine its processing capabilities.
+
+![Refer to caption](extracted/5541298/figs/vapaad.png) Figure 1: Executive
+Diagram of VAPAAD: An advanced video model enhances understanding with
+attention and data augmentation.
+
+The model starts with an initial step aimed at enriching the training data
+through data augmentation. This process involves subtly altering the frames of
+the video to simulate variations that might not be present in the original
+dataset. Techniques such as random rotation are applied to each frame. These
+augmentations help the model become more robust and less sensitive to minor
+changes in the video data, improving its ability to generalize from the
+training data to new, unseen videos.
+
+Following data augmentation, the model uses a series of ConvLSTM2D layers.
+These layers are specifically designed for video and sequential data, as they
+combine the spatial feature extraction capabilities of convolutional neural
+networks (CNNs) with the temporal processing abilities of LSTM (Long Short-
+Term Memory) networks. This combination allows the model to effectively
+understand both the appearance and movement within video frames over time.
+Each ConvLSTM2D layer is followed by a batch normalization step, which
+standardizes the activations from the layer, helping to stabilize and
+accelerate the training process.
+
+A crucial enhancement to this model is the integration of a self-attention
+mechanism after each ConvLSTM2D layer. The self-attention mechanism enables
+the model to weigh the importance of different parts of the video differently,
+focusing more on elements that are crucial for understanding the content while
+potentially disregarding irrelevant background details. This ability to â€™pay
+attentionâ€™ to specific parts of the video frames leads to a more nuanced and
+context-aware processing.
+
+The sequence of layersâ€”data augmentation, ConvLSTM2D, batch normalization,
+and self-attentionâ€”is repeated multiple times, each time processing the
+video data in increasingly sophisticated ways, allowing the model to build a
+complex understanding of the video content.
+
+The culmination of this process is a final Conv3D layer, which combines the
+features extracted and refined by the previous layers to produce the final
+output. This output is designed to capture the essence of the video data as
+interpreted by the model, ready for further analysis or decision-making tasks.
+
+By leveraging data augmentation, ConvLSTM2D layers for spatial-temporal
+feature extraction, and self-attention mechanisms for focused processing, this
+model represents a powerful tool for video analysis applications. Itâ€™s built
+to not only recognize patterns in video data but also understand the context
+and significance of what it â€™sees,â€™ making it valuable for a wide range of
+tasks from automated surveillance to content categorization and beyond.
+
+Model Architecture - Custom Attention Layer: Our investigation includes a
+custom-built attention mechanism, designed to help a neural network focus on
+the most relevant parts of its input data. This mechanism, known as self-
+attention, is a sophisticated tool that allows the network to process and
+interpret complex data more effectively by paying more attention to certain
+parts of the data than others.
+
+When creating this attention mechanism, the first step is to set it up to be
+ready for use, similar to unpacking and assembling a piece of equipment. This
+setup includes preparing certain functions that can transform the incoming
+data into different formats needed for the attention process to work. These
+transformations are akin to viewing the data through different lenses, each
+highlighting specific aspects of the data.
+
+Once the mechanism receives data, it undergoes a process akin to a debate
+among the data points on which of them should be highlighted as the most
+important. This debate is facilitated by comparing all pieces of data against
+each other, using the different transformations applied earlier. The result of
+this debate is a set of scores that indicate the importance of each data point
+in relation to the others. Following the debate, these scores are adjusted to
+ensure they are fair and balanced, using a process similar to normalization in
+statistics. This adjustment makes sure that the scores can be effectively used
+to select which data points should be highlighted. With these adjusted scores,
+the mechanism then decides how much attention to pay to each piece of data,
+emphasizing the points deemed most important. This is achieved by combining
+the original data points in a weighted manner, where the weights are
+determined by the importance scores. The outcome is a new representation of
+the original data, but with a focus on the most relevant parts, as determined
+by the mechanism.
+
+Finally, to ensure that no critical information is lost during this process,
+the mechanism adds back some of the original data to the newly focused
+representation. This step is like double-checking that nothing important was
+overlooked, ensuring the final output maintains a connection to the original
+input while still highlighting the most crucial parts.
+
+###  3.2 Learning
+
+How does it learn? Consider the framework where the instructor, denoted as
+â„â¢(x;ğœ½Î¹)â„ğ‘¥subscriptğœ½ğœ„\mathcal{I}(x;\boldsymbol{\theta}_{\iota})caligraphic_I
+( italic_x ; bold_italic_Î¸ start_POSTSUBSCRIPT italic_Î¹ end_POSTSUBSCRIPT ),
+evaluates noisy data instances xğ‘¥xitalic_x drawn from a true distribution
+pxâ¢(x)subscriptğ‘ğ‘¥ğ‘¥p_{x}(x)italic_p start_POSTSUBSCRIPT italic_x
+end_POSTSUBSCRIPT ( italic_x ). Concurrently, the VAPAAD model, symbolized as
+ğ’±â¢(z;ğœ½âˆ¨)ğ’±ğ‘§subscriptğœ½\mathcal{V}(z;\boldsymbol{\theta}_{\vee})caligraphic_V
+( italic_z ; bold_italic_Î¸ start_POSTSUBSCRIPT âˆ¨ end_POSTSUBSCRIPT ), is
+devised. The objective for â„’â„’\mathcal{L}caligraphic_L is to augment the
+probability of accurately assigning labels to both actual training data and
+synthetic instances produced by ğ’±ğ’±\mathcal{V}caligraphic_V. In parallel,
+ğ’±ğ’±\mathcal{V}caligraphic_V endeavors to minimize
+logâ¡(1âˆ’â„â¢(ğ’±â¢(x)))1â„ğ’±ğ‘¥\log(1-\mathcal{I}(\mathcal{V}(x)))roman_log
+( 1 - caligraphic_I ( caligraphic_V ( italic_x ) ) ).
+
+The interplay between â„â„\mathcal{I}caligraphic_I and
+ğ’±ğ’±\mathcal{V}caligraphic_V manifests as a dual-layer minimization
+objective function characterized by the objective function
+â„’â¢(ğ’±,â„)â„’ğ’±â„\mathcal{L}(\mathcal{V},\mathcal{I})caligraphic_L (
+caligraphic_V , caligraphic_I ), formally expressed as:
+
+| minğ’±,â„â¡â„’â¢(â„,ğ’±)=ğ”¼xâˆ¼pdataâ¢(x)â¢[logâ¡â„â¢(x)]+ğ”¼xâˆ¼pxâ¢(x)â¢[logâ¡(1âˆ’â„â¢(ğ’±â¢(x)))]subscriptğ’±â„â„’â„ğ’±subscriptğ”¼similar-toğ‘¥subscriptğ‘datağ‘¥delimited-[]â„ğ‘¥subscriptğ”¼similar-toğ‘¥subscriptğ‘ğ‘¥ğ‘¥delimited-[]1â„ğ’±ğ‘¥\min_{\mathcal{V},\mathcal{I}}\mathcal{L}(\mathcal{I},\mathcal{V})=\mathbb{E}_% {x\sim p_{\text{data}}(x)}[\log\mathcal{I}(x)]+\mathbb{E}_{x\sim p_{x}(x)}[% \log(1-\mathcal{I}(\mathcal{V}(x)))]roman_min start_POSTSUBSCRIPT caligraphic_V , caligraphic_I end_POSTSUBSCRIPT caligraphic_L ( caligraphic_I , caligraphic_V ) = blackboard_E start_POSTSUBSCRIPT italic_x âˆ¼ italic_p start_POSTSUBSCRIPT data end_POSTSUBSCRIPT ( italic_x ) end_POSTSUBSCRIPT [ roman_log caligraphic_I ( italic_x ) ] + blackboard_E start_POSTSUBSCRIPT italic_x âˆ¼ italic_p start_POSTSUBSCRIPT italic_x end_POSTSUBSCRIPT ( italic_x ) end_POSTSUBSCRIPT [ roman_log ( 1 - caligraphic_I ( caligraphic_V ( italic_x ) ) ) ] |  | (1)  
+---|---|---|---  
+  
+Within each iteration of learning, the instructorâ€™s gradient, with respect
+to its parameters
+ğœ½Î¹subscriptğœ½ğœ„\boldsymbol{\theta}_{\iota}bold_italic_Î¸
+start_POSTSUBSCRIPT italic_Î¹ end_POSTSUBSCRIPT, is updated as follows:
+
+| âˆ‡ğœ½Î¹1mâ¢âˆ‘i=1m[logâ¡â„â¢(x(i))+logâ¡(1âˆ’â„â¢(ğ’±â¢(x(i))))]subscriptâˆ‡subscriptğœ½ğœ„1ğ‘šsuperscriptsubscriptğ‘–1ğ‘šdelimited-[]â„superscriptğ‘¥ğ‘–1â„ğ’±superscriptğ‘¥ğ‘–\nabla_{\boldsymbol{\theta}_{\iota}}\frac{1}{m}\sum_{i=1}^{m}[\log\mathcal{I}(% x^{(i)})+\log(1-\mathcal{I}(\mathcal{V}(x^{(i)})))]âˆ‡ start_POSTSUBSCRIPT bold_italic_Î¸ start_POSTSUBSCRIPT italic_Î¹ end_POSTSUBSCRIPT end_POSTSUBSCRIPT divide start_ARG 1 end_ARG start_ARG italic_m end_ARG âˆ‘ start_POSTSUBSCRIPT italic_i = 1 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_m end_POSTSUPERSCRIPT [ roman_log caligraphic_I ( italic_x start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT ) + roman_log ( 1 - caligraphic_I ( caligraphic_V ( italic_x start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT ) ) ) ] |  | (2)  
+---|---|---|---  
+  
+where mğ‘šmitalic_m represents the number of samples under consideration.
+
+Conversely, the gradient update for the VAPAAD, in relation to its parameters
+ğœ½âˆ¨subscriptğœ½\boldsymbol{\theta}_{\vee}bold_italic_Î¸ start_POSTSUBSCRIPT
+âˆ¨ end_POSTSUBSCRIPT, is delineated by:
+
+| âˆ‡ğœ½âˆ¨1mâ¢âˆ‘i=1mlogâ¡(1âˆ’â„â¢(ğ’±â¢(x(i))))subscriptâˆ‡subscriptğœ½1ğ‘šsuperscriptsubscriptğ‘–1ğ‘š1â„ğ’±superscriptğ‘¥ğ‘–\nabla_{\boldsymbol{\theta}_{\vee}}\frac{1}{m}\sum_{i=1}^{m}\log(1-\mathcal{I}% (\mathcal{V}(x^{(i)})))âˆ‡ start_POSTSUBSCRIPT bold_italic_Î¸ start_POSTSUBSCRIPT âˆ¨ end_POSTSUBSCRIPT end_POSTSUBSCRIPT divide start_ARG 1 end_ARG start_ARG italic_m end_ARG âˆ‘ start_POSTSUBSCRIPT italic_i = 1 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_m end_POSTSUPERSCRIPT roman_log ( 1 - caligraphic_I ( caligraphic_V ( italic_x start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT ) ) ) |  | (3)  
+---|---|---|---  
+  
+wherein mğ‘šmitalic_m similarly denotes the sample count, and the gradient is
+specifically with respect to
+ğœ½âˆ¨subscriptğœ½\boldsymbol{\theta}_{\vee}bold_italic_Î¸ start_POSTSUBSCRIPT
+âˆ¨ end_POSTSUBSCRIPT.
+
+This refined articulation not only underscores the mathematical elegance of
+the learning dynamics in GANs but also elucidates the sophisticated
+interdependence between the VAPAAD and instructor within the adversarial
+framework.
+
+In the context of Stochastic Gradient Descent (SGD) within a VAPAAD framework,
+the optimization process involves iteratively adjusting the parameters of both
+the VAPAAD and the instructor to minimize their respective loss functions. The
+SGD algorithm facilitates this by computing the gradients of the loss
+functions with respect to the model parameters and updating these parameters
+in the direction that reduces the loss. Hereâ€™s how it unfolds, step by step,
+using mathematical notation:
+
+Gradient Computation: At each step sğ‘ sitalic_s, the process begins with the
+computation of gradients for both the VAPAADâ€™s loss
+(â„’gensubscriptâ„’gen\mathcal{L}_{\text{gen}}caligraphic_L
+start_POSTSUBSCRIPT gen end_POSTSUBSCRIPT) and the instructorâ€™s loss
+(â„’discsubscriptâ„’disc\mathcal{L}_{\text{disc}}caligraphic_L
+start_POSTSUBSCRIPT disc end_POSTSUBSCRIPT) with respect to their parameters
+(ğœ½âˆ¨subscriptğœ½\boldsymbol{\theta}_{\vee}bold_italic_Î¸
+start_POSTSUBSCRIPT âˆ¨ end_POSTSUBSCRIPT for the VAPAAD and
+ğœ½Î¹subscriptğœ½ğœ„\boldsymbol{\theta}_{\iota}bold_italic_Î¸
+start_POSTSUBSCRIPT italic_Î¹ end_POSTSUBSCRIPT for the instructor).
+
+For the instructor, the gradient of its loss with respect to its parameters is
+given by:
+
+| âˆ‡ğœ½Î¹â„’instructor=âˆ‡ğœ½Î¹(âˆ’1mâ¢âˆ‘i=1m[logâ¡â„â¢(x(i))+logâ¡(1âˆ’â„â¢(ğ’±â¢(x(i))))])subscriptâˆ‡subscriptğœ½ğœ„subscriptâ„’instructorsubscriptâˆ‡subscriptğœ½ğœ„1ğ‘šsuperscriptsubscriptğ‘–1ğ‘šdelimited-[]â„superscriptğ‘¥ğ‘–1â„ğ’±superscriptğ‘¥ğ‘–\nabla_{\boldsymbol{\theta}_{\iota}}\mathcal{L}_{\text{instructor}}=\nabla_{% \boldsymbol{\theta}_{\iota}}\left(-\frac{1}{m}\sum_{i=1}^{m}[\log\mathcal{I}(x% ^{(i)})+\log(1-\mathcal{I}(\mathcal{V}(x^{(i)})))]\right)âˆ‡ start_POSTSUBSCRIPT bold_italic_Î¸ start_POSTSUBSCRIPT italic_Î¹ end_POSTSUBSCRIPT end_POSTSUBSCRIPT caligraphic_L start_POSTSUBSCRIPT instructor end_POSTSUBSCRIPT = âˆ‡ start_POSTSUBSCRIPT bold_italic_Î¸ start_POSTSUBSCRIPT italic_Î¹ end_POSTSUBSCRIPT end_POSTSUBSCRIPT ( - divide start_ARG 1 end_ARG start_ARG italic_m end_ARG âˆ‘ start_POSTSUBSCRIPT italic_i = 1 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_m end_POSTSUPERSCRIPT [ roman_log caligraphic_I ( italic_x start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT ) + roman_log ( 1 - caligraphic_I ( caligraphic_V ( italic_x start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT ) ) ) ] ) |  | (4)  
+---|---|---|---  
+  
+And for the VAPAAD, the gradient of its loss with respect to its parameters
+is:
+
+| âˆ‡ğœ½âˆ¨â„’vapaad=âˆ‡ğœ½âˆ¨(âˆ’1mâ¢âˆ‘i=1mlogâ¡(1âˆ’â„â¢(ğ’±â¢(x(i)))))subscriptâˆ‡subscriptğœ½subscriptâ„’vapaadsubscriptâˆ‡subscriptğœ½1ğ‘šsuperscriptsubscriptğ‘–1ğ‘š1â„ğ’±superscriptğ‘¥ğ‘–\nabla_{\boldsymbol{\theta}_{\vee}}\mathcal{L}_{\text{vapaad}}=\nabla_{% \boldsymbol{\theta}_{\vee}}\left(-\frac{1}{m}\sum_{i=1}^{m}\log(1-\mathcal{I}(% \mathcal{V}(x^{(i)})))\right)âˆ‡ start_POSTSUBSCRIPT bold_italic_Î¸ start_POSTSUBSCRIPT âˆ¨ end_POSTSUBSCRIPT end_POSTSUBSCRIPT caligraphic_L start_POSTSUBSCRIPT vapaad end_POSTSUBSCRIPT = âˆ‡ start_POSTSUBSCRIPT bold_italic_Î¸ start_POSTSUBSCRIPT âˆ¨ end_POSTSUBSCRIPT end_POSTSUBSCRIPT ( - divide start_ARG 1 end_ARG start_ARG italic_m end_ARG âˆ‘ start_POSTSUBSCRIPT italic_i = 1 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_m end_POSTSUPERSCRIPT roman_log ( 1 - caligraphic_I ( caligraphic_V ( italic_x start_POSTSUPERSCRIPT ( italic_i ) end_POSTSUPERSCRIPT ) ) ) ) |  | (5)  
+---|---|---|---  
+  
+Weight Update - Single Backpropagation Round: Once the gradients are computed,
+both sets of parameters are updated simultaneously in one round of
+backpropagation. This simultaneous update ensures that the VAPAAD and the
+instructor evolve together in a balanced manner, each responding to the latest
+changes of the other. The parameter updates are performed as follows:
+
+For the instructor:
+
+| ğœ½Î¹â†ğœ½Î¹âˆ’Î·â¢âˆ‡ğœ½Î¹â„’instructorâ†subscriptğœ½ğœ„subscriptğœ½ğœ„ğœ‚subscriptâˆ‡subscriptğœ½ğœ„subscriptâ„’instructor\boldsymbol{\theta}_{\iota}\leftarrow\boldsymbol{\theta}_{\iota}-\eta\nabla_{% \boldsymbol{\theta}_{\iota}}\mathcal{L}_{\text{instructor}}bold_italic_Î¸ start_POSTSUBSCRIPT italic_Î¹ end_POSTSUBSCRIPT â† bold_italic_Î¸ start_POSTSUBSCRIPT italic_Î¹ end_POSTSUBSCRIPT - italic_Î· âˆ‡ start_POSTSUBSCRIPT bold_italic_Î¸ start_POSTSUBSCRIPT italic_Î¹ end_POSTSUBSCRIPT end_POSTSUBSCRIPT caligraphic_L start_POSTSUBSCRIPT instructor end_POSTSUBSCRIPT |  | (6)  
+---|---|---|---  
+  
+and for the VAPAAD:
+
+| ğœ½âˆ¨â†ğœ½âˆ¨âˆ’Î·â¢âˆ‡ğœ½âˆ¨â„’vapaadâ†subscriptğœ½subscriptğœ½ğœ‚subscriptâˆ‡subscriptğœ½subscriptâ„’vapaad\boldsymbol{\theta}_{\vee}\leftarrow\boldsymbol{\theta}_{\vee}-\eta\nabla_{% \boldsymbol{\theta}_{\vee}}\mathcal{L}_{\text{vapaad}}bold_italic_Î¸ start_POSTSUBSCRIPT âˆ¨ end_POSTSUBSCRIPT â† bold_italic_Î¸ start_POSTSUBSCRIPT âˆ¨ end_POSTSUBSCRIPT - italic_Î· âˆ‡ start_POSTSUBSCRIPT bold_italic_Î¸ start_POSTSUBSCRIPT âˆ¨ end_POSTSUBSCRIPT end_POSTSUBSCRIPT caligraphic_L start_POSTSUBSCRIPT vapaad end_POSTSUBSCRIPT |  | (7)  
+---|---|---|---  
+  
+Here, Î·ğœ‚\etaitalic_Î· represents the learning rate, a hyperparameter that
+controls the size of the step taken in the direction of the negative gradient.
+This learning rate must be carefully chosen to ensure that the model converges
+to a good solution without oscillating or diverging.
+
+In summary, during each step of stochastic gradient descent, the gradients of
+both the VAPAAD and instructor losses are computed with respect to their
+respective parameters. These gradients are then used to update the weights of
+both models in a single round of backpropagation. This approach allows the
+models to adapt based on the current landscape of the adversarial game,
+striving to improve the VAPAADâ€™s ability to produce realistic data and the
+instructorâ€™s ability to distinguish between real and generated data.
+
+Weight Update - Higher Moments: The Adam optimization algorithm is a method
+used to minimize the loss function in machine learning models, particularly
+effective in deep learning applications. At its inception, Adam initializes
+two vectors, m0subscriptğ‘š0m_{0}italic_m start_POSTSUBSCRIPT 0
+end_POSTSUBSCRIPT and v0subscriptğ‘£0v_{0}italic_v start_POSTSUBSCRIPT 0
+end_POSTSUBSCRIPT, which represent the first moment (the mean) and the second
+moment (the uncentered variance) of the gradients, respectively. Both moments
+are set to zero. The algorithm then enters a loop where, for each iteration or
+timestep tğ‘¡titalic_t, it updates these moments based on the gradients of the
+stochastic objective function at that step. Specifically, the first moment
+mtsubscriptğ‘šğ‘¡m_{t}italic_m start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT
+is updated as a weighted average of the previous moment and the current
+gradient, applying a decay rate Î²1subscriptğ›½1\beta_{1}italic_Î²
+start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT. Similarly, the second moment
+vtsubscriptğ‘£ğ‘¡v_{t}italic_v start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT
+is updated with the square of the current gradient, using a decay rate
+Î²2subscriptğ›½2\beta_{2}italic_Î² start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT.
+These moments, however, are biased towards zero, especially during the initial
+timesteps. To correct this bias, Adam adjusts both moments using factors
+(1âˆ’Î²1t)1superscriptsubscriptğ›½1ğ‘¡(1-\beta_{1}^{t})( 1 - italic_Î²
+start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t
+end_POSTSUPERSCRIPT ) and
+(1âˆ’Î²2t)1superscriptsubscriptğ›½2ğ‘¡(1-\beta_{2}^{t})( 1 - italic_Î²
+start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT start_POSTSUPERSCRIPT italic_t
+end_POSTSUPERSCRIPT ), yielding bias-corrected estimates
+m^tsubscript^ğ‘šğ‘¡\hat{m}_{t}over^ start_ARG italic_m end_ARG
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT and
+v^tsubscript^ğ‘£ğ‘¡\hat{v}_{t}over^ start_ARG italic_v end_ARG
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT. The algorithm then adjusts the
+parameters of the model in the direction that reduces the loss, scaled by the
+corrected first moment and inversely scaled by the square root of the
+corrected second moment. A small constant Ïµitalic-Ïµ\epsilonitalic_Ïµ is
+added to the denominator to ensure numerical stability. The step size
+Î±ğ›¼\alphaitalic_Î± controls the rate at which Adam adjusts the model
+parameters. This process repeats until the algorithm converges on a set of
+parameters that minimize the loss function, effectively training the model.
+Adam is favored for its adaptiveness, automatically tuning the learning rate
+for each parameter based on the computed moments, facilitating faster and more
+stable convergence in practice.
+
+Algorithm 1 Adam Optimization Algorithm
+
+1:Initialize step size Î±ğ›¼\alphaitalic_Î±, moments
+m0=0subscriptğ‘š00m_{0}=0italic_m start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT = 0,
+v0=0subscriptğ‘£00v_{0}=0italic_v start_POSTSUBSCRIPT 0 end_POSTSUBSCRIPT = 0,
+and timestep t=0ğ‘¡0t=0italic_t = 0
+
+2:Initialize decay rates Î²1subscriptğ›½1\beta_{1}italic_Î²
+start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT and Î²2subscriptğ›½2\beta_{2}italic_Î²
+start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT close to 1
+
+3:Initialize parameter vector Î¸ğœƒ\thetaitalic_Î¸
+
+4:whileÂ not convergedÂ do
+
+5:Â Â Â Â Â tâ†t+1â†ğ‘¡ğ‘¡1t\leftarrow t+1italic_t â† italic_t + 1
+
+6:Â Â Â Â Â Get gradients gtsubscriptğ‘”ğ‘¡g_{t}italic_g start_POSTSUBSCRIPT
+italic_t end_POSTSUBSCRIPT w.r.t. stochastic objective at timestep
+tğ‘¡titalic_t
+
+7:Â Â Â Â Â Update biased first moment estimate:
+mtâ†Î²1â‹…mtâˆ’1+(1âˆ’Î²1)â‹…gtâ†subscriptğ‘šğ‘¡â‹…subscriptğ›½1subscriptğ‘šğ‘¡1â‹…1subscriptğ›½1subscriptğ‘”ğ‘¡m_{t}\leftarrow\beta_{1}\cdot
+m_{t-1}+(1-\beta_{1})\cdot g_{t}italic_m start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT â† italic_Î² start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT â‹…
+italic_m start_POSTSUBSCRIPT italic_t - 1 end_POSTSUBSCRIPT + ( 1 - italic_Î²
+start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT ) â‹… italic_g start_POSTSUBSCRIPT
+italic_t end_POSTSUBSCRIPT
+
+8:Â Â Â Â Â Update biased second raw moment estimate:
+vtâ†Î²2â‹…vtâˆ’1+(1âˆ’Î²2)â‹…gt2â†subscriptğ‘£ğ‘¡â‹…subscriptğ›½2subscriptğ‘£ğ‘¡1â‹…1subscriptğ›½2superscriptsubscriptğ‘”ğ‘¡2v_{t}\leftarrow\beta_{2}\cdot
+v_{t-1}+(1-\beta_{2})\cdot g_{t}^{2}italic_v start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT â† italic_Î² start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT â‹…
+italic_v start_POSTSUBSCRIPT italic_t - 1 end_POSTSUBSCRIPT + ( 1 - italic_Î²
+start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT ) â‹… italic_g start_POSTSUBSCRIPT
+italic_t end_POSTSUBSCRIPT start_POSTSUPERSCRIPT 2 end_POSTSUPERSCRIPT
+
+9:Â Â Â Â Â Correct bias in first moment:
+m^tâ†mt/(1âˆ’Î²1t)â†subscript^ğ‘šğ‘¡subscriptğ‘šğ‘¡1superscriptsubscriptğ›½1ğ‘¡\hat{m}_{t}\leftarrow
+m_{t}/(1-\beta_{1}^{t})over^ start_ARG italic_m end_ARG start_POSTSUBSCRIPT
+italic_t end_POSTSUBSCRIPT â† italic_m start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT / ( 1 - italic_Î² start_POSTSUBSCRIPT 1 end_POSTSUBSCRIPT
+start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT )
+
+10:Â Â Â Â Â Correct bias in second raw moment:
+v^tâ†vt/(1âˆ’Î²2t)â†subscript^ğ‘£ğ‘¡subscriptğ‘£ğ‘¡1superscriptsubscriptğ›½2ğ‘¡\hat{v}_{t}\leftarrow
+v_{t}/(1-\beta_{2}^{t})over^ start_ARG italic_v end_ARG start_POSTSUBSCRIPT
+italic_t end_POSTSUBSCRIPT â† italic_v start_POSTSUBSCRIPT italic_t
+end_POSTSUBSCRIPT / ( 1 - italic_Î² start_POSTSUBSCRIPT 2 end_POSTSUBSCRIPT
+start_POSTSUPERSCRIPT italic_t end_POSTSUPERSCRIPT )
+
+11:Â Â Â Â Â Update parameters:
+Î¸â†Î¸âˆ’Î±â‹…m^t/(v^t+Ïµ)â†ğœƒğœƒâ‹…ğ›¼subscript^ğ‘šğ‘¡subscript^ğ‘£ğ‘¡italic-
+Ïµ\theta\leftarrow\theta-\alpha\cdot\hat{m}_{t}/(\sqrt{\hat{v}_{t}}+\epsilon)italic_Î¸
+â† italic_Î¸ - italic_Î± â‹… over^ start_ARG italic_m end_ARG
+start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT / ( square-root start_ARG over^
+start_ARG italic_v end_ARG start_POSTSUBSCRIPT italic_t end_POSTSUBSCRIPT
+end_ARG + italic_Ïµ )
+
+12:endÂ while
+
+13:return Î¸ğœƒ\thetaitalic_Î¸
+
+Intuition of Adam in Sequence of Images: Adam optimization is particularly
+adept at training models with sequences of images due to several key features
+that align well with the challenges presented by sequential data.
+
+Firstly, Adamâ€™s use of adaptive learning rates for each parameter helps
+manage the varying scales and dynamics inherent in sequential image data. In a
+sequence, the importance of features can change dramatically from one frame to
+the next. Adam adjusts the learning rate dynamically, increasing it for
+parameters associated with infrequent features and decreasing it for those
+associated with frequent features. This adaptability is crucial for
+efficiently learning from sequences where the relevance of features may evolve
+over time.
+
+Secondly, the incorporation of higher moments (the first moment estimating the
+mean and the second estimating the uncentered variance of the gradients) in
+Adamâ€™s algorithm allows for a more nuanced adjustment of the learning rates.
+In the context of sequence data, the gradientsâ€™ variance can provide insight
+into the stability of the learning process over time. For sequences of images,
+where consecutive frames may exhibit high correlation but important
+differences might still occur (such as movement or changes in lighting), the
+second moment helps to smooth the learning process. It ensures that the model
+does not overreact to minor changes between frames, thereby stabilizing
+training.
+
+The effect of the second moment is particularly significant in handling the
+noise and variability in sequences. By adjusting the learning rate based on
+the variability in the observed gradients, Adam ensures that updates are
+neither too large (which could lead to instability or overshooting the
+minimum) nor too small (which could slow down learning). This is particularly
+useful for sequential image data, where the model must balance learning from
+the continuous flow of information without being derailed by the noise or
+minor variations between similar sequences.
+
+In summary, Adam optimizationâ€™s ability to dynamically adjust learning rates
+for each parameter, informed by an understanding of both the direction and
+variability of the gradients, makes it well-suited for training models on
+sequential image data. It navigates the fine line between adapting to
+significant changes in the sequence while ignoring irrelevant fluctuations,
+thereby facilitating efficient and effective learning.
+
+##  4 Experiment and Discussion
+
+###  4.1 Moving MNIST
+
+The Moving MNIST dataset (see Figure 2) stands as a compelling extension of
+the classic MNIST dataset, renowned for its collection of handwritten digits.
+Unlike its predecessor, the Moving MNIST dataset introduces a dynamic twist:
+it features sequences of digits in motion across frames, making it an
+invaluable resource for tasks requiring an understanding of temporal dynamics,
+such as video processing and next-frame prediction. At its core, the Moving
+MNIST dataset is ingeniously designed to simulate simple yet challenging
+scenarios where digits move linearly within a fixed-size frame, often
+overlapping and continuing their trajectory as they reappear from the edges
+they exit. This characteristic introduces complexities that are not present in
+static images, demanding models to learn not just the appearance of digits but
+also their motion patterns over time.
+
+![Refer to caption](extracted/5541298/figs/moving_mnist.png) Figure 2: Moving
+MNIST. The figure displays five samples of sequences of input/output images
+from the Moving MNIST dataset.
+
+The paper elaborates on the methodology for leveraging the Moving MNIST
+dataset to train models capable of predicting subsequent frames in a sequence
+based on previous ones. This task, known as next-frame prediction, is pivotal
+for applications in video compression, anomaly detection in surveillance, and
+more, where understanding and anticipating motion can significantly enhance
+performance.
+
+The preprocessing and construction of the dataset for training and validation
+are meticulously outlined in the paper. The dataset is initially downloaded
+from a specified source, ensuring accessibility and reproducibility of the
+research. Following acquisition, a crucial preprocessing step involves
+constructing "shifted" inputs and outputs. This procedure entails aligning
+each frame, designated as xnsubscriptğ‘¥ğ‘›x_{n}italic_x start_POSTSUBSCRIPT
+italic_n end_POSTSUBSCRIPT (the nth frame in a sequence), with its subsequent
+frame, yn+1subscriptğ‘¦ğ‘›1y_{n+1}italic_y start_POSTSUBSCRIPT italic_n + 1
+end_POSTSUBSCRIPT, as the target output. Such alignment enables the model to
+learn from frame xnsubscriptğ‘¥ğ‘›x_{n}italic_x start_POSTSUBSCRIPT italic_n
+end_POSTSUBSCRIPT how to accurately predict the next frame
+yn+1subscriptğ‘¦ğ‘›1y_{n+1}italic_y start_POSTSUBSCRIPT italic_n + 1
+end_POSTSUBSCRIPT, thus mimicking the temporal continuity of real-world
+motion.
+
+For effective training and evaluation of the model, the dataset is divided
+into training and validation sets. The training set comprises 900 sequences,
+each containing 19 frames of 64x64 pixels with a single channel (grayscale),
+encapsulating the movement of digits across consecutive frames. Similarly, the
+validation set includes 100 sequences with the same dimensions, offering a
+distinct subset of data for assessing the modelâ€™s performance on unseen
+examples. This separation is vital for tuning the model parameters and
+preventing overfitting, ensuring that the model generalizes well to new,
+unobserved data.
+
+The training datasetâ€™s shape, â€œ(900, 19, 64, 64, 1)â€, and the validation
+datasetâ€™s shape, â€œ(100, 19, 64, 64, 1)â€, reflect a structured approach to
+representing video data in machine learning. The first dimension signifies the
+number of sequences, the second the number of frames per sequence, followed by
+the frameâ€™s height and width, and finally, the number of channels (1 for
+grayscale). This standardized format facilitates the modelâ€™s training by
+providing a consistent input shape, crucial for deep learning architectures
+specialized in handling sequential data.
+
+The process of using "shifted" inputs and outputs is a strategic approach that
+mimics the temporal progression of frames in videos. By training the model to
+predict yn+1subscriptğ‘¦ğ‘›1y_{n+1}italic_y start_POSTSUBSCRIPT italic_n + 1
+end_POSTSUBSCRIPT from xnsubscriptğ‘¥ğ‘›x_{n}italic_x start_POSTSUBSCRIPT
+italic_n end_POSTSUBSCRIPT, the paper addresses a fundamental challenge in
+video processing: understanding not only the current state of the visual
+elements within a frame but also their future state based on their motion.
+This task requires the model to encapsulate both spatial features, such as the
+shape and orientation of digits, and temporal features, like their direction
+and speed of movement.
+
+In essence, the paperâ€™s methodology for processing the Moving MNIST dataset
+embodies a comprehensive strategy to tackle next-frame prediction. By
+thoughtfully preparing the data, delineating training and validation sets, and
+employing "shifted" frame sequences as inputs and outputs, the study sets a
+foundation for developing models that adeptly navigate the complexities of
+video data. This approach not only harnesses the intrinsic challenge posed by
+the dataset but also paves the way for advancements in video analysis and
+prediction technologies. Through such endeavors, the Moving MNIST dataset
+serves as a bridge between static image processing and the dynamic, ever-
+changing realm of video data, offering researchers and practitioners a
+platform to explore and innovate in the field of computer vision.
+
+###  4.2 Results and Discussion
+
+The paper investigated a variety of different set up using autoencoders and
+u-net style models as benchmarks. The Table 1 presented illustrates the
+comparative performance of various machine learning models on a specific
+dataset, evaluated at three different test sizes: 0.1, 0.2, and 0.3. The
+primary models under comparison include basic Autoencoders (AE), Autoencoders
+enhanced with an attention mechanism (AE-Attention), variations of U-Net
+architecture, and two versions of the proposed VAPAAD modelâ€”one standard and
+one with a stopped gradient during training.
+
+The results are summarized in terms of accuracy, represented as the mean with
+an associated standard deviation indicating the consistency or variability of
+the modelâ€™s performance across different trials. The tabulated data clearly
+show that the models enhanced with more sophisticated architectural features
+or training mechanisms tend to outperform the basic Autoencoder model.
+
+Starting with the Autoencoder (AE), the accuracy at different test sizes
+appears to be the lowest among the compared models, with a slight decrease as
+the test size increases from 0.1 to 0.3. The AE modelâ€™s performance
+decreases from 0.65 to 0.62, and the associated standard deviations range from
+0.3 to 0.4, indicating moderate variability in the modelâ€™s predictive
+accuracy.
+
+The AE-Attention model, which incorporates an attention mechanism into the
+Autoencoder architecture, shows a marked improvement in both accuracy and
+consistency. This model achieves accuracies of 0.73, 0.71, and 0.69 across the
+increasing test sizes, respectively, with a relatively low standard deviation
+of 0.3. The attention mechanism likely helps the model focus on more relevant
+features in the data, thereby enhancing its predictive performance.
+
+The U-Net and its variations, which include basic, residual, dense, and
+attention-augmented architectures, provide a nuanced view of the effectiveness
+of architectural complexity on model performance. Notably, these models
+maintain a fairly consistent accuracy across different test sizes, ranging
+from 0.76 to 0.74, with the highest accuracy observed at the smallest test
+size (0.1). The U-Net models also exhibit moderate variability in their
+results, similar to the AE-Attention model.
+
+The proposed VAPAAD models stand out significantly in this comparison. The
+standard VAPAAD model achieves consistently higher accuracies of 0.78, 0.76,
+and 0.75, and importantly, it demonstrates lower variability with a standard
+deviation of only 0.2 across all test sizes. This indicates not only higher
+performance but also greater reliability and consistency in its predictions
+compared to other models.
+
+The VAPAAD model with stopped gradient training further improves upon this,
+achieving the highest accuracies of 0.82, 0.81, and 0.80 with remarkably lower
+variability. The standard deviations decrease to 0.1 at a test size of 0.1 and
+remain below those of other models at larger test sizes. This version of
+VAPAAD, by preventing gradient updates in certain layers or during specific
+phases of training, might be better retaining and utilizing learned features
+without overfitting, thereby leading to more robust generalization across
+different datasets.
+
+In summary, the table underscores the effectiveness of advanced model
+architectures and specialized training techniques in enhancing both the
+accuracy and consistency of predictive models in machine learning tasks. The
+proposed VAPAAD models, especially with the stopped gradient method, highlight
+significant advancements in model design that lead to superior performance
+metrics.
+
+Table 1: Experimental Results. The table summarizes the experimental results of the proposed VAPAAD model with its competitors. | Test Size |  |   
+---|---|---|---  
+Model | 0.1 | 0.2 | 0.3  
+AE | 0.65 (Â±0.3plus-or-minus0.3\pm 0.3Â± 0.3) | 0.64 (Â±0.4plus-or-minus0.4\pm 0.4Â± 0.4) | 0.62 (Â±0.4plus-or-minus0.4\pm 0.4Â± 0.4)  
+AE-Attention | 0.73 (Â±0.3plus-or-minus0.3\pm 0.3Â± 0.3) | 0.71 (Â±0.3plus-or-minus0.3\pm 0.3Â± 0.3) | 0.69 (Â±0.3plus-or-minus0.3\pm 0.3Â± 0.3)  
+U-Net (and variations) | 0.76 (Â±0.3plus-or-minus0.3\pm 0.3Â± 0.3) | 0.73 (Â±0.3plus-or-minus0.3\pm 0.3Â± 0.3) | 0.74 (Â±0.4plus-or-minus0.4\pm 0.4Â± 0.4)  
+VAPAAD | 0.78 (Â±0.2plus-or-minus0.2\pm 0.2Â± 0.2) | 0.76 (Â±0.2plus-or-minus0.2\pm 0.2Â± 0.2) |  0.75 (Â±0.2plus-or-minus0.2\pm 0.2Â± 0.2)  
+VAPAAD (stop grad) | 0.82 (Â±0.1plus-or-minus0.1\pm 0.1Â± 0.1) | 0.81 (Â±0.2plus-or-minus0.2\pm 0.2Â± 0.2) |  0.80 (Â±0.3plus-or-minus0.3\pm 0.3Â± 0.3)  
+  
+Our experiments demonstrate a clear advantage of using attention mechanisms in
+the training path over the conventional approach without attention, as
+proposed in Srivastavaâ€™s work [1]. The inclusion of attention mechanisms
+significantly enhances model performance, underscoring their efficacy in
+improving the encoderâ€™s ability to focus on relevant features within complex
+data sequences. This success provides strong motivation to further explore and
+integrate attention-based encoders in our models, rather than relying solely
+on traditional methods. The substantial performance gains observed encourage
+us to delve deeper into refining and optimizing attention mechanisms to
+harness their full potential in predictive modeling.
+
+Figure 3: Comparison with and without Attention mechanism. The table provides
+empirical evidence to support the usage of the attention design in our
+model.![Refer to
+caption](extracted/5541298/figs/training_path_with_and_without_attention.png)
+
+The visualization showcased in the figure provides an insightful examination
+of the predictive capabilities of the proposed VAPAAD model on the Moving
+MNIST dataset. This dataset consists of sequences of handwritten digits that
+move across a two-dimensional canvas, presenting a unique challenge for
+sequence prediction models which must capture both the spatial movements and
+morphological transformations of the digits over time.
+
+Each visualized sample in the figure comprises 19 sequential frames, with the
+true frames displayed in one row and the corresponding predicted frames
+immediately below them. The figure highlights two random samples, thereby
+offering a representative snapshot of the modelâ€™s performance across
+different instances of the dataset.
+
+The predicted frames illustrate the VAPAAD modelâ€™s proficiency not only in
+accurately tracing the outlines and trajectories of the moving digits but also
+in rendering the subtle nuances such as the shadows and warps associated with
+their motion. These details are crucial for understanding the dynamics of the
+digits as they traverse the canvas, adding a layer of complexity to the
+prediction task.
+
+The effectiveness of the VAPAAD model in this context lies in its ability to
+go beyond mere replication of observed movements. Instead, the model engages
+in a form of generative prediction, where it does not simply forecast the next
+position of a digit based on linear extrapolation. Rather, it makes educated
+guesses about the future frames, considering potential deformations and
+changes in direction that mimic realistic motion. This generative approach is
+indicative of the modelâ€™s deep learning capability, which incorporates both
+convolutional and recurrent neural structures to capture and synthesize the
+temporal and spatial dependencies inherent in the data.
+
+Moreover, the visualization hints at the modelâ€™s potential to learn complex
+warping mechanisms. These mechanisms, observed as subtle shifts and
+distortions in the predicted frames, suggest that the VAPAAD model is not just
+tracking motion but also adapting to changes in form and orientation of the
+digits as they move. This aspect of the modelâ€™s performance invites further
+research into the underlying neural architectures and training techniques
+employed. It raises intriguing questions about the extent to which such models
+understand and internalize the physics and geometry of movement in visual
+spaces.
+
+Future work could explore the specific layers and activations within the
+VAPAAD framework that contribute to this advanced understanding, potentially
+leading to improvements in how predictive models handle dynamic visual data.
+Such studies would be invaluable for enhancing the accuracy and realism of
+predictions in applications requiring nuanced understanding of motion and
+transformation, from augmented reality systems to advanced monitoring and
+surveillance technologies.
+
+Figure 4: Prediction Outcome. The figure displays the prediction outcome on
+held-out test set.![Refer to
+caption](extracted/5541298/figs/sample_truth_pred.png)
+
+##  5 Conclusion
+
+The proposed VAPAAD model represents a significant advancement in two-
+dimensional sequential prediction, effectively learning from past frames to
+forecast future sequences with high accuracy. Our experimental results
+substantiate the modelâ€™s robust performance, particularly when integrating
+attention mechanisms, which outperform traditional training paths. However,
+the observed warping phenomenon in the predictions opens up new avenues for
+research, suggesting deeper investigation into how models perceive and
+interpret dynamic changes. The potential for adapting this mechanism to 3D
+applications is vast, ranging from film-to-film predictions to critical
+medical scenarios like tracking mutations in cancerous cells, or even
+predicting the flight trajectory of intercontinental ballistic missiles,
+highlighting the broad applicability and profound impact of our findings.
+
+## Data and Model Availability
+
+The Moving Dataset is publicly available here. We are grateful for their work
+[1].
+
+## Funding
+
+No funding information available.
+
+## Authorsâ€™ contributions
+
+Yiqiao Yin wrote the main manuscript text. Yiqiao Yin designed the experiment
+and ran the code. Yiqiao Yin collected the data and was responsible for the
+data processing pipeline. Yiqiao Yin contributed to the major design of the
+app backed by the architecture proposed in the paper. The author reviewed the
+manuscript. The author read and approved the final manuscript.
+
+## Acknowledgments
+
+The work is dedicated to Frances June Nunn, a life-long partner and a
+technical editor who also contributed to this paper.
+
+## Ethical Declarations
+
+The author declare no competing interests.
+
+## References
+
+  * [1] Nitish Srivastava, Elman Mansimov, and Ruslan Salakhudinov.  Unsupervised learning of video representations using lstms.  In International conference on machine learning, pages 843â€“852. PMLR, 2015. 
+  * [2] Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, AidanÂ N Gomez, Åukasz Kaiser, and Illia Polosukhin.  Attention is all you need.  Advances in neural information processing systems, 30, 2017. 
+  * [3] Chiori Hori, Takaaki Hori, Teng-Yok Lee, Ziming Zhang, Bret Harsham, JohnÂ R Hershey, TimÂ K Marks, and Kazuhiko Sumi.  Attention-based multimodal fusion for video description.  In Proceedings of the IEEE international conference on computer vision, pages 4193â€“4202, 2017. 
+  * [4] Shuiwang Ji, Wei Xu, Ming Yang, and Kai Yu.  3d convolutional neural networks for human action recognition.  IEEE transactions on pattern analysis and machine intelligence, 35(1):221â€“231, 2012. 
+  * [5] DuÂ Tran, LubomirÂ D Bourdev, Rob Fergus, Lorenzo Torresani, and Manohar Paluri.  C3d: generic features for video analysis.  CoRR, abs/1412.0767, 2(7):8, 2014. 
+  * [6] Yann LeCun, LÃ©on Bottou, Yoshua Bengio, and Patrick Haffner.  Gradient-based learning applied to document recognition.  Proceedings of the IEEE, 86(11):2278â€“2324, 1998. 
+  * [7] Gao Huang, Zhuang Liu, Laurens Van DerÂ Maaten, and KilianÂ Q Weinberger.  Densely connected convolutional networks.  In Proceedings of the IEEE conference on computer vision and pattern recognition, pages 4700â€“4708, 2017. 
+  * [8] Karen Simonyan and Andrew Zisserman.  Two-stream convolutional networks for action recognition in videos.  Advances in neural information processing systems, 27, 2014. 
+  * [9] Karen Simonyan and Andrew Zisserman.  Very deep convolutional networks for large-scale image recognition.  arXiv preprint arXiv:1409.1556, 2014. 
+  * [10] Christian Szegedy, Wei Liu, Yangqing Jia, Pierre Sermanet, Scott Reed, Dragomir Anguelov, Dumitru Erhan, Vincent Vanhoucke, and Andrew Rabinovich.  Going deeper with convolutions.  In Proceedings of the IEEE conference on computer vision and pattern recognition, pages 1â€“9, 2015. 
+  * [11] JÂ Hans van Hateren and DanÂ L Ruderman.  Independent component analysis of natural image sequences yields spatio-temporal filters similar to simple cells in primary visual cortex.  Proceedings of the Royal Society of London. Series B: Biological Sciences, 265(1412):2315â€“2320, 1998. 
+  * [12] Jarmo Hurri and Aapo HyvÃ¤rinen.  Simple-cell-like receptive fields maximize temporal coherence in natural video.  Neural Computation, 15(3):663â€“691, 2003. 
+  * [13] QuocÂ V Le, WillÂ Y Zou, SerenaÂ Y Yeung, and AndrewÂ Y Ng.  Learning hierarchical invariant spatio-temporal features for action recognition with independent subspace analysis.  In CVPR 2011, pages 3361â€“3368. IEEE, 2011. 
+  * [14] Roland Memisevic and GeoffreyÂ E Hinton.  Learning to represent spatial transformations with factored higher-order boltzmann machines.  Neural computation, 22(6):1473â€“1492, 2010. 
+  * [15] Roland Memisevic.  Learning to relate images.  IEEE transactions on pattern analysis and machine intelligence, 35(8):1829â€“1846, 2013. 
+  * [16] MarcAurelio Ranzato, Arthur Szlam, Joan Bruna, Michael Mathieu, Ronan Collobert, and Sumit Chopra.  Video (language) modeling: a baseline for generative models of natural videos.  arXiv preprint arXiv:1412.6604, 2014. 
+  * [17] Jinsong Su, Jialong Tang, Ziyao Lu, Xianpei Han, and Haiying Zhang.  A neural image captioning model with caption-to-images semantic constructor.  Neurocomputing, 367:144â€“151, 2019. 
+  * [18] Anand Bhattad, Jason Rock, and David Forsyth.  Detecting anomalous faces withâ€™no peekingâ€™autoencoders.  arXiv preprint arXiv:1802.05798, 2018. 
+  * [19] Pan Wang, Rui Zhou, Shuo Wang, Ling Li, Wenjia Bai, Jialu Fan, Chunlin Li, Peter Childs, and Yike Guo.  A general framework for revealing human mind with auto-encoding gans.  arXiv preprint arXiv:2102.05236, 2021. 
+  * [20] Zahra Mohamed, Riadh Ksantini, and Jihene Kaabi.  Convolutional dynamic auto-encoder: a clustering method for semantic images.  Neural Computing and Applications, 34(19):17087â€“17105, 2022. 
+  * [21] Audrey Duran, Pierre-Marc Jodoin, and Carole Lartizien.  Prostate cancer semantic segmentation by gleason score group in bi-parametric mri with self attention model on the peripheral zone.  In Medical Imaging with Deep Learning, pages 193â€“204. PMLR, 2020. 
+  * [22] Dongdong Ren, Jinbao Li, Meng Han, and Minglei Shu.  Dnanet: Dense nested attention network for single image dehazing.  In ICASSP 2021-2021 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP), pages 2035â€“2039. IEEE, 2021. 
+  * [23] Xiaoxiao Liu and Qingyang Xu.  Adaptive attention-based high-level semantic introduction for image caption.  ACM Transactions on Multimedia Computing, Communications, and Applications (TOMM), 16(4):1â€“22, 2020. 
+  * [24] Natsuda Laokulrat, Sang Phan, Noriki Nishida, Raphael Shu, YoÂ Ehara, Naoaki Okazaki, Yusuke Miyao, and Hideki Nakayama.  Generating video description using sequence-to-sequence model with temporal attention.  In Proceedings of COLING 2016, the 26th International Conference on Computational Linguistics: Technical Papers, pages 44â€“52, 2016. 
+  * [25] Yu-Fei Ma, Lie Lu, Hong-Jiang Zhang, and Mingjing Li.  A user attention model for video summarization.  In Proceedings of the tenth ACM international conference on Multimedia, pages 533â€“542, 2002. 
+  * [26] Bin Zhao, Xuelong Li, and Xiaoqiang Lu.  Cam-rnn: Co-attention model based rnn for video captioning.  IEEE Transactions on Image Processing, 28(11):5552â€“5565, 2019. 
+  * [27] Wilson Yan, Yunzhi Zhang, Pieter Abbeel, and Aravind Srinivas.  Videogpt: Video generation using vq-vae and transformers.  arXiv preprint arXiv:2104.10157, 2021. 
