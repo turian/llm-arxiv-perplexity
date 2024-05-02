@@ -34,7 +34,8 @@ for (paper, model, model_clean, model_output) in tqdm(paper_model_pairs):
         cmd = f"/Users/joseph/dev/llama.cpp/perplexity --model {model} -f {paper} --flash-attn --seed 0 > {tmptxtfile} 2> {tmperrfile}"
         os.system(cmd)
 
-        if "Final estimate" not in open(tmperrfile).read():
+        if "Final estimate" not in open(tmptxtfile).read():
+            print(f"Final estimate not found in {tmptxtfile}")
             continue
 
         finaltxtfile = model_output
