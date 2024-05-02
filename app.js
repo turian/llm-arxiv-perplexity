@@ -3,15 +3,16 @@ document.addEventListener('DOMContentLoaded', function () {
     .then(response => response.text())
     .then(text => {
         const lines = text.trim().split('\n');
-        const minPpl = 1;
+        //const minPpl = 1;
+        const minPpl = 2;
         const maxPpl = 32;
         const logMin = Math.log10(minPpl);
         const logMax = Math.log10(maxPpl);
 
-        document.getElementById('ticks1cell').innerHTML = createTicks([1.0, 2.0, 4.0, 8.0, 16, 32], logMin, logMax);
-        document.getElementById('ticks2cell').innerHTML = createTicks2([1.0, 2.0, 4.0, 8.0, 16, 32], logMin, logMax);
-        document.getElementById('ticks1cell2').innerHTML = createTicks([1.0, 2.0, 4.0, 8.0, 16, 32], logMin, logMax);
-        document.getElementById('ticks2cell2').innerHTML = createTicks2([1.0, 2.0, 4.0, 8.0, 16, 32], logMin, logMax);
+        document.getElementById('ticks1cell').innerHTML = createTicks([2.0, 4.0, 8.0, 16, 32], logMin, logMax);
+        document.getElementById('ticks2cell').innerHTML = createTicks2([2.0, 4.0, 8.0, 16, 32], logMin, logMax);
+        document.getElementById('ticks1cell2').innerHTML = createTicks([2.0, 4.0, 8.0, 16, 32], logMin, logMax);
+        document.getElementById('ticks2cell2').innerHTML = createTicks2([2.0, 4.0, 8.0, 16, 32], logMin, logMax);
 
         lines.forEach(line => {
             const data = JSON.parse(line);
@@ -35,7 +36,7 @@ function addRow(model, ppl, logMin, logMax) {
     // Data row
     const row = `<tr>
                    <td><a href="https://huggingface.co/${model_url}">${model_url}</a><br>${model[1]}</td>
-                   <td>${ppl.toFixed(2)}</td>
+                   <td>${ppl.toFixed(3)}</td>
                    <td style="width: 50%;"><div class="ppl-bar" style="width: ${widthPercent}%;">${ppl.toFixed(2)}</div></td>
                  </tr>`;
 
