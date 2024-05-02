@@ -14,6 +14,7 @@ from playwright.async_api import async_playwright
 from tqdm import tqdm
 
 
+
 async def get_html(url):
     # Launch an instance of Playwright
     async with async_playwright() as p:
@@ -23,13 +24,18 @@ async def get_html(url):
         page = await browser.new_page()
         # Navigate to the URL
         await page.goto(url)
-        # Wait for 5 seconds to ensure the page has fully loaded
-        await asyncio.sleep(5)
+        # Wait for 10 seconds to ensure the page has fully loaded
+        await asyncio.sleep(10)
+        # Scroll the page all the way to the right
+        await page.evaluate("window.scrollTo(document.body.scrollWidth, 0)")
+        # Wait for the scroll to finish (might need to adjust based on the page)
+        await asyncio.sleep(2)
         # Get the page content
         content = await page.content()
         # Close the browser
         await browser.close()
         return content
+
 
 
 async def fetch_page(url):
@@ -98,10 +104,13 @@ async def main():
     soup = BeautifulSoup(html_content, "html.parser")
     # Find all div elements with class 'panel'
     divs = soup.find_all("div", class_="panel")
+    print(f"Found {len(divs)} divs with class 'panel'")
     # Filter divs to keep only those with a child h3 with text 'Hot Papers'
-    filtered_divs = [div for div in divs if div.find("h3", text="Hot Papers")]
+    filtered_divs = [div for div in divs if div.find("h3", string="Hot Papers")]
 
     hot_urls = set()
+
+    print(f"Found {len(filtered_divs)} divs with 'Hot Papers' h3 tag")
 
     # Print each filtered div prettified
     for div in filtered_divs:
