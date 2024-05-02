@@ -1,17 +1,17 @@
 import asyncio
-import sys
-import os
-import os.path 
-
 import datetime
-import aiohttp
+import hashlib
+import os
+import os.path
 import re
+import sys
+
+import aiohttp
 import chardet
 import html2text
 from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 from tqdm import tqdm
-import hashlib
 
 
 async def get_html(url):
@@ -69,14 +69,15 @@ def filtered_lines(text):
     which is almost always the last line(s) of the text
     """
     # Split the text into lines
-    lines = text.split('\n')
+    lines = text.split("\n")
     filtered_lines = []
     for line in lines:
-        if not line.startswith('Generated on'):
+        if not line.startswith("Generated on"):
             filtered_lines.append(line)
         else:
             break
     return "\n".join(filtered_lines)
+
 
 def hash4slug(slug):
     return hashlib.sha1(slug.encode()).hexdigest()[:4]
@@ -129,6 +130,7 @@ async def main():
 
         with open(f"{workdir}/{hash4}-{slug}.txt", "wt") as f:
             f.write(filtered_text)
+
 
 # Run the main function
 asyncio.run(main())
