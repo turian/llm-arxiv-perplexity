@@ -24,15 +24,22 @@ function addRow(model, ppl, logMin, logMax) {
     const logPpl = Math.log10(ppl);
     const widthPercent = ((logPpl - logMin) / (logMax - logMin)) * 100;
 
+    // Split model[0] at the first occurrence of '_'
+    const underscoreIndex = model[0].indexOf('_');
+    const firstPart = model[0].substring(0, underscoreIndex);
+    const secondPart = model[0].substring(underscoreIndex + 1);
+    const model_url = `${firstPart}/${secondPart}`;
+
     // Data row
     const row = `<tr>
-                   <td>${model.join('<br>')}</td>
+                   <td><a href="https://huggingface.co/${model_url}">${model_url}</a><br>${model[1]}</td>
                    <td>${ppl.toFixed(2)}</td>
                    <td><div class="ppl-bar" style="width: ${widthPercent}%;">${ppl.toFixed(2)}</div></td>
                  </tr>`;
 
     tbody.innerHTML += row;
 }
+
 
 function createTicks(tickValues, logMin, logMax) {
     return '<div class="tick-marks" style="width: 100%; position: relative;">' + tickValues.map(value => {
