@@ -29,6 +29,8 @@ for paper in papers:
 for paper, model, model_clean, model_output in tqdm(paper_model_pairs):
     print(f"Processing {paper} with {model_clean}")
     os.makedirs(os.path.dirname(model_output), exist_ok=True)
+    if os.path.exists(model_output):
+        continue
 
     # Create named temporary directory
     with tempfile.TemporaryDirectory() as tmpdirname:
