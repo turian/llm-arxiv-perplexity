@@ -126,6 +126,8 @@ async def main():
         text_maker = html2text.HTML2Text()
         text_maker.ignore_links = True
         text = text_maker.handle(html)
+        if "HTML is not available for the source." in text:
+            continue
         filtered_text = filtered_lines(text)
 
         with open(f"{workdir}/{hash4}-{slug}.txt", "wt") as f:
