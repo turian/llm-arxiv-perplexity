@@ -1,6 +1,6 @@
 import glob
 
-BASE_DIR = "/Users/joseph/dev/HuggingFaceDownloader/"
+BASE_DIR = "/Users/joseph/dev/HuggingFaceModelDownloader/"
 
 
 def find_all_gguf_models():
