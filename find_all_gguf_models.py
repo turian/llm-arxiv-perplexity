@@ -2,7 +2,7 @@ import glob
 import random
 import re
 
-BASE_DIR = "/Users/joseph/dev/HuggingFaceModelDownloader/downloads/"
+BASE_DIR = "/home/ubuntu/downloads/"
 
 general_pattern = re.compile(r"[0-9]-of-[0-9]")
 exclusion_pattern = re.compile(r"00001-of-")

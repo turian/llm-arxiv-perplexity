@@ -29,6 +29,8 @@ for paper in papers:
 for paper, model, model_clean, model_output in tqdm(paper_model_pairs):
     print(f"Processing {paper} with {model_clean}")
     os.makedirs(os.path.dirname(model_output), exist_ok=True)
+    if os.path.exists(model_output):
+        continue
 
     # Create named temporary directory
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -36,7 +38,8 @@ for paper, model, model_clean, model_output in tqdm(paper_model_pairs):
         tmptxtfile = os.path.join(tmpdirname, "tmp.txt")
         tmperrfile = os.path.join(tmpdirname, "tmp.err")
         # Run perplexity
-        cmd = f"/Users/joseph/dev/llama.cpp/perplexity --model {model} -f {paper} --flash-attn --seed 0 > {tmptxtfile} 2> {tmperrfile}"
+        cmd = f"CUDA_VISIBLE_DEVICES=0 /home/ubuntu/llama.cpp/build/bin/perplexity --model {model} -f {paper} --flash-attn --seed 0 -ngl 128 > {tmptxtfile} 2> {tmperrfile}"
+        print(cmd)
         now = datetime.datetime.now()
         os.system(cmd)
 
