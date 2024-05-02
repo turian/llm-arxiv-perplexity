@@ -36,7 +36,7 @@ function addRow(model, ppl, logMin, logMax) {
     const row = `<tr>
                    <td><a href="https://huggingface.co/${model_url}">${model_url}</a><br>${model[1]}</td>
                    <td>${ppl.toFixed(2)}</td>
-                   <td><div class="ppl-bar" style="width: ${widthPercent}%;">${ppl.toFixed(2)}</div></td>
+                   <td style="width: 50%;"><div class="ppl-bar" style="width: ${widthPercent}%;">${ppl.toFixed(2)}</div></td>
                  </tr>`;
 
     tbody.innerHTML += row;
