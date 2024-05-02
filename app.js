@@ -10,6 +10,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         document.getElementById('ticks1cell').innerHTML = createTicks([1.0, 2.0, 4.0, 8.0, 16, 32], logMin, logMax);
         document.getElementById('ticks2cell').innerHTML = createTicks2([1.0, 2.0, 4.0, 8.0, 16, 32], logMin, logMax);
+        document.getElementById('ticks1cell2').innerHTML = createTicks([1.0, 2.0, 4.0, 8.0, 16, 32], logMin, logMax);
+        document.getElementById('ticks2cell2').innerHTML = createTicks2([1.0, 2.0, 4.0, 8.0, 16, 32], logMin, logMax);
 
         lines.forEach(line => {
             const data = JSON.parse(line);
