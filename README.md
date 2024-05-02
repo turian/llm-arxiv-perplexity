@@ -4,6 +4,8 @@ LLM perplexity on new arxiv papers
 TODO:
 * Should save the git hash of the model used (and llama.cpp version?)
 
+* cog is broken because it doesn't do isolation of different jobs? will several jobs use the same disk?
+
 TO TRY:
 * Existings model but with at least Q5
 * https://huggingface.co/NousResearch/Hermes-2-Pro-Llama-3-8B
