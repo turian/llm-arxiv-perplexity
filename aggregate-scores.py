@@ -1,8 +1,8 @@
 import glob
 import gzip
+import json
 import re
 from collections import defaultdict
-import json
 
 ppl_re = re.compile("^Final estimate: PPL = ([0-9\.]+) ... ([0-9\.]+)$")
 
@@ -26,14 +26,14 @@ for date in glob.glob("data/*/"):
                     ppl = float(m.group(1))
                     ppl_err = float(m.group(2))
                     assert thispaper not in model_to_paper[model]
-                    #model_to_paper[model][thispaper] = (ppl, ppl_err)
+                    # model_to_paper[model][thispaper] = (ppl, ppl_err)
                     model_to_paper[model][thispaper] = ppl
 
     model_ppls = {}
     for model, thispapers in model_to_paper.items():
         if set(thispapers) == set(papers):
             ppl = sum(thispapers.values()) / len(thispapers)
-            #print(ppl, thisdate, model)
+            # print(ppl, thisdate, model)
             model_ppls[model] = ppl
 
     # Sort by increasing ppl

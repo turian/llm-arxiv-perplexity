@@ -14,7 +14,6 @@ from playwright.async_api import async_playwright
 from tqdm import tqdm
 
 
-
 async def get_html(url):
     # Launch an instance of Playwright
     async with async_playwright() as p:
@@ -35,7 +34,6 @@ async def get_html(url):
         # Close the browser
         await browser.close()
         return content
-
 
 
 async def fetch_page(url):

@@ -43,4 +43,7 @@ Data contamination concerns:
 * If it's a more recent version of something published before knowledge cutoff
 * If it's published by a majro corp and they trained on the text before publishing
 
-Related: https://github.com/ggerganov/llama.cpp/discussions/2321
+Related:
+https://github.com/ggerganov/llama.cpp/discussions/2321
+https://github.com/ggerganov/llama.cpp/issues/7066
+https://github.com/bodaay/HuggingFaceModelDownloader/issues/30
