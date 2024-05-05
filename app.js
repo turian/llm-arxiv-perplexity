@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', function () {
-    fetch('https://raw.githubusercontent.com/turian/llm-arxiv-perplexity/gpu/data/2024-05-01-20%3A45%3A31/final.jsonl')
+    fetch('https://raw.githubusercontent.com/turian/llm-arxiv-perplexity/gh-pages/data/2024-05-01-20%3A45%3A31/final.jsonl')
     .then(response => response.text())
     .then(text => {
         const lines = text.trim().split('\n');
