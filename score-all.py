@@ -45,8 +45,11 @@ for paper, model, model_clean, model_output in tqdm(paper_model_pairs):
 
         if "Final estimate" not in open(tmptxtfile).read():
             print(f"Final estimate not found in {tmptxtfile}")
-            print(open(tmptxtfile).read())
-            print(open(tmperrfile).read())
+            try:
+                print(open(tmptxtfile).read())
+                print(open(tmperrfile).read())
+            except:
+                pass
             continue
 
         elapsed = datetime.datetime.now() - now
